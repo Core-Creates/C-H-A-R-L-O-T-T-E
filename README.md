@@ -1,5 +1,5 @@
 # C.H.A.R.L.O.T.T.E.
-
+![RE Support](https://img.shields.io/badge/Reverse%20Engineering-Supported-blueviolet)
 **Cybernetic Heuristic Assistant for Recon, Logic, Offensive Tactics, Triage & Exploitation**
 
 ---
