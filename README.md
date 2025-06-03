@@ -6,7 +6,7 @@ C.H.A.R.L.O.T.T.E.
 
 - Completely Open Source
 
-- Archetecture
+- Architecture
 
                ┌────────────────────────────┐
                │        Charlotte           │
