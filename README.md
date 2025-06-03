@@ -42,7 +42,8 @@ charlotte/
 │   ├── re/
 │   │   ├── bin_strings.py      # Strings + entropy analyzer
 │   │   ├── ghidra_bridge.py    # Interact with Ghidra headless mode
-│   │   ├── symbolic_trace.py   # (for deobfuscation or tracing)
+│   │   ├── symbolic_trace.py   # Symbolic analysis + tracing for binaries
+│   │   ├── deobfuscator.py     # LLM-based obfuscated function reconstructor
 │
 ├── data/
 │   ├── findings.json           # Stores parsed scan results
