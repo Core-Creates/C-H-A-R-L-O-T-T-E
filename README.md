@@ -1,19 +1,28 @@
 # C.H.A.R.L.O.T.T.E.
-C.H.A.R.L.O.T.T.E.
 
-- Cybernetic Heuristic Assistant for Recon, Logic, Offensive Tactics, Triage & Exploitation
+**Cybernetic Heuristic Assistant for Recon, Logic, Offensive Tactics, Triage & Exploitation**
 
+---
 
-- Completely Open Source
-- Cybernetic Heuristic Assistant for:
-    Recon                => Web reconnaissance, scanning, passive intel gathering
-    Logic                => LLM reasoning, prompt routing, static/dynamic analysis
-    Offensive Tactics    => Exploit suggestion, payload crafting, fuzzing
-    Triage               => Auto-prioritizing vulnerabilities, CVSS estimation
-    Exploitation         => Proof-of-concept generator, post-exploitation notes
+> **Completely Open Source**
 
-  
-- Folder Structure:
+---
+
+### 🧠 Purpose
+
+Cybernetic Heuristic Assistant for:
+
+- **Recon** → Web reconnaissance, scanning, passive intel gathering  
+- **Logic** → LLM reasoning, prompt routing, static/dynamic analysis  
+- **Offensive Tactics** → Exploit suggestion, payload crafting, fuzzing  
+- **Triage** → Auto-prioritizing vulnerabilities, CVSS estimation  
+- **Exploitation** → Proof-of-concept generator, post-exploitation notes  
+
+---
+
+### 📁 Folder Structure
+
+```plaintext
 charlotte/
 ├── core/
 │   ├── llm_interface.py        # Handles prompt routing, OpenAI/HF API, etc.
@@ -48,10 +57,6 @@ charlotte/
 │
 ├── cli.py                      # CLI wrapper to run scans or ask questions
 └── README.md                   # About C.H.A.R.L.O.T.T.E.
-
-
-
-- Architecture
 
                ┌────────────────────────────┐
                │        Charlotte           │
