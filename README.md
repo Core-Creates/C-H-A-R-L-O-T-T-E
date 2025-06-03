@@ -17,6 +17,7 @@ Cybernetic Heuristic Assistant for:
 - **Offensive Tactics** → Exploit suggestion, payload crafting, fuzzing  
 - **Triage** → Auto-prioritizing vulnerabilities, CVSS estimation  
 - **Exploitation** → Proof-of-concept generator, post-exploitation notes  
+- **Reverse Engineering** → Binary analysis, function extraction, deobfuscation, symbolic tracing  
 
 ---
 
