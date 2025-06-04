@@ -1,67 +1,78 @@
-# C.H.A.R.L.O.T.T.E.
+# 🧠 C.H.A.R.L.O.T.T.E.
 
-**Cybernetic Heuristic Assistant for Recon, Logic, Offensive Tactics, Triage & Exploitation**
+**Cybernetic Heuristic Assistant for Recon, Logic, Offensive Tactics, Triage & Exploitation**  
+A modular, AI-augmented offensive security framework — designed for autonomy, adaptability, and advanced analysis.
 
----
-
-> **Completely Open Source**
-
----
-
-### 🧠 Purpose
-
-Cybernetic Heuristic Assistant for:
-
-- **Recon** → Web reconnaissance, scanning, passive intel gathering  
-- **Logic** → LLM reasoning, prompt routing, static/dynamic analysis  
-- **Offensive Tactics** → Exploit suggestion, payload crafting, fuzzing  
-- **Triage** → Auto-prioritizing vulnerabilities, CVSS estimation  
-- **Exploitation** → Proof-of-concept generator, post-exploitation notes  
-- **Reverse Engineering** → Binary analysis, function extraction, deobfuscation, symbolic tracing  
+> **🛠️ 100% Open Source. Toggle between self-contained or LLM-augmented operation.**
 
 ---
 
-### 📁 Folder Structure
+## 🔍 Purpose
+
+CHARLOTTE is built for multi-phase offensive security tasks, enabling both manual and automated workflows:
+
+- **Recon** – Subdomain enumeration, port scanning, passive intel gathering  
+- **Logic** – LLM-powered reasoning, prompt routing, symbolic analysis  
+- **Offensive Tactics** – Payload crafting, fuzzing, exploit generation  
+- **Triage** – Auto-ranking vulnerabilities, CVSS prediction, clustering  
+- **Exploitation** – Proof-of-concept generation, post-exploitation handling  
+- **Reverse Engineering** – Binary dissection, deobfuscation, symbolic tracing
+
+---
+
+## 🧬 Dual Intelligence Modes
+
+CHARLOTTE can operate in one of two modes:
+
+| Mode               | Description                                                                 |
+|--------------------|-----------------------------------------------------------------------------|
+| **Self-Contained** | Runs fully offline using embedded models and logic                          |
+| **Extended**       | Utilizes remote APIs (OpenAI, HuggingFace, etc.) for enhanced capabilities |
+
+Toggle the mode easily via `config.py` or runtime CLI flag.
+
+---
+
+## 🗂️ Folder Structure
 
 ```plaintext
 charlotte/
 ├── core/
-│   ├── llm_interface.py        # Handles prompt routing, OpenAI/HF API, etc.
-│   ├── plugin_manager.py       # Dynamically loads tools and scripts
-│   ├── config.py               # Global settings, API keys, etc.
+│   ├── llm_interface.py    # Routes prompts to local or remote LLMs
+│   ├── plugin_manager.py   # Loads plugins dynamically
+│   ├── config.py           # Toggles self-contained/extended modes
+│   ├── cve_lookup.py       # CVE scanner (local DB or online API)
+│   ├── reverse_engineer.py # Binary analysis logic (symbolic, static)
+│   └── main.py             # Entry point logic + CLI control
 │
 ├── plugins/
-│   ├── recon/
-│   │   ├── subdomain_enum.py   # Passive + active recon
-│   │   ├── port_scanner.py     # Nmap or socket scanner
-│   │
-│   ├── vulnscan/
-│   │   ├── sql_injection.py
-│   │   ├── xss_detector.py
-│   │
-│   ├── re/
-│   │   ├── bin_strings.py      # Strings + entropy analyzer
-│   │   ├── ghidra_bridge.py    # Interact with Ghidra headless mode
-│   │   ├── symbolic_trace.py   # Symbolic analysis + tracing for binaries
-│   │   ├── deobfuscator.py     # LLM-based obfuscated function reconstructor
+│   ├── recon/              # Subdomain enum, port scans, etc.
+│   ├── vulnscan/           # XSS, SQLi detectors, etc.
+│   ├── re/                 # Binary plugins: strings, ghidra, symbolic tracing
 │
 ├── data/
-│   ├── findings.json           # Stores parsed scan results
-│   ├── fingerprints/           # Known vuln fingerprints
+│   ├── findings.json       # Stores scan output & metadata
+│   └── fingerprints/       # Known vuln/function patterns
 │
 ├── agents/
-│   ├── exploit_agent.py        # Uses results + reasoning to generate POCs
-│   ├── triage_agent.py         # Ranks issues using LLM
+│   ├── exploit_agent.py    # POC generator based on findings
+│   └── triage_agent.py     # Ranks issues using scoring or LLM
 │
 ├── utils/
-│   ├── logger.py
-│   ├── filetools.py
+│   ├── logger.py           # Logging setup
+│   └── filetools.py        # File/directory helpers
 │
-├── cli.py                      # CLI wrapper to run scans or ask questions
-└── README.md                   # About C.H.A.R.L.O.T.T.E.
+├── cli.py                  # CLI interface for scans, tasks, queries
+└── README.md
+```
 
+---
+
+## 🧩 System Overview
+
+```
                ┌────────────────────────────┐
-               │        Charlotte           │
+               │        CHARLOTTE           │
                │  LLM-Driven Assistant Core │
                └────────────┬───────────────┘
                             │
@@ -69,12 +80,21 @@ charlotte/
       ▼                     ▼                     ▼
 ┌────────────┐       ┌──────────────┐       ┌─────────────┐
 │ VulnScanner│       │ RE Assistant │       │ Prompt Engine│
-│ (Web Vulns)│       │ (Bin Analysis│       │  (LLM Logic) │
+│ (Web Vulns)│       │ (Bin Analysis)│      │  (LLM Logic) │
 └────┬───────┘       └──────┬───────┘       └──────┬───────┘
      │                      │                     │
      ▼                      ▼                     ▼
 ┌─────────────┐      ┌─────────────┐       ┌────────────────┐
 │ ZAP/Burp API│      │ Ghidra API  │       │ Retrieval +    │
-│ or custom   │      │ or BinaryNinja│     │ Tool Plugins   │
-│ scanner     │      │ scripting    │      │ (LLMs, tools)  │
+│ or Custom   │      │ or BinNinja │       │ Tool Plugins   │
+│ Scanner     │      │ Headless RE│        │ (LLMs, local)  │
 └─────────────┘      └─────────────┘       └────────────────┘
+```
+
+---
+
+## 🚀 Coming Soon
+- CVE matching from live scan data  
+- GUI dashboard  
+- Plugin wizard with YAML-based tool descriptions  
+- Full offline mode with local CVE database and LLM weights
