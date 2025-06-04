@@ -17,6 +17,9 @@ CHARLOTTE_CONFIG = {
     "LLM_PROVIDER": os.getenv("LLM_PROVIDER", "openai"),  # or "huggingface", "local"
     "OPENAI_API_KEY": os.getenv("OPENAI_API_KEY", ""),
     "OPENAI_MODEL": os.getenv("OPENAI_MODEL", "gpt-4"),
+    "HUGGINGFACE_API_KEY": os.getenv("HUGGINGFACE_API_KEY", ""),
+    "HUGGINGFACE_MODEL": os.getenv("HUGGINGFACE_MODEL", "mistralai/Mistral-7B-Instruct-v0.1"),
+    "LOCAL_MODEL_PATH": os.getenv("LOCAL_MODEL_PATH", ""),  # Path to local model if using Transformers
 
     # === Binary Analysis ===
     "USE_GHIDRA": os.getenv("USE_GHIDRA", "true").lower() == "true",

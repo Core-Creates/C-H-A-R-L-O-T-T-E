@@ -2,19 +2,27 @@
 llm_interface.py
 
 Handles all interaction between CHARLOTTE and the configured LLM backend.
-Supports OpenAI, Hugging Face, and other APIs for task-based prompting.
+Supports OpenAI (default), Hugging Face models, or local Transformers.
 """
 
 import os
-import json
-from typing import Optional
-
-import openai  # You can switch this to Hugging Face or LM Studio later
 from core.config import CHARLOTTE_CONFIG
 
+# Load OpenAI if needed
+if CHARLOTTE_CONFIG["LLM_PROVIDER"] == "openai":
+    import openai
+    openai.api_key = CHARLOTTE_CONFIG.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
 
-# Load API keys or use environment variables
-openai.api_key = CHARLOTTE_CONFIG.get("OPENAI_API_KEY", os.getenv("OPENAI_API_KEY"))
+# Load HF Transformers if needed
+if CHARLOTTE_CONFIG["LLM_PROVIDER"] == "huggingface":
+    from transformers import AutoModelForCausalLM, AutoTokenizer, pipeline
+    import torch
+
+    # Load the model and tokenizer just once
+    HF_MODEL_NAME = CHARLOTTE_CONFIG.get("HF_MODEL_NAME", "mistralai/Mistral-7B-Instruct-v0.1")
+    tokenizer = AutoTokenizer.from_pretrained(HF_MODEL_NAME)
+    model = AutoModelForCausalLM.from_pretrained(HF_MODEL_NAME, torch_dtype=torch.float16, device_map="auto")
+    pipe = pipeline("text-generation", model=model, tokenizer=tokenizer)
 
 
 def format_prompt(task: str, context: str, goal: str) -> str:
@@ -22,42 +30,52 @@ def format_prompt(task: str, context: str, goal: str) -> str:
     Creates a task-specific prompt for the LLM.
     """
     return f"""
-    [CHARLOTTE MODE: {task.upper()}]
+[CHARLOTTE MODE: {task.upper()}]
 
-    CONTEXT:
-    {context}
+CONTEXT:
+{context}
 
-    GOAL:
-    {goal}
+GOAL:
+{goal}
 
-    Provide a detailed, actionable response.
+Respond with actionable intelligence.
+"""
+
+
+def query_llm(task: str, context: str, goal: str) -> str:
     """
-
-
-def query_llm(task: str, context: str, goal: str, model: str = "gpt-4") -> str:
-    """
-    Sends a prompt to the LLM and returns the response.
+    Routes the prompt to the correct LLM backend based on config.
     """
     prompt = format_prompt(task, context, goal)
-    
-    try:
-        response = openai.ChatCompletion.create(
-            model=model,
-            messages=[{"role": "user", "content": prompt}],
-            temperature=0.4,
-        )
-        return response["choices"][0]["message"]["content"].strip()
+    provider = CHARLOTTE_CONFIG["LLM_PROVIDER"].lower()
 
-    except Exception as e:
-        return f"[LLM ERROR]: {str(e)}"
+    if provider == "openai":
+        try:
+            response = openai.ChatCompletion.create(
+                model=CHARLOTTE_CONFIG.get("OPENAI_MODEL", "gpt-4"),
+                messages=[{"role": "user", "content": prompt}],
+                temperature=0.4,
+            )
+            return response["choices"][0]["message"]["content"].strip()
+        except Exception as e:
+            return f"[OPENAI ERROR]: {str(e)}"
+
+    elif provider == "huggingface":
+        try:
+            output = pipe(prompt, max_new_tokens=500, do_sample=True, temperature=0.7)[0]["generated_text"]
+            return output.replace(prompt, "").strip()  # Clean echo from pipeline
+        except Exception as e:
+            return f"[HF ERROR]: {str(e)}"
+
+    else:
+        return "[ERROR]: Unsupported LLM_PROVIDER specified in config."
 
 
 # Example usage
 if __name__ == "__main__":
-    # Simple local test
-    task = "binary_analysis"
-    context = "Disassembled main function from stripped ELF shows suspicious XOR loop"
-    goal = "Explain what this function is likely doing and how to reverse it"
+    task = "reverse_engineering"
+    context = "The binary contains a function that loops over a buffer using XOR with 0x5A"
+    goal = "Describe what this function is doing and how to recover the original data."
 
-    output = query_llm(task, context, goal)
-    print("\n🔍 CHARLOTTE'S INSIGHT:\n", output)
+    print("\n🔍 CHARLOTTE'S INSIGHT:\n")
+    print(query_llm(task, context, goal))
