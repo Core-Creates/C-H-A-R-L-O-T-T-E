@@ -2,11 +2,15 @@
 
 from transformers import AutoTokenizer, AutoModelForMaskedLM
 import torch
+import os
 
 class CodeReasoner:
-    def __init__(self, model_path="microsoft/codebert-base"):
-        self.tokenizer = AutoTokenizer.from_pretrained(model_path)
-        self.model = AutoModelForMaskedLM.from_pretrained(model_path)
+    def __init__(self, local_path="./models/codebert"):
+        if not os.path.exists(local_path):
+            raise RuntimeError(f"Model not found at {local_path}. Run scripts/cache_model.py first.")
+        
+        self.tokenizer = AutoTokenizer.from_pretrained(local_path if os.path.exists(local_path) else "microsoft/codebert-base")
+        self.model = AutoModelForMaskedLM.from_pretrained(local_path if os.path.exists(local_path) else "microsoft/codebert-base")
 
     def guess_missing_token(self, code_snippet):
         # Expects something like "mov eax, [MASK]"
