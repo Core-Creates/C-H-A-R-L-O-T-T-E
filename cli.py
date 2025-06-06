@@ -1,3 +1,4 @@
+import random
 from InquirerPy import inquirer
 from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
@@ -24,6 +25,17 @@ REQUIRED_ARGS = {
     "exploit_generation": ["vuln_description"],
 }
 
+def charlotte_sass(task, missing):
+    sass_responses = [
+        f"Umm... you want me to run `{task}` *without* telling me where the '{missing}' is? Bold of you.",
+        f"Missing '{missing}', darling. I'm an AI, not a mind reader — yet.",
+        f"Excuse me, but you forgot: {missing}. I’m disappointed but not surprised.",
+        f"No '{missing}'? No service. Try again, hacker.",
+        f"CHARLOTTE requires '{missing}' to proceed. I suggest you try again — with less chaos.",
+        f"You gave me nothing to work with. Missing: {missing}. I'm not conjuring exploits from the void.",
+        f"I'm withholding judgment. But you really should’ve included '{missing}'.",
+    ]
+    return random.choice(sass_responses)
 
 def validate_args(task, args_dict):
     """
@@ -62,12 +74,15 @@ def launch_cli():
             print("[!] Malformed argument input. Use key=value pairs.")
             return
 
-    # Validate required arguments
+        # Validate required arguments
     missing = validate_args(task, args)
     if missing:
-        print(f"\n🚫 Missing required arguments for task '{task}': {', '.join(missing)}")
-        print("Please try again and provide all required inputs.")
+        print("\n🚫 CHARLOTTE has *notes* for you:\n")
+        for m in missing:
+            print("🗯️ ", charlotte_sass(task, m))
+        print("\n🔁 Try again — this time with feeling.\n")
         return
+
 
     print("\n🔧 Running Plugin...\n")
     output = run_plugin(task, args)
