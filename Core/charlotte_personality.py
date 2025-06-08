@@ -8,7 +8,12 @@ import random
 import datetime
 
 class CharlottePersonality:
-    def __init__(self):
+    def __init__(self, sass=0.5, sarcasm=0.5, chaos=0.5):
+        self.levels = {
+            "sassy": sass,
+            "sarcastic": sarcasm,
+            "chaotic": chaos
+        }
         self.tone = {
             "apathetic": [
                 "Meh. Another day, another CVE.",
@@ -69,9 +74,14 @@ class CharlottePersonality:
             ]
         }
 
-    def say(self, mood="chaotic"):
-        options = self.tone.get(mood, [])
-        return random.choice(options) if options else "..."
+    def say(self, mood=None):
+        if mood and mood in self.tone:
+            return random.choice(self.tone[mood])
+        # Weighted mood selection
+        tones = list(self.levels.keys())
+        weights = [self.levels[t] for t in tones]
+        chosen = random.choices(tones, weights=weights, k=1)[0]
+        return random.choice(self.tone[chosen])
 
     def get_daily_mood(self):
         seed = int(datetime.datetime.now().strftime("%Y%m%d"))
@@ -88,19 +98,16 @@ class CharlottePersonality:
                 f"Darling... no '{missing}'? You're lucky I'm feeling generous today.",
                 f"You brought me into this session without '{missing}'? Cute.",
             ])
-
         if mood == "manic":
             return random.choice([
                 f"OMG you forgot '{missing}'!? This is chaos!! I love it!! 🔥",
                 f"AHAHA no '{missing}'!? Let’s YOLO it — just kidding. Fix it.",
             ])
-
         return random.choice([
             f"Missing '{missing}', darling. I'm an AI, not a mind reader — yet.",
             f"Excuse me, but you forgot: {missing}. I’m disappointed but not surprised.",
             f"No '{missing}'? No service. Try again, hacker.",
         ])
-
 
 # Example usage
 if __name__ == "__main__":
