@@ -37,26 +37,29 @@ Toggle the mode easily via `config.py` or runtime CLI flag.
 
 ```plaintext
 charlotte/
+├── agents/
+│   ├── exploit_agent.py    # POC generator based on findings
+│   └── triage_agent.py     # Ranks issues using scoring or LLM
 ├── core/
-│   ├── llm_interface.py    # Routes prompts to local or remote LLMs
-│   ├── plugin_manager.py   # Loads plugins dynamically
+│   ├── charlotte_personality.py # Toggles self-contained/extended modes
+│   ├── code_reasoner.py    # Toggles self-contained/extended modes
+│   ├── cve_lookup.py       # CVE scanner (local DB or online API)
 │   ├── config.py           # Toggles self-contained/extended modes
 │   ├── cve_lookup.py       # CVE scanner (local DB or online API)
-│   ├── reverse_engineer.py # Binary analysis logic (symbolic, static)
-│   └── main.py             # Entry point logic + CLI control
-│
-├── plugins/
-│   ├── recon/              # Subdomain enum, port scans, etc.
-│   ├── vulnscan/           # XSS, SQLi detectors, etc.
-│   ├── re/                 # Binary plugins: strings, ghidra, symbolic tracing
+│   ├── llm_interface.py    # Routes prompts to local or remote LLMs
+│   ├── main.py             # Entry point logic + CLI control
+│   ├── plugin_manager.py   # Loads plugins dynamically
+│   └── reverse_engineer.py # Binary analysis logic (symbolic, static)
 │
 ├── data/
 │   ├── findings.json       # Stores scan output & metadata
 │   └── fingerprints/       # Known vuln/function patterns
 │
-├── agents/
-│   ├── exploit_agent.py    # POC generator based on findings
-│   └── triage_agent.py     # Ranks issues using scoring or LLM
+│
+├── plugins/
+│   ├── recon/              # Subdomain enum, port scans, etc.
+│   ├── vulnscan/           # XSS, SQLi detectors, etc.
+│   └── re/                 # Binary plugins: strings, ghidra, symbolic tracing
 │
 ├── utils/
 │   ├── logger.py           # Logging setup
