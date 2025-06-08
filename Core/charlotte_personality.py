@@ -1,11 +1,18 @@
+
 """
 charlotte_personality.py
 
-Defines CHARLOTTE's personality and tone for interactive output with predefined modes.
+Defines CHARLOTTE's personality and tone engine for expressive interaction.
+Includes mood-weighted phrase generation and predefined chaotic-neutral profiles.
 """
 
 import random
 import datetime
+
+# ******************************************************************************************
+# Predefined Personality Modes (Used by CLI selector and config)
+# Each mode maps to sass, sarcasm, and chaos levels between 0.0 and 1.0.
+# ******************************************************************************************
 
 PREDEFINED_MODES = {
     "professional": {"sass": 0.1, "sarcasm": 0.1, "chaos": 0.0},
@@ -15,8 +22,13 @@ PREDEFINED_MODES = {
     "gremlin_mode": {"sass": 0.8, "sarcasm": 0.7, "chaos": 0.95}
 }
 
+# ******************************************************************************************
+# CharlottePersonality Class - Governs all tone and phrase responses from CHARLOTTE
+# ******************************************************************************************
+
 class CharlottePersonality:
     def __init__(self, sass=0.5, sarcasm=0.5, chaos=0.5, mode=None):
+        # If a mode is selected, override sliders
         if mode and mode in PREDEFINED_MODES:
             self.levels = PREDEFINED_MODES[mode]
         else:
@@ -26,6 +38,7 @@ class CharlottePersonality:
                 "chaotic": chaos
             }
 
+        # Phrase bank sorted by tone/mood for dynamic speech
         self.tone = {
             "apathetic": [
                 "Meh. Another day, another CVE.",
@@ -86,6 +99,7 @@ class CharlottePersonality:
             ]
         }
 
+    # Choose a phrase dynamically based on current tone weighting or a forced mood
     def say(self, mood=None):
         if mood and mood in self.tone:
             return random.choice(self.tone[mood])
@@ -94,6 +108,7 @@ class CharlottePersonality:
         chosen = random.choices(tones, weights=weights, k=1)[0]
         return random.choice(self.tone[chosen])
 
+    # Assigns CHARLOTTE a deterministic daily mood and sample phrase
     def get_daily_mood(self):
         seed = int(datetime.datetime.now().strftime("%Y%m%d"))
         random.seed(seed)
@@ -101,6 +116,7 @@ class CharlottePersonality:
         phrase = self.say(mood)
         return mood, phrase
 
+    # Special responses used when arguments are missing or malformed
     def sass(self, task, missing):
         mood, _ = self.get_daily_mood()
         if mood == "sassy":
@@ -119,9 +135,15 @@ class CharlottePersonality:
             f"No '{missing}'? No service. Try again, hacker.",
         ])
 
-# Example usage
+# ******************************************************************************************
+# Test Mode - When run directly, display CHARLOTTE's mood and a sass test line.
+# ******************************************************************************************
 if __name__ == "__main__":
     charlotte = CharlottePersonality(mode="goth_queen")
     mood, intro = charlotte.get_daily_mood()
     print(f"[CHARLOTTE Mood: {mood.upper()}] {intro}")
     print("[Sass Test]:", charlotte.sass("reverse_engineering", "file"))
+# ******************************************************************************************
+# This code defines CHARLOTTE's personality and tone engine, allowing for expressive interaction
+# with users through mood-weighted phrases and predefined chaotic-neutral profiles.
+# ******************************************************************************************
