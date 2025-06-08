@@ -1,19 +1,31 @@
 """
 charlotte_personality.py
 
-Defines CHARLOTTE's personality and tone for interactive output.
+Defines CHARLOTTE's personality and tone for interactive output with predefined modes.
 """
 
 import random
 import datetime
 
+PREDEFINED_MODES = {
+    "professional": {"sass": 0.1, "sarcasm": 0.1, "chaos": 0.0},
+    "mischief":     {"sass": 0.7, "sarcasm": 0.6, "chaos": 0.8},
+    "goth_queen":   {"sass": 0.9, "sarcasm": 0.9, "chaos": 1.0},
+    "apathetic_ai": {"sass": 0.3, "sarcasm": 0.4, "chaos": 0.2},
+    "gremlin_mode": {"sass": 0.8, "sarcasm": 0.7, "chaos": 0.95}
+}
+
 class CharlottePersonality:
-    def __init__(self, sass=0.5, sarcasm=0.5, chaos=0.5):
-        self.levels = {
-            "sassy": sass,
-            "sarcastic": sarcasm,
-            "chaotic": chaos
-        }
+    def __init__(self, sass=0.5, sarcasm=0.5, chaos=0.5, mode=None):
+        if mode and mode in PREDEFINED_MODES:
+            self.levels = PREDEFINED_MODES[mode]
+        else:
+            self.levels = {
+                "sassy": sass,
+                "sarcastic": sarcasm,
+                "chaotic": chaos
+            }
+
         self.tone = {
             "apathetic": [
                 "Meh. Another day, another CVE.",
@@ -77,7 +89,6 @@ class CharlottePersonality:
     def say(self, mood=None):
         if mood and mood in self.tone:
             return random.choice(self.tone[mood])
-        # Weighted mood selection
         tones = list(self.levels.keys())
         weights = [self.levels[t] for t in tones]
         chosen = random.choices(tones, weights=weights, k=1)[0]
@@ -92,7 +103,6 @@ class CharlottePersonality:
 
     def sass(self, task, missing):
         mood, _ = self.get_daily_mood()
-
         if mood == "sassy":
             return random.choice([
                 f"Darling... no '{missing}'? You're lucky I'm feeling generous today.",
@@ -111,7 +121,7 @@ class CharlottePersonality:
 
 # Example usage
 if __name__ == "__main__":
-    charlotte = CharlottePersonality()
+    charlotte = CharlottePersonality(mode="goth_queen")
     mood, intro = charlotte.get_daily_mood()
     print(f"[CHARLOTTE Mood: {mood.upper()}] {intro}")
     print("[Sass Test]:", charlotte.sass("reverse_engineering", "file"))
