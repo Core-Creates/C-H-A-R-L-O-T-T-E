@@ -1,9 +1,15 @@
 import os
+import sys
+# Charlotte - A Modular Penetration Testing Framework
 from InquirerPy import inquirer
 from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
 from core.charlotte_personality import CharlottePersonality
+# Ensure the core directory is in the path for imports
+if __name__ == "__main__":
+    sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 
+# Initialize CHARLOTTE's personality
 charlotte = CharlottePersonality()
 
 def print_banner():
