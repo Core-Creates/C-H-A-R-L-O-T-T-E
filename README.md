@@ -62,6 +62,8 @@ charlotte/
 │   ├── logger.py           # Logging setup
 │   └── filetools.py        # File/directory helpers
 │
+|
+└── personality_config.json   ← CHARLOTTE's saved mode lives here
 ├── cli.py                  # CLI interface for scans, tasks, queries
 └── README.md
 ```
@@ -78,16 +80,16 @@ charlotte/
                             │
       ┌─────────────────────┼─────────────────────┐
       ▼                     ▼                     ▼
-┌────────────┐       ┌──────────────┐       ┌─────────────┐
-│ VulnScanner│       │ RE Assistant │       │ Prompt Engine│
+┌────────────┐       ┌───────────────┐      ┌──────────────┐
+│ VulnScanner│       │ RE Assistant  │      │ Prompt Engine│
 │ (Web Vulns)│       │ (Bin Analysis)│      │  (LLM Logic) │
-└────┬───────┘       └──────┬───────┘       └──────┬───────┘
+└────┬───────┘       └──────┬────────┘      └──────┬───────┘
      │                      │                     │
      ▼                      ▼                     ▼
 ┌─────────────┐      ┌─────────────┐       ┌────────────────┐
 │ ZAP/Burp API│      │ Ghidra API  │       │ Retrieval +    │
 │ or Custom   │      │ or BinNinja │       │ Tool Plugins   │
-│ Scanner     │      │ Headless RE│        │ (LLMs, local)  │
+│ Scanner     │      │ Headless RE │       │ (LLMs, local)  │
 └─────────────┘      └─────────────┘       └────────────────┘
 ```
 
