@@ -4,6 +4,8 @@ config.py
 
 Global configuration and personality settings for C.H.A.R.L.O.T.T.E.
 Supports environment-based overrides and user-level persistence.
+This module defines CHARLOTTE's core settings, including LLM provider,
+binary analysis options, web scanning defaults, and personality persistence.
 """
 
 import os
