@@ -1,37 +1,47 @@
-"""
-plugin_manager.py
 
-Responsible for dynamically loading and running CHARLOTTE plugins based on task names.
-Supports CLI or LLM-directed routing to plugin modules.
-"""
+# ******************************************************************************************
+# plugin_manager.py
+# Responsible for dynamically loading and executing CHARLOTTE's plugins.
+# Used to dispatch tasks either from CLI or an LLM interface.
+# ******************************************************************************************
 
 import importlib
 import os
 import traceback
 from typing import Dict
 
-# Plugin mapping: task name → category → filename (no extension)
+# ******************************************************************************************
+# Plugin Registry
+# Maps logical task names to their plugin category and filename (excluding extension).
+# This enables CHARLOTTE to route tasks modularly across functionality groups.
+# ******************************************************************************************
+
 PLUGIN_REGISTRY = {
-    "reverse_engineering": ("re", "symbolic_trace"),
-    "binary_strings": ("re", "bin_strings"),
-    "web_recon": ("recon", "subdomain_enum"),
-    "port_scan": ("recon", "port_scanner"),
-    "xss_scan": ("vulnscan", "xss_detector"),
-    "sql_injection": ("vulnscan", "sql_injection"),
-    "exploit_generation": ("agents", "exploit_agent"),
+    "reverse_engineering": ("re", "symbolic_trace"),         # 🧠 Binary symbolic tracer
+    "binary_strings": ("re", "bin_strings"),                 # 🔍 Strings & entropy scan
+    "web_recon": ("recon", "subdomain_enum"),                # 🌐 Subdomain discovery
+    "port_scan": ("recon", "port_scanner"),                  # 📡 Basic port scan
+    "xss_scan": ("vulnscan", "xss_detector"),                # 🧼 Cross-site scripting test
+    "sql_injection": ("vulnscan", "sql_injection"),          # 💉 SQLi vulnerability test
+    "exploit_generation": ("agents", "exploit_agent"),       # 🚨 LLM-generated exploit suggestions
 }
 
+# ******************************************************************************************
+# run_plugin
+# Dynamically loads and executes the requested plugin module, passing user arguments.
+# Handles plugin discovery, error reporting, and return output formatting.
+# ******************************************************************************************
 
 def run_plugin(task: str, args: Dict) -> str:
     """
     Loads and executes the plugin for the given task.
 
     Args:
-        task: The name of the task to run (must match PLUGIN_REGISTRY)
-        args: Dictionary of arguments to pass to the plugin
+        task *str* = Key for task type (must match PLUGIN_REGISTRY)
+        args *Dict* = Dictionary of arguments to pass to plugin's run function
 
     Returns:
-        Output string or error message
+        *str* = Output from the plugin or detailed error if execution fails
     """
     if task not in PLUGIN_REGISTRY:
         return f"[ERROR] No plugin registered for task '{task}'"
@@ -50,3 +60,5 @@ def run_plugin(task: str, args: Dict) -> str:
 
     except Exception as e:
         return f"[PLUGIN ERROR]: {str(e)}\n{traceback.format_exc()}"
+# ******************************************************************************************
+# End of plugin_manager.py
