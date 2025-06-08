@@ -28,6 +28,8 @@ REQUIRED_ARGS = {
     "exploit_generation": ["vuln_description"],
 }
 
+PREDEFINED_MODES = ["goth_queen", "mischief", "gremlin_mode", "professional", "apathetic_ai"]
+
 def load_personality_config(path="personality_config.json"):
     try:
         with open(path, "r") as f:
@@ -35,18 +37,12 @@ def load_personality_config(path="personality_config.json"):
     except FileNotFoundError:
         return {}
 
-def create_charlotte_from_args(args):
-    if args.mode:
-        return CharlottePersonality(mode=args.mode)
-    return CharlottePersonality(sass=args.sass, sarcasm=args.sarcasm, chaos=args.chaos)
-
-def parse_cli_args():
-    parser = argparse.ArgumentParser(description="Launch CHARLOTTE with personality config.")
-    parser.add_argument("--mode", type=str, help="Predefined personality mode (e.g. goth_queen)")
-    parser.add_argument("--sass", type=float, help="Sass level (0.0–1.0)")
-    parser.add_argument("--sarcasm", type=float, help="Sarcasm level (0.0–1.0)")
-    parser.add_argument("--chaos", type=float, help="Chaos level (0.0–1.0)")
-    return parser.parse_args()
+def create_charlotte_from_config(config):
+    mode = config.get("mode", "goth_queen")
+    sass = config.get("sass", 0.5)
+    sarcasm = config.get("sarcasm", 0.5)
+    chaos = config.get("chaos", 0.5)
+    return CharlottePersonality(sass=sass, sarcasm=sarcasm, chaos=chaos, mode=mode)
 
 def validate_args(task, args_dict):
     required = REQUIRED_ARGS.get(task, [])
@@ -68,16 +64,22 @@ def log_session(task, args, mood, output):
         f.write("═" * 60 + "\n\n")
 
 def launch_cli():
-    cli_args = parse_cli_args()
-    config = load_personality_config()
+    # Mode selector
+    selected_mode = inquirer.select(
+        message="Select CHARLOTTE's personality mode:",
+        choices=PREDEFINED_MODES + ["custom"],
+        default="goth_queen"
+    ).execute()
 
-    # Prefer CLI args; fallback to config
-    sass = cli_args.sass if cli_args.sass is not None else config.get("sass", 0.5)
-    sarcasm = cli_args.sarcasm if cli_args.sarcasm is not None else config.get("sarcasm", 0.5)
-    chaos = cli_args.chaos if cli_args.chaos is not None else config.get("chaos", 0.5)
-    mode = cli_args.mode if cli_args.mode else config.get("mode")
+    if selected_mode != "custom":
+        config = {"mode": selected_mode}
+    else:
+        sass = float(inquirer.text(message="Sass level (0.0–1.0):", default="0.5").execute())
+        sarcasm = float(inquirer.text(message="Sarcasm level (0.0–1.0):", default="0.5").execute())
+        chaos = float(inquirer.text(message="Chaos level (0.0–1.0):", default="0.5").execute())
+        config = {"sass": sass, "sarcasm": sarcasm, "chaos": chaos}
 
-    charlotte = CharlottePersonality(sass=sass, sarcasm=sarcasm, chaos=chaos, mode=mode)
+    charlotte = create_charlotte_from_config(config)
 
     mood, phrase = charlotte.get_daily_mood()
     print(f"\n👾 Welcome to C.H.A.R.L.O.T.T.E. [Mood: {mood.upper()}]")
@@ -126,5 +128,3 @@ def launch_cli():
 
 if __name__ == "__main__":
     launch_cli()
-# This code is part of the C.H.A.R.L.O.T.T.E. project, a command-line interface for security tasks.
-# It provides a personality-driven experience with various plugins for tasks like reverse engineering, web recon, and more. 
