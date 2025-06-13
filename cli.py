@@ -3,9 +3,10 @@
 # Provides task selection, personality configuration, and scan execution via plugin engine.
 # ******************************************************************************************
 
-import random
 import os
+import sys
 import json
+import random
 import argparse
 from datetime import datetime
 from InquirerPy import inquirer
@@ -94,6 +95,36 @@ def log_session(task, args, mood, output):
 # Main Interactive CLI Handler
 # Presents interactive menus for mode selection, input collection, validation, and scanning.
 # ******************************************************************************************
+
+def print_help():
+    print("""
+    Usage: python cli.py [--help] [--about]
+
+    Options:
+        --help      Show this help message and exit
+        --about     Learn more about CHARLOTTE and her capabilities
+
+    If no flags are provided, the interactive CLI will launch.
+    CHARLOTTE is a cybersecurity assistant designed to help with reverse engineering, web scanning, and more.""")
+
+def print_about():
+    print("""
+    ✨ C-H-A-R-L-O-T-T-E ✨
+    Cybernetic Heuristic Assistant for Reverse-engineering, Logic, and Offensive Tactics with LLMs, Threat Emulation, and Exploitation.
+
+    CHARLOTTE is a chaotic-neutral cybersecurity assistant with:
+    - Modular plugin support for binary analysis, triage, web scanning, and more
+    - LLM-augmented recon + static analysis, or offline operation
+    - Mood-based sass, sarcasm, and emotional snark
+    - Glossaries, logging, and roast-worthy commentary on every scan
+
+    Project Repo: https://github.com/Core-Creates/C-H-A-R-L-O-T-T-E
+    """)
+def parse_args():
+    parser = argparse.ArgumentParser(description="CHARLOTTE CLI - Interactive Cybersecurity Assistant")
+    parser.add_argument("--help", action="store_true", help="Show this help message and exit")
+    parser.add_argument("--about", action="store_true", help="Learn more about CHARLOTTE and her capabilities")
+    return parser.parse_args()
 
 def launch_cli():
     # 🌙 User selects CHARLOTTE's personality configuration
