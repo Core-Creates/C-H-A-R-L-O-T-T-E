@@ -15,6 +15,7 @@ from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
 from core.roast_generator import get_summary_roast  # Adjust path based on your structure
 from core.charlotte_personality import CharlottePersonality
+from core.cli_handler import launch_cli, parse_custom_flags
 
 # ******************************************************************************************
 # Plugin Task + Argument Setup
@@ -27,7 +28,7 @@ PLUGIN_TASKS = {
     "🌐 Web Recon (Subdomains)": "web_recon",
     "📱 Port Scan": "port_scan",
     "💉 SQL Injection Scan": "sql_injection",
-    "🮺 XSS Scan": "xss_scan",
+    "🧺 XSS Scan": "xss_scan",
     "🚨 Exploit Generator": "exploit_generation",
 }
 
@@ -87,7 +88,7 @@ def check_plugin_doc():
             try:
                 plugin_key = sys.argv[sys.argv.index(arg) + 1]
                 if plugin_key in PLUGIN_DOCS:
-                    print(f"\n🗾 CHARLOTTE Plugin Help: {plugin_key}\n")
+                    print(f"\n🗞 CHARLOTTE Plugin Help: {plugin_key}\n")
                     print(PLUGIN_DOCS[plugin_key])
                 else:
                     print(f"\n[!] Unknown plugin '{plugin_key}'. Try one of: {', '.join(PLUGIN_DOCS.keys())}")
@@ -131,14 +132,12 @@ def explain_task(task, mood):
 
 def main():
     check_plugin_doc()
-
-    # Windows-safe fallback if __name__ not handled
-    if __name__ != "__main__":
-        return
-
-    # 🧠 CHARLOTTE runtime
     parse_custom_flags()
+    config = load_personality_config()
+    charlotte = create_charlotte_from_config(config)
     launch_cli(explain_task, charlotte)
 
 if __name__ == "__main__":
     main()
+# Ensure the script runs only when executed directly, not when imported
+# This allows for better modularity and testing.
