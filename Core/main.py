@@ -108,9 +108,9 @@ def main():
         return
     
     # Handle CVE Lookup separately
-    if task == "🕵️ CVE Lookup (CHARLOTTE)": "cve_lookup"
-    run_cve_lookup()
-    return
+    if task == "🕵️ CVE Lookup (CHARLOTTE)":
+        run_cve_lookup()
+        return
 
     plugin_key = PLUGIN_TASKS.get(task)
     if plugin_key:
