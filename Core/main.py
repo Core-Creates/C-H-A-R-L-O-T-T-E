@@ -4,7 +4,12 @@
 
 import os
 import sys
-
+import json
+from core import cve_lookup
+from datetime import datetime
+from InquirerPy import inquirer
+# ******************************************************************************************
+# Utility Functions
 # Ensure root project path is in sys.path
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
@@ -66,19 +71,39 @@ PLUGIN_TASKS = {
 
 
 def run_cve_lookup():
-    print("\n=== CHARLOTTE CVE Lookup Tool ===")
-    cve_id = input("Enter CVE ID (e.g., CVE-2023-12345): ").strip().upper()
-    if not cve_id.startswith("CVE-"):
-        print("Invalid CVE ID format.")
-        return
-    cache = cve_lookup.load_cache()
-    result = cache.get(cve_id) or cve_lookup.fetch_cve_online(cve_id)
-    if result:
-        cache[cve_id] = result
-        cve_lookup.save_cache(cache)
-        print(json.dumps(result, indent=4))
+    print("\n=== HARLOTTE CVE Intelligence Module ===")
+
+    option = inquirer.select(
+        message="Choose your CVE query method:",
+        choices=[
+            "🔎 Lookup by CVE ID",
+            "🗂️ Search by Keyword",
+            "📅 List CVEs by Product and Year",
+            "❌ Back to Main Menu"
+        ]
+    ).execute()
+
+    if option == "🔎 Lookup by CVE ID":
+        cve_id = input("Enter CVE ID (e.g., CVE-2023-12345): ").strip().upper()
+        if not cve_id.startswith("CVE-"):
+            print("Invalid CVE ID format.")
+            return
+        result = fetch_and_cache(cve_id)
+        show_and_export(result)
+
+    elif option == "🗂️ Search by Keyword":
+        keyword = input("Enter keyword (e.g., apache, buffer overflow): ").strip().lower()
+        results = cve_lookup.search_by_keyword(keyword)
+        show_and_export(results, multiple=True)
+
+    elif option == "📅 List CVEs by Product and Year":
+        product = input("Enter product name (e.g., chrome, openssl): ").strip().lower()
+        year = input("Enter year (e.g., 2022): ").strip()
+        results = cve_lookup.search_by_product_year(product, year)
+        show_and_export(results, multiple=True)
+
     else:
-        print("CVE not found.")
+        return
 
 # ******************************************************************************************
 # Main Application Logic
