@@ -12,6 +12,7 @@ from InquirerPy import inquirer
 from core.logger import log_session
 from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
+from core.roast_generator import get_summary_roast  # Adjust path based on your structure
 from core.charlotte_personality import CharlottePersonality
 
 # ******************************************************************************************
@@ -193,22 +194,38 @@ def launch_cli():
             return
 
     # 🚫 Alert if arguments are missing
+    sass_lines = []
     missing = validate_args(task, args)
     if missing:
         print("\n🚫 CHARLOTTE has *notes* for you:\n")
         for m in missing:
-            print("🗯️ ", charlotte.sass(task, m))
+            sass = charlotte.sass(task, m)
+            sass_lines.append(sass)
+            print("🗯️ ", sass)
         print("\n🔁 Try again — this time with feeling.\n")
         return
+    else:
+        print("\n✅ All required arguments provided! Let's proceed...\n")
+    # 📝 Log the session start
+    print("📝 Logging session details..."
+          
+          f"\nTask: {task}\nArgs: {args}\nMood: {mood}\n")
+    log_session(task, args, mood, "Session started")
+    print("═" * 60 + "\n")
+    # 🧠 CHARLOTTE's sass commentary on the task
 
+    
     # 🚀 Run the selected plugin with validated input
     print("\n🔧 Running Plugin...\n")
     output = run_plugin(task, args)
+
+    # 🌶️ Add CHARLOTTE's spicy roast
+    summary_roast = get_summary_roast(task, mood)
+    output += f"\n\n💀 CHARLOTTE's Final Roast:\n{summary_roast}"
     print("\n📤 Output:\n", output)
 
-    # 🧾 Save results to the log
-    log_session(task, args, mood, output)
-
+# 🧾 Save results to the log
+log_session(task, args, mood, output, sass_lines=sass_lines)
 # Entry point to launch CLI
 if __name__ == "__main__":
     launch_cli()
