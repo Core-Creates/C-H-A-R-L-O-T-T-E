@@ -1,6 +1,6 @@
 # ******************************************************************************************
-# cve_lookup.py - CVE Lookup Utility for CHARLOTTE
-# Supports online and offline queries, with batch and year filtering.
+# cve_lookup.py - HARLOTTE CVE Lookup Utility
+# Supports NVD-based CVE ID lookups, batch queries, year filtering, and local caching.
 # ******************************************************************************************
 
 import os
@@ -8,31 +8,47 @@ import json
 import requests
 from datetime import datetime
 
-CACHE_FILE = os.path.join("data", "cve_cache.json")
-API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+# ------------------------------------------------------------------------------------------
+# Configuration
+# ------------------------------------------------------------------------------------------
 
+CACHE_FILE = os.path.join("data", "cve_cache.json")
+NVD_API = "https://services.nvd.nist.gov/rest/json/cves/2.0"
+
+
+# ------------------------------------------------------------------------------------------
+# Cache Management
+# ------------------------------------------------------------------------------------------
 
 def load_cache():
     if os.path.exists(CACHE_FILE):
-        with open(CACHE_FILE, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+                return json.load(f)
+        except json.JSONDecodeError:
+            print("[WARN] Cache file corrupted. Starting fresh.")
     return {}
 
 
 def save_cache(cache):
+    os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2)
 
 
+# ------------------------------------------------------------------------------------------
+# Core Lookup Functions
+# ------------------------------------------------------------------------------------------
+
 def fetch_cve_data(cve_id):
     cache = load_cache()
     cve_id = cve_id.upper()
+
     if cve_id in cache:
         return cache[cve_id], True
 
-    params = {"cveId": cve_id}
     try:
-        response = requests.get(API_URL, params=params)
+        response = requests.get(NVD_API, params={"cveId": cve_id})
         response.raise_for_status()
         result = response.json()
         if "vulnerabilities" in result and result["vulnerabilities"]:
@@ -51,10 +67,14 @@ def fetch_cves_batch(cve_ids, year_filter=None):
     for cve_id in cve_ids:
         if year_filter and not cve_id.startswith(f"CVE-{year_filter}"):
             continue
-        data, from_cache = fetch_cve_data(cve_id)
+        data, _ = fetch_cve_data(cve_id)
         results[cve_id] = data
     return results
 
+
+# ------------------------------------------------------------------------------------------
+# Summary Formatter
+# ------------------------------------------------------------------------------------------
 
 def summarize_cve(cve_data):
     try:
@@ -66,7 +86,7 @@ def summarize_cve(cve_data):
         published = cve_data.get("published", "N/A")
         cvss = "N/A"
 
-        metrics = cve_data.get("cve", {}).get("metrics", {})
+        metrics = cve_data["cve"].get("metrics", {})
         for version in ["cvssMetricV31", "cvssMetricV30", "cvssMetricV2"]:
             if version in metrics:
                 cvss = metrics[version][0]["cvssData"]["baseScore"]
@@ -76,6 +96,10 @@ def summarize_cve(cve_data):
     except Exception as e:
         return f"[!] Failed to summarize CVE: {str(e)}"
 
+
+# ------------------------------------------------------------------------------------------
+# Optional CLI Entry Point
+# ------------------------------------------------------------------------------------------
 
 def run(args):
     cve_arg = args.get("cve")
@@ -93,13 +117,19 @@ def run(args):
     return "\n".join(output)
 
 
+# ------------------------------------------------------------------------------------------
+# Standalone Test Mode
+# ------------------------------------------------------------------------------------------
+
 if __name__ == "__main__":
-    print("🔎 CHARLOTTE CVE Lookup Tool")
+    print("🔎 HARLOTTE CVE Lookup Tool")
     ids_input = input("Enter CVE ID(s) (comma-separated): ").strip()
     year = input("Filter by year (optional): ").strip()
-    cve_ids = [c.strip() for c in ids_input.split(",") if c.strip()]
+    cve_ids = [c.strip().upper() for c in ids_input.split(",") if c.strip()]
 
     results = fetch_cves_batch(cve_ids, year_filter=year or None)
     for cid, data in results.items():
         print("═" * 60)
         print(summarize_cve(data))
+# ------------------------------------------------------------------------------------------
+# This module is designed to be imported and used by the main application.
