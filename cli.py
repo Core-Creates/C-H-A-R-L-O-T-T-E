@@ -10,6 +10,7 @@ import json
 import argparse
 from datetime import datetime
 from InquirerPy import inquirer
+from core.logger import log_session
 from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
 from core.charlotte_personality import CharlottePersonality
