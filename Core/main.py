@@ -66,7 +66,7 @@ PLUGIN_TASKS = {
 
 
 def run_cve_lookup():
-    print("\n=== HARLOTTE CVE Lookup Tool ===")
+    print("\n=== CHARLOTTE CVE Lookup Tool ===")
     cve_id = input("Enter CVE ID (e.g., CVE-2023-12345): ").strip().upper()
     if not cve_id.startswith("CVE-"):
         print("Invalid CVE ID format.")
@@ -108,7 +108,7 @@ def main():
         return
     
     # Handle CVE Lookup separately
-    if task == "🕵️ CVE Lookup (CHARLOTTE)":
+    if task == "🕵️ CVE Lookup (CHARLOTTE)": "cve_lookup"
     run_cve_lookup()
     return
 
