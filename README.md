@@ -60,7 +60,10 @@ charlotte/
 │   ├── recon/              # Subdomain enum, port scans, etc.
 │   ├── vulnscan/           # XSS, SQLi detectors, etc.
 │   └── re/                 # Binary plugins: strings, ghidra, symbolic tracing
-│
+│       ├── bin_strings.py  # 🔍 String & entropy analysis plugin
+│       ├── symbolic_trace.py 
+│       └── ghidra_bridge.py 
+|
 ├── utils/
 │   ├── logger.py           # Logging setup
 │   └── filetools.py        # File/directory helpers
