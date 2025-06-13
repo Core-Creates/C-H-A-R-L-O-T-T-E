@@ -257,9 +257,17 @@ def launch_cli():
 
 # 🧾 Save results to the log
 log_session(task, args, mood, output, sass_lines=sass_lines)
+
+# ******************************************************************************************
+# CHARLOTTE CLI - Interactive Interface for the Cybernetic Heuristic Assistant
 # Entry point to launch CLI
 if __name__ == "__main__":
-    launch_cli()
+    if "--help" in sys.argv:
+        print_help()
+    elif "--about" in sys.argv:
+        print_about()
+    else:
+        launch_cli()
 
 # ******************************************************************************************
 # End of CHARLOTTE CLI - Interactive Interface for the Cybernetic Heuristic Assistant
