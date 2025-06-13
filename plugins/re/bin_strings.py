@@ -1,14 +1,90 @@
+"""
+bin_strings.py
+
+Plugin for extracting printable strings from a binary file,
+optionally scoring them by entropy to identify encoded or suspicious content.
+"""
+
+import os
+import string
+import math
 from core.logger import log_plugin_event
+
+
+def is_printable_ascii(s):
+    """Returns True if all characters in s are printable ASCII."""
+    return all(c in string.printable for c in s)
+
+
+def calculate_entropy(data):
+    """Shannon entropy calculation."""
+    if not data:
+        return 0.0
+    freq = {c: data.count(c) for c in set(data)}
+    entropy = -sum((f / len(data)) * math.log2(f / len(data)) for f in freq.values())
+    return round(entropy, 3)
+
+
+def extract_strings(file_path, min_len=4):
+    """
+    Reads the binary file and extracts printable ASCII strings.
+
+    Args:
+        file_path: Path to the binary file.
+        min_len: Minimum length of printable strings to consider.
+
+    Returns:
+        List of (string, offset, entropy) tuples.
+    """
+    results = []
+    try:
+        with open(file_path, "rb") as f:
+            data = f.read()
+
+        current = b""
+        base_offset = 0
+
+        for i, byte in enumerate(data):
+            if 32 <= byte <= 126:  # Printable ASCII
+                if not current:
+                    base_offset = i
+                current += bytes([byte])
+            else:
+                if len(current) >= min_len:
+                    decoded = current.decode("ascii", errors="ignore")
+                    entropy = calculate_entropy(decoded)
+                    results.append((decoded, base_offset, entropy))
+                current = b""
+
+        # Check for trailing string
+        if len(current) >= min_len:
+            decoded = current.decode("ascii", errors="ignore")
+            entropy = calculate_entropy(decoded)
+            results.append((decoded, base_offset, entropy))
+
+        return results
+
+    except Exception as e:
+        log_plugin_event("bin_strings", f"[ERROR] Failed to extract strings: {str(e)}")
+        return []
+
 
 def run(args):
     file_path = args.get("file")
-    log_plugin_event("bin_strings", f"Running string analysis on {file_path}")
-    try:
-        with open(file_path, 'rb') as file:
-            content = file.read()
-            strings = [s for s in content.decode('utf-8', errors='ignore').split('\n') if len(s) > 4]
-            log_plugin_event("bin_strings", f"Found {len(strings)} strings in {file_path}")
-            return strings
-    except Exception as e:
-        log_plugin_event("bin_strings", f"Error processing {file_path}: {e}")
-        return []
+
+    if not file_path or not os.path.exists(file_path):
+        return "[ERROR] Valid binary file path not provided."
+
+    log_plugin_event("bin_strings", f"Extracting strings from {file_path}")
+
+    strings_with_entropy = extract_strings(file_path)
+
+    if not strings_with_entropy:
+        return "[INFO] No printable strings found."
+
+    # Format results
+    output_lines = []
+    for s, offset, entropy in strings_with_entropy:
+        output_lines.append(f"@0x{offset:08X} | Entropy: {entropy:.3f} | {s}")
+
+    return "\n".join(output_lines)
