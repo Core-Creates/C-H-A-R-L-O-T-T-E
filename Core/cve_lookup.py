@@ -11,15 +11,18 @@ from datetime import datetime
 CACHE_FILE = os.path.join("data", "cve_cache.json")
 API_URL = "https://services.nvd.nist.gov/rest/json/cves/2.0"
 
+
 def load_cache():
     if os.path.exists(CACHE_FILE):
         with open(CACHE_FILE, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
+
 def save_cache(cache):
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2)
+
 
 def fetch_cve_data(cve_id):
     cache = load_cache()
@@ -42,6 +45,7 @@ def fetch_cve_data(cve_id):
 
     return {"error": "CVE not found"}, False
 
+
 def fetch_cves_batch(cve_ids, year_filter=None):
     results = {}
     for cve_id in cve_ids:
@@ -50,6 +54,7 @@ def fetch_cves_batch(cve_ids, year_filter=None):
         data, from_cache = fetch_cve_data(cve_id)
         results[cve_id] = data
     return results
+
 
 def summarize_cve(cve_data):
     try:
@@ -71,22 +76,22 @@ def summarize_cve(cve_data):
     except Exception as e:
         return f"[!] Failed to summarize CVE: {str(e)}"
 
+
 def run(args):
-    cve_input = args.get("cve")
-    year_filter = args.get("year")
+    cve_arg = args.get("cve")
+    year = args.get("year")
 
-    if not cve_input:
-        return "[!] Please provide a CVE ID or list of IDs using the 'cve' argument."
+    if not cve_arg:
+        return "[!] Please provide one or more CVE IDs using the 'cve' argument."
 
-    cve_ids = [cid.strip() for cid in cve_input.split(",") if cid.strip()]
-    results = fetch_cves_batch(cve_ids, year_filter=year_filter)
-
+    cve_ids = [cid.strip().upper() for cid in cve_arg.split(",") if cid.strip()]
+    results = fetch_cves_batch(cve_ids, year_filter=year)
     output = []
     for cid, data in results.items():
         output.append("═" * 60)
         output.append(summarize_cve(data))
-
     return "\n".join(output)
+
 
 if __name__ == "__main__":
     print("🔎 CHARLOTTE CVE Lookup Tool")
