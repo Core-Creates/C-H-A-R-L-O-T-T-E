@@ -58,7 +58,30 @@ PLUGIN_TASKS = {
     "💉 SQL Injection Scan": "sql_injection",
     "🧼 XSS Scan": "xss_scan",
     "🚨 Exploit Generator": "exploit_generation",
+    "🔓 Binary Exploit (ROP Chain)": "binary_exploit",
+    "🕵️ CVE Lookup (HARLOTTE)": "cve_lookup"
 }
+# ******************************************************************************************
+# CVE Lookup Plugin Logic
+
+
+def run_cve_lookup():
+    print("\n=== HARLOTTE CVE Lookup Tool ===")
+    cve_id = input("Enter CVE ID (e.g., CVE-2023-12345): ").strip().upper()
+    if not cve_id.startswith("CVE-"):
+        print("Invalid CVE ID format.")
+        return
+    cache = cve_lookup.load_cache()
+    result = cache.get(cve_id) or cve_lookup.fetch_cve_online(cve_id)
+    if result:
+        cache[cve_id] = result
+        cve_lookup.save_cache(cache)
+        print(json.dumps(result, indent=4))
+    else:
+        print("CVE not found.")
+
+# ******************************************************************************************
+# Main Application Logic
 
 def main():
     print_banner()
@@ -73,6 +96,8 @@ def main():
             *[k for k in PLUGIN_TASKS.keys() if "Scan" in k or "Recon" in k],
             Separator("=== Exploitation ==="),
             *[k for k in PLUGIN_TASKS.keys() if "Exploit" in k],
+            Separator("=== Intelligence ==="),
+            "🕵️ CVE Lookup (CHARLOTTE)",
             Separator(),
             "❌ Exit",
         ],
@@ -81,6 +106,11 @@ def main():
     if task == "❌ Exit":
         print("Goodbye, bestie 🖤")
         return
+    
+    # Handle CVE Lookup separately
+    if task == "🕵️ CVE Lookup (CHARLOTTE)":
+    run_cve_lookup()
+    return
 
     plugin_key = PLUGIN_TASKS.get(task)
     if plugin_key:
