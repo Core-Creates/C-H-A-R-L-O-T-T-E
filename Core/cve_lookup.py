@@ -1,67 +1,95 @@
 # ******************************************************************************************
-# CHARLOTTE CVE Lookup Module
-# Looks up Common Vulnerabilities and Exposures from local DB or remote API
+# cve_lookup.py - CVE Lookup Utility for CHARLOTTE
+# Supports online and offline queries, with batch and year filtering.
 # ******************************************************************************************
 
-import json
 import os
+import json
 import requests
-from datetime import datetime
 
-# Optional local cache (if user wants offline mode)
-CVE_DB_PATH = "data/cve_cache.json"
+CACHE_FILE = os.path.join("data", "cve_cache.json")
 REMOTE_API = "https://cve.circl.lu/api/cve/"
 
-# ******************************************************************************************
-# Utility to Load Local CVE Cache (if available)
-# ******************************************************************************************
-def load_local_cve_db():
-    if os.path.exists(CVE_DB_PATH):
-        try:
-            with open(CVE_DB_PATH, "r", encoding="utf-8") as f:
-                return json.load(f)
-        except Exception as e:
-            print(f"[!] Failed to load local CVE DB: {e}")
-    return {}
 
-# ******************************************************************************************
-# Query CVE by ID (e.g., CVE-2023-12345)
-# ******************************************************************************************
-def lookup_cve(cve_id):
-    local_db = load_local_cve_db()
-    if cve_id in local_db:
-        return local_db[cve_id]
+def load_cache():
+    if not os.path.exists(CACHE_FILE):
+        return {}
+    with open(CACHE_FILE, "r", encoding="utf-8") as f:
+        return json.load(f)
 
+
+def save_cache(cache):
+    with open(CACHE_FILE, "w", encoding="utf-8") as f:
+        json.dump(cache, f, indent=4)
+
+
+def fetch_cve_online(cve_id):
     try:
-        response = requests.get(f"{REMOTE_API}{cve_id}", timeout=10)
-        if response.status_code == 200:
-            cve_data = response.json()
-            return cve_data
+        res = requests.get(REMOTE_API + cve_id)
+        if res.status_code == 200:
+            return res.json()
         else:
-            return {"error": f"Remote lookup failed (HTTP {response.status_code})"}
-    except requests.RequestException as e:
-        return {"error": f"Network error: {e}"}
+            return None
+    except Exception:
+        return None
 
-# ******************************************************************************************
-# Pretty Print CVE Summary
-# ******************************************************************************************
-def format_cve(cve_data):
-    if "error" in cve_data:
-        return f"[!] {cve_data['error']}"
 
+def get_cve_info(cve_id, cache):
+    cve_id = cve_id.upper()
+    if cve_id in cache:
+        return cache[cve_id], True
+
+    data = fetch_cve_online(cve_id)
+    if data:
+        cache[cve_id] = data
+        save_cache(cache)
+    return data, False
+
+
+def format_cve_data(cve_data):
+    if not cve_data:
+        return "[!] No data found."
     return f"""
-🔐 CVE ID: {cve_data.get('id', 'N/A')}
-📅 Published: {cve_data.get('Published', 'N/A')}
-📝 Summary: {cve_data.get('summary', 'No summary available.')}
-🎯 CVSS Score: {cve_data.get('cvss', 'N/A')}
-📂 References:
-  - {cve_data.get('references', ['None'])[0] if cve_data.get('references') else 'None'}
+🆔 {cve_data.get('id')}
+📛 Summary: {cve_data.get('summary')}
+🏷️  CVSS Score: {cve_data.get('cvss')}
+🧪 Published: {cve_data.get('Published')}
+🧪 Modified: {cve_data.get('Modified')}
+🔗 Link: https://cve.circl.lu/api/cve/{cve_data.get('id')}
 """
 
-# ******************************************************************************************
-# Sample Usage (standalone)
-# ******************************************************************************************
-if __name__ == "__main__":
-    cve_id = input("Enter CVE ID (e.g., CVE-2023-12345): ").strip()
-    result = lookup_cve(cve_id)
-    print(format_cve(result))
+
+def lookup_single(cve_id):
+    cache = load_cache()
+    cve_data, from_cache = get_cve_info(cve_id, cache)
+    source = "[CACHE]" if from_cache else "[API]"
+    return source + "\n" + format_cve_data(cve_data)
+
+
+def lookup_batch(cve_ids):
+    cache = load_cache()
+    results = []
+    for cve_id in cve_ids:
+        cve_data, from_cache = get_cve_info(cve_id, cache)
+        source = "[CACHE]" if from_cache else "[API]"
+        results.append(source + "\n" + format_cve_data(cve_data))
+    return "\n".join(results)
+
+
+def filter_cves_by_year(cve_ids, year):
+    cache = load_cache()
+    year = str(year)
+    filtered = []
+    for cve_id in cve_ids:
+        cve_data, _ = get_cve_info(cve_id, cache)
+        if cve_data and cve_data.get("Published", "").startswith(year):
+            filtered.append(cve_id)
+    return filtered
+
+
+# Example usage (you can integrate this into a plugin UI or CLI):
+# print(lookup_single("CVE-2023-12345"))
+# print(lookup_batch(["CVE-2023-12345", "CVE-2022-0001"]))
+# print(filter_cves_by_year(["CVE-2023-12345", "CVE-2022-0001"], 2023))
+# Note: The example usage is commented out. You can uncomment and use it in your application.
+# This module can be imported and used in other parts of the CHARLOTTE application.
