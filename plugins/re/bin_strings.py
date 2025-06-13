@@ -3,6 +3,7 @@ bin_strings.py
 
 Plugin for extracting printable strings from a binary file,
 optionally scoring them by entropy to identify encoded or suspicious content.
+Supports filtering and sorting based on entropy.
 """
 
 import os
@@ -15,7 +16,6 @@ from core.logger import log_plugin_event
 # Check if a given string is composed only of printable ASCII
 # ---------------------------------------------------------------
 def is_printable_ascii(s):
-    """Returns True if all characters in s are printable ASCII."""
     return all(c in string.printable for c in s)
 
 
@@ -23,7 +23,6 @@ def is_printable_ascii(s):
 # Calculate Shannon entropy of a string (higher = more random)
 # ---------------------------------------------------------------
 def calculate_entropy(data):
-    """Shannon entropy calculation."""
     if not data:
         return 0.0
     freq = {c: data.count(c) for c in set(data)}
@@ -32,21 +31,9 @@ def calculate_entropy(data):
 
 
 # ---------------------------------------------------------------
-# Core string extraction logic
-# Scans the binary for printable ASCII strings of length >= min_len
-# Returns a list of (string, offset, entropy) tuples
+# Extract printable ASCII strings from a binary file
 # ---------------------------------------------------------------
 def extract_strings(file_path, min_len=4):
-    """
-    Reads the binary file and extracts printable ASCII strings.
-
-    Args:
-        file_path: Path to the binary file.
-        min_len: Minimum length of printable strings to consider.
-
-    Returns:
-        List of (string, offset, entropy) tuples.
-    """
     results = []
     try:
         with open(file_path, "rb") as f:
@@ -55,21 +42,19 @@ def extract_strings(file_path, min_len=4):
         current = b""
         base_offset = 0
 
-        # Loop through each byte in the binary
         for i, byte in enumerate(data):
-            if 32 <= byte <= 126:  # Check for printable ASCII range
+            if 32 <= byte <= 126:
                 if not current:
-                    base_offset = i  # Start of a new string
+                    base_offset = i
                 current += bytes([byte])
             else:
-                # Save current string if it's long enough
                 if len(current) >= min_len:
                     decoded = current.decode("ascii", errors="ignore")
                     entropy = calculate_entropy(decoded)
                     results.append((decoded, base_offset, entropy))
                 current = b""
 
-        # Catch trailing string at EOF
+        # Handle trailing string
         if len(current) >= min_len:
             decoded = current.decode("ascii", errors="ignore")
             entropy = calculate_entropy(decoded)
@@ -84,27 +69,33 @@ def extract_strings(file_path, min_len=4):
 
 # ---------------------------------------------------------------
 # Plugin entry point
-# Invoked by plugin_manager with parsed CLI args
 # ---------------------------------------------------------------
 def run(args):
     file_path = args.get("file")
+    threshold = float(args.get("entropy_threshold", 0))  # Optional: filter below this
+    sort_by_entropy = args.get("sort_by_entropy", "false").lower() == "true"
 
-    # Validate input
     if not file_path or not os.path.exists(file_path):
         return "[ERROR] Valid binary file path not provided."
 
-    # Log plugin start
-    log_plugin_event("bin_strings", f"Extracting strings from {file_path}")
+    log_plugin_event("bin_strings", f"Extracting strings from {file_path} (threshold={threshold}, sort={sort_by_entropy})")
 
-    # Run extraction
+    # Extract all printable strings with entropy scores
     strings_with_entropy = extract_strings(file_path)
 
-    if not strings_with_entropy:
-        return "[INFO] No printable strings found."
+    # Filter out strings below entropy threshold
+    filtered = [t for t in strings_with_entropy if t[2] >= threshold]
 
-    # Format output for display
+    if not filtered:
+        return f"[INFO] No strings found above entropy threshold {threshold}."
+
+    # Optional: sort by descending entropy
+    if sort_by_entropy:
+        filtered = sorted(filtered, key=lambda x: x[2], reverse=True)
+
+    # Format output
     output_lines = []
-    for s, offset, entropy in strings_with_entropy:
+    for s, offset, entropy in filtered:
         output_lines.append(f"@0x{offset:08X} | Entropy: {entropy:.3f} | {s}")
 
     return "\n".join(output_lines)

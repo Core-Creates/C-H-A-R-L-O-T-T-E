@@ -1,4 +1,3 @@
-
 # ******************************************************************************************
 # CHARLOTTE CLI - Interactive Interface for the Cybernetic Heuristic Assistant
 # Provides task selection, personality configuration, and scan execution via plugin engine.
@@ -135,6 +134,47 @@ def launch_cli():
 
     task = PLUGIN_TASKS[task_label]
 
+    # 🧠 CHARLOTTE explains each task (with mood-specific entropy logic)
+    if task == "binary_strings":
+        print("\n🧪 CHARLOTTE says:")
+
+        if mood == "sassy":
+            print("  Honey, entropy is just chaos — measured mathematically.")
+            print("  If it looks random and sus, it probably is. Let’s dig in.\n")
+
+        elif mood == "brooding":
+            print("  Entropy... the measure of disorder. Like code. Like people.\n")
+
+        elif mood == "manic":
+            print("  OMG! High entropy = ENCRYPTION! SECRETS! CHAOS! I love it!! 🤩\n")
+
+        elif mood == "apathetic":
+            print("  Entropy is a number. It’s whatever. Just run the scan.\n")
+
+        else:
+            print("  Entropy measures how *random* or *unstructured* a string is.")
+            print("  Higher entropy often means encryption, encoding, or something suspicious.\n")
+
+    elif task == "reverse_engineering":
+        print("\n🧪 CHARLOTTE says:")
+        print("  Symbolic tracing helps analyze binary behavior without execution.")
+        print("  Useful for malware analysis or understanding complex binaries.\n")
+    elif task == "web_recon":
+        print("\n🧪 CHARLOTTE says:")
+        print("  Web recon helps discover hidden subdomains and potential attack surfaces.\n")
+    elif task == "port_scan":
+        print("\n🧪 CHARLOTTE says:")
+        print("  Port scanning identifies open ports and services on a target system.\n")
+    elif task == "sql_injection":
+        print("\n🧪 CHARLOTTE says:")
+        print("  SQL injection scans look for vulnerabilities in web applications.\n")
+    elif task == "xss_scan":
+        print("\n🧪 CHARLOTTE says:")
+        print("  XSS scans detect cross-site scripting vulnerabilities in web apps.\n")
+    elif task == "exploit_generation":
+        print("\n🧪 CHARLOTTE says:")
+        print("  Exploit generation creates payloads based on vulnerability descriptions.\n")
+
     # ✍️ Collect key=value args required by plugin
     raw_args = inquirer.text(
         message="Enter args as key=value (comma separated, leave blank for none):",
@@ -172,5 +212,9 @@ def launch_cli():
 # Entry point to launch CLI
 if __name__ == "__main__":
     launch_cli()
+
 # ******************************************************************************************
 # End of CHARLOTTE CLI - Interactive Interface for the Cybernetic Heuristic Assistant
+# ******************************************************************************************
+# This code provides an interactive command-line interface for CHARLOTTE, allowing users to select tasks,
+# configure personality settings, and execute various security-related plugins. It includes
