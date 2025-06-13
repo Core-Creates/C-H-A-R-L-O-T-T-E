@@ -2,9 +2,11 @@ import os
 import sys
 # Charlotte - A Modular Penetration Testing Framework
 from InquirerPy import inquirer
+from plugin_manager import run_plugin
 from InquirerPy.separator import Separator
-from core.plugin_manager import run_plugin
-from core.charlotte_personality import CharlottePersonality
+from charlotte_personality import CharlottePersonality
+# ******************************************************************************************
+# Charlotte - A Modular Penetration Testing Framework
 # Ensure the core directory is in the path for imports
 if __name__ == "__main__":
     sys.path.append(os.path.dirname(os.path.abspath(__file__)))
