@@ -7,7 +7,9 @@
 import requests
 import json
 import os
-
+from plugins.servicenow.servicenow_setup import configure_servicenow
+# ==========================================================================================
+# CONSTANT: SERVICENOW_CONFIG_PATH
 SERVICENOW_CONFIG_PATH = "data/servicenow_config.json"
 
 # ==========================================================================================
