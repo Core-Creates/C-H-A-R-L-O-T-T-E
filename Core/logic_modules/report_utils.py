@@ -10,6 +10,61 @@ from reportlab.lib.pagesizes import letter
 from reportlab.lib import colors
 
 # ==========================================================================================
+# FUNCTION: generate_html_report()
+# Renders triage results as a basic HTML report with exploit and severity highlighting
+# ==========================================================================================
+def generate_html_report(findings, output_file="reports/triage_report.html"):
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
+
+    html = [
+        "<!DOCTYPE html>",
+        "<html><head><meta charset='utf-8'><title>CHARLOTTE Triage Report</title>",
+        "<style>",
+        "body { font-family: Arial, sans-serif; background-color: #121212; color: #eee; padding: 20px; }",
+        "h1 { color: #b45cff; } h2 { color: #ffffff; }",
+        ".critical { color: red; font-weight: bold; }",
+        ".section { margin-bottom: 2em; border-bottom: 1px solid #333; padding-bottom: 1em; }",
+        "</style></head><body>",
+        "<h1>🧠 CHARLOTTE Vulnerability Triage Report</h1>",
+    ]
+
+    html.append("<h2>📊 Summary by Severity</h2><ul>")
+    severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+    for f in sorted_findings:
+        sev = f.get("severity", "Unknown")
+        if sev in severity_counts:
+            severity_counts[sev] += 1
+    for sev, count in severity_counts.items():
+        html.append(f"<li>{sev}: {count}</li>")
+    html.append("</ul>")
+
+    html.append("<h2>🔥 Critical Exploitable Vulnerabilities</h2><ul>")
+    for vuln in sorted_findings:
+        if vuln.get("severity") == "Critical" and vuln.get("exploit_prediction") == "Exploit Likely":
+            cve = vuln.get("id", "Unknown")
+            link = f"https://nvd.nist.gov/vuln/detail/{cve}" if cve.startswith("CVE-") else "#"
+            html.append(f"<li><a href='{link}'>{cve}</a> – {vuln.get('impact')} | Score: {vuln.get('score')} | {vuln.get('confidence')}</li>")
+    html.append("</ul>")
+
+    for vuln in sorted_findings:
+        cve = vuln.get("id", "Unknown")
+        html.append(f"<div class='section'><h2>{cve}</h2>")
+        html.append(f"<p><strong>Severity:</strong> <span class='{ 'critical' if vuln.get('severity') == 'Critical' else '' }'>{vuln.get('severity')}</span></p>")
+        html.append(f"<p><strong>Priority:</strong> {vuln.get('priority')}</p>")
+        html.append(f"<p><strong>Score:</strong> {vuln.get('score')}</p>")
+        html.append(f"<p><strong>Impact:</strong> {vuln.get('impact')}</p>")
+        html.append(f"<p><strong>CWE:</strong> {vuln.get('cwe')}</p>")
+        html.append(f"<p><strong>Exploitability:</strong> {vuln.get('exploit_prediction')} ({vuln.get('confidence')})</p></div>")
+
+    html.append("</body></html>")
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(html))
+    print(f"[+] HTML report saved to {output_file}")
+    return output_file
+# ******************************************************************************************
+
+# ==========================================================================================
 # FUNCTION: generate_markdown_report()
 # Generates a Markdown report from vulnerability data
 # ==========================================================================================
