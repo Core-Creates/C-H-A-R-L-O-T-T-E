@@ -1,59 +1,47 @@
-
 # ******************************************************************************************
 # plugin_manager.py
 # Responsible for dynamically loading and executing CHARLOTTE's plugins.
-# Used to dispatch tasks either from CLI or an LLM interface.
+# Supports static task routing and dynamic plugin.yaml-based discovery.
 # ******************************************************************************************
 
 import importlib
 import os
 import traceback
-from typing import Dict
+import yaml
+from typing import Dict, List
 
 # ******************************************************************************************
-# Plugin Registry
-# Maps logical task names to their plugin category and filename (excluding extension).
-# This enables CHARLOTTE to route tasks modularly across functionality groups.
+# Static Plugin Registry
+# Maps logical task names to hardcoded plugin categories and filenames
 # ******************************************************************************************
 
 PLUGIN_REGISTRY = {
     "reverse_engineering": ("re", "symbolic_trace"),         # 🧠 Binary symbolic tracer
     "binary_strings": ("re", "bin_strings"),                 # 🔍 Strings & entropy scan
     "web_recon": ("recon", "subdomain_enum"),                # 🌐 Subdomain discovery
-    "port_scan": ("recon", "port_scanner"),                  # 📡 Basic port scan
+    "port_scan": ("recon", "nmap_plugin"),                   # 📡 Basic port scan
     "xss_scan": ("vulnscan", "xss_detector"),                # 🧼 Cross-site scripting test
     "sql_injection": ("vulnscan", "sql_injection"),          # 💉 SQLi vulnerability test
     "exploit_generation": ("agents", "exploit_agent"),       # 🚨 LLM-generated exploit suggestions
+    "servicenow_setup": ("servicenow", "servicenow_setup"),  # 🛎️ Initial ServiceNow config wizard
 }
 
-# ******************************************************************************************
-# run_plugin
-# Dynamically loads and executes the requested plugin module, passing user arguments.
-# Handles plugin discovery, error reporting, and return output formatting.
-# ******************************************************************************************
-# ******************************************************************************************
-# Optional Dynamic Plugin Loader (Placeholder for future expansion)
-# ******************************************************************************************
 
-def load_plugins():
-    """
-    Stub for plugin auto-discovery, scanning `plugins/` directory, etc.
-    Currently does nothing — add your dynamic plugin loading logic here if needed.
-    """
-    # For now, CHARLOTTE doesn't dynamically load plugins from the filesystem.
-    # This function exists for future-proofing or dynamic enumeration.
-    print("🔌 CHARLOTTE: Plugin system initialized (static plugins).")
+# ******************************************************************************************
+# Static Plugin Executor
+# Dynamically loads and executes the requested plugin module from PLUGIN_REGISTRY
+# ******************************************************************************************
 
 def run_plugin(task: str, args: Dict) -> str:
     """
-    Loads and executes the plugin for the given task.
+    Loads and executes a statically registered plugin.
 
     Args:
-        task *str* = Key for task type (must match PLUGIN_REGISTRY)
-        args *Dict* = Dictionary of arguments to pass to plugin's run function
+        task *str* = Key from PLUGIN_REGISTRY
+        args *Dict* = Arguments passed to plugin's `run(args)` function
 
     Returns:
-        *str* = Output from the plugin or detailed error if execution fails
+        *str* = Plugin output or error message
     """
     if task not in PLUGIN_REGISTRY:
         return f"[ERROR] No plugin registered for task '{task}'"
@@ -63,15 +51,70 @@ def run_plugin(task: str, args: Dict) -> str:
 
     try:
         plugin = importlib.import_module(module_path)
-
         if not hasattr(plugin, "run"):
             return f"[ERROR] Plugin '{module_name}' has no 'run(args)' function."
-
-        output = plugin.run(args)
-        return output
-
+        return plugin.run(args)
     except Exception as e:
         return f"[PLUGIN ERROR]: {str(e)}\n{traceback.format_exc()}"
-    
+
+# ******************************************************************************************
+# Dynamic Plugin Discovery (plugin.yaml-based)
+# Supports CLI-accessible or auto-triggered extensions
+# ******************************************************************************************
+
+PLUGIN_DIR = "plugins"
+
+def discover_plugins() -> List[Dict]:
+    """Scans plugin directories for plugin.yaml files and loads metadata."""
+    plugins = []
+    for folder in os.listdir(PLUGIN_DIR):
+        plugin_path = os.path.join(PLUGIN_DIR, folder)
+        yaml_path = os.path.join(plugin_path, "plugin.yaml")
+        if os.path.isdir(plugin_path) and os.path.isfile(yaml_path):
+            try:
+                with open(yaml_path, "r", encoding="utf-8") as f:
+                    metadata = yaml.safe_load(f)
+                    metadata["path"] = plugin_path
+                    metadata["name"] = folder
+                    plugins.append(metadata)
+            except Exception as e:
+                print(f"[!] Failed to load plugin.yaml from {folder}: {e}")
+    return plugins
+
+def run_dynamic_plugin(entry_point: str):
+    """Runs a plugin from entry_point = 'module.submodule:function'."""
+    try:
+        module_name, func_name = entry_point.split(":")
+        module = importlib.import_module(module_name)
+        func = getattr(module, func_name)
+        return func()
+    except Exception as e:
+        print(f"[!] Failed to execute plugin: {e}")
+        traceback.print_exc()
+
+def list_plugins() -> List[str]:
+    """Returns a list of plugin labels and descriptions."""
+    return [f"{p.get('label')} :: {p.get('description')}" for p in discover_plugins()]
+
+def select_plugin_by_label(label: str):
+    """Finds and runs a plugin by human-friendly label."""
+    for plugin in discover_plugins():
+        if plugin.get("label") == label:
+            return run_dynamic_plugin(plugin["entry_point"])
+    print(f"[!] No plugin found with label: {label}")
+
+# ******************************************************************************************
+# Optional: CLI Test Entry Point
+# ******************************************************************************************
+
+if __name__ == "__main__":
+    print("🔌 Static Tasks:")
+    for key in PLUGIN_REGISTRY:
+        print(f"  - {key}")
+
+    print("\n🧩 Discovered Plugins:")
+    for item in list_plugins():
+        print(f"  - {item}")
+ 
 # ******************************************************************************************
 # End of plugin_manager.py
