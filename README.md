@@ -50,7 +50,6 @@ charlotte/
 |   |
 │   ├── charlotte_personality.py # Toggles self-contained/extended modes
 │   ├── code_reasoner.py    # Toggles self-contained/extended modes
-│   ├── cve_lookup.py       # CVE scanner (local DB or online API)
 │   ├── config.py           # Toggles self-contained/extended modes
 │   ├── cve_lookup.py       # CVE scanner (local DB or online API)
 │   ├── llm_interface.py    # Routes prompts to local or remote LLMs
@@ -64,17 +63,25 @@ charlotte/
 │
 │
 ├── plugins/
-│   └── recon/              # Subdomain enum, port scans, etc.
+│   |── integration/
+│   |   └── servicenow/
+│   |       ├── servicenow_client.py        # Handles auth and incident creation
+│   |       └── servicenow_setup.py         # One-time config wizard
+|   |
+|   |
+│   |── re/                 # Binary plugins: strings, ghidra, symbolic tracing
+│   |   ├── bin_strings.py  # 🔍 String & entropy analysis plugin
+│   |   ├── symbolic_trace.py 
+│   |   └── ghidra_bridge.py 
+|   |
+|   |
+│   |── recon/              # Subdomain enum, port scans, etc.
 |   |  ├── owasp_amass.py   # OWASP Amass plugin
 |   |  └── nmap_plugin.py   # nmap plugin
 |   |
 │   ├── vulnscan/           # XSS, SQLi detectors, etc.
 |   |
-|   |
-│   └── re/                 # Binary plugins: strings, ghidra, symbolic tracing
-│       ├── bin_strings.py  # 🔍 String & entropy analysis plugin
-│       ├── symbolic_trace.py 
-│       └── ghidra_bridge.py 
+|   
 |
 ├── utils/
 │   ├── logger.py           # Logging setup
