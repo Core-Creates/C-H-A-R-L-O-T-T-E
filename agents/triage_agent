@@ -17,6 +17,12 @@ from core.logic_modules.report_utils import (
 )
 from core.report_dispatcher import dispatch_report, resend_queued_reports
 
+# ServiceNow integration
+from plugins.integration.servicenow.servicenow_client import create_incident
+from plugins.integration.servicenow.servicenow_setup import configure_servicenow
+
+SERVICENOW_CONFIG_PATH = "data/servicenow_config.json"
+
 # ==========================================================================================
 # FUNCTION: load_findings()
 # Loads vulnerability scan results from a local JSON file
@@ -148,6 +154,14 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
     if dispatch and report_file:
         dispatch_report(report_file)
 
+    # Ask about ticket creation
+    auto_ticket = inquirer.confirm(
+    message="Auto-create ServiceNow tickets for critical findings?",
+    default=True
+    ).execute()
+
+    if auto_ticket:
+        maybe_create_tickets(enriched_findings)
 # ==========================================================================================
 # MAIN EXECUTION BLOCK
 # ==========================================================================================
