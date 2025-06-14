@@ -1,0 +1,48 @@
+
+import nmap
+
+# Define the scan options
+scan_types = {
+    "1": {"name": "TCP SYN Scan", "arg": "-sS", "description": "Stealthy, fast TCP scan (default)"},
+    "2": {"name": "TCP Connect Scan", "arg": "-sT", "description": "Standard TCP connect scan"},
+    "3": {"name": "UDP Scan", "arg": "-sU", "description": "Scan for open UDP ports"},
+    "4": {"name": "Service Version Detection", "arg": "-sV", "description": "Detect service versions"},
+    "5": {"name": "OS Detection", "arg": "-O", "description": "Try to identify the target OS"},
+    "6": {"name": "Aggressive Scan", "arg": "-A", "description": "All-in-one: OS, services, scripts"},
+    "7": {"name": "Ping Scan", "arg": "-sn", "description": "Discover live hosts (no port scan)"}
+}
+
+def show_menu():
+    print("Available Nmap Scan Types:\n")
+    for key, scan in scan_types.items():
+        print(f"{key}. {scan['name']} - {scan['description']}")
+
+def get_scan_choice():
+    choice = input("\nEnter the number for the scan you want to run: ").strip()
+    if choice not in scan_types:
+        print("[!] Invalid choice. Try again.")
+        return get_scan_choice()
+    return scan_types[choice]
+
+def run_scan(scan_type, target, ports):
+    print(f"\n[+] Running {scan_type['name']} on {target}:{ports}")
+    nm = nmap.PortScanner()
+    nm.scan(hosts=target, arguments=f"{scan_type['arg']} -p {ports}")
+
+    for host in nm.all_hosts():
+        print(f"\nScan Results for {host}")
+        print(f"Host is {nm[host].state()}")
+        for proto in nm[host].all_protocols():
+            print(f"\nProtocol: {proto}")
+            ports = nm[host][proto].keys()
+            for port in sorted(ports):
+                state = nm[host][proto][port]['state']
+                print(f"Port: {port} \tState: {state}")
+
+if __name__ == "__main__":
+    show_menu()
+    scan_choice = get_scan_choice()
+    target_ip = input("\nEnter the target IP address: ").strip()
+    ports = input("Enter port(s) to scan (e.g. 22,80 or 1-1000): ").strip()
+
+    run_scan(scan_choice, target_ip, ports)
