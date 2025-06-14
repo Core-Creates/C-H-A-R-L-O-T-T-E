@@ -1,8 +1,8 @@
 # ******************************************************************************************
 # agents/triage_agent.py
 # Handles triage of vulnerabilities using rule-based scoring and classification.
-# Supports optional Markdown and PDF report generation.
-# Depends on core/logic_modules/triage_rules.py
+# Supports optional Markdown, PDF, and HTML report generation.
+# Depends on core/logic_modules/triage_rules.py and report_utils.py
 # ******************************************************************************************
 
 import os
@@ -10,7 +10,11 @@ import json
 from InquirerPy import inquirer
 from core.logic_modules.triage_rules import triage
 from core.logic_modules.exploit_predictor import predict_exploitability
-from core.logic_modules.report_utils import generate_markdown_report, generate_pdf_report
+from core.logic_modules.report_utils import (
+    generate_markdown_report,
+    generate_pdf_report,
+    generate_html_report
+)
 
 # ==========================================================================================
 # FUNCTION: load_findings()
@@ -122,13 +126,15 @@ def run_triage_agent(scan_file="data/findings.json"):
 
     format_choice = inquirer.select(
         message="Select report output format:",
-        choices=["📄 Markdown (.md)", "🧾 PDF (.pdf)", "❌ Skip report"]
+        choices=["📄 Markdown (.md)", "🧾 PDF (.pdf)", "🌐 HTML (.html)", "❌ Skip report"]
     ).execute()
 
     if format_choice.startswith("📄"):
         generate_markdown_report(enriched_findings)
     elif format_choice.startswith("🧾"):
         generate_pdf_report(enriched_findings)
+    elif format_choice.startswith("🌐"):
+        generate_html_report(enriched_findings)
     else:
         print("[*] Skipped report generation.")
 
@@ -137,10 +143,11 @@ def run_triage_agent(scan_file="data/findings.json"):
 # ==========================================================================================
 if __name__ == "__main__":
     run_triage_agent()
-
 # This block allows the script to be run directly from the command line.
 # It will execute the triage agent with the default scan file.
-# This allows the script to be run directly for testing or standalone triage
-# purposes, without needing to go through the main CLI flow.
 # It can also be imported as a module in other scripts.
 # This modular design allows for easy integration into larger workflows.
+# This allows the script to be run directly for testing or standalone triage
+# purposes, without needing to go through the main CLI flow.
+
+
