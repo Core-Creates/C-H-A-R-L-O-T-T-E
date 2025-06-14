@@ -8,17 +8,18 @@ import json
 import cve_lookup
 from datetime import datetime
 from InquirerPy import inquirer
+from agents.triage_agent import run_triage_agent
+from plugin_manager import run_plugin, load_plugins
+from charlotte_personality import CharlottePersonality
+from InquirerPy.separator import Separator
+
 # ******************************************************************************************
-# Utility Functions
-# Ensure root project path is in sys.path
+# Utility Setup
+# Ensure root project path is in sys.path for relative imports
+# ******************************************************************************************
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
-
-from InquirerPy import inquirer
-from InquirerPy.separator import Separator
-from plugin_manager import run_plugin, load_plugins
-from charlotte_personality import CharlottePersonality
 
 # Initialize CHARLOTTE personality
 charlotte = CharlottePersonality()
@@ -47,7 +48,7 @@ def print_banner():
                    ..........''''... . ....'............                ....'......'..          ....     ....          ...      ...          '.'      ...            '..........;             ...........                ....                  ....              ;...........;           
                   .......................................                '.........;'                                                                                                           ';;;;;;'
                   ;.....................................;                   '''''''
-                     ..,'  ',,'  ',,'  ',,'  ',,'  ',..
+                     ..,'  ',,'  ',,'  ',,'  ',,'  ',..                 
                    ;  .;....;;....;;....;;....;;....;.  ;                                                                                                                      
                    ;;                                  ;;
                    ;;;;'''';''';''';''';'''';''';'''';;;;
@@ -64,7 +65,7 @@ def print_banner():
     print(skull_banner)
 
 # ******************************************************************************************
-# Plugin Task Selection Logic
+# Plugin Task Mapping
 # ******************************************************************************************
 
 PLUGIN_TASKS = {
@@ -76,11 +77,15 @@ PLUGIN_TASKS = {
     "🧼 XSS Scan": "xss_scan",
     "🚨 Exploit Generator": "exploit_generation",
     "🔓 Binary Exploit (ROP Chain)": "binary_exploit",
-    "🕵️ CVE Lookup (HARLOTTE)": "cve_lookup"
+    "🕵️ CVE Lookup (CHARLOTTE)": "cve_lookup",
+    "🧪 Static Analysis (Binary)": "static_analysis",
+    "📊 Vulnerability Assessment": "vulnerability_assessment",
+    "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
 }
-# ******************************************************************************************
-# CVE Lookup Plugin Logic
 
+# ******************************************************************************************
+# CVE Lookup Menu Logic
+# ******************************************************************************************
 
 def run_cve_lookup():
     print("\n=== HARLOTTE CVE Intelligence Module ===")
@@ -100,25 +105,26 @@ def run_cve_lookup():
         if not cve_id.startswith("CVE-"):
             print("Invalid CVE ID format.")
             return
-        result = fetch_and_cache(cve_id)
-        show_and_export(result)
+        result = cve_lookup.fetch_and_cache(cve_id)
+        cve_lookup.show_and_export(result)
 
     elif option == "🗂️ Search by Keyword":
         keyword = input("Enter keyword (e.g., apache, buffer overflow): ").strip().lower()
         results = cve_lookup.search_by_keyword(keyword)
-        show_and_export(results, multiple=True)
+        cve_lookup.show_and_export(results, multiple=True)
 
     elif option == "📅 List CVEs by Product and Year":
         product = input("Enter product name (e.g., chrome, openssl): ").strip().lower()
         year = input("Enter year (e.g., 2022): ").strip()
         results = cve_lookup.search_by_product_year(product, year)
-        show_and_export(results, multiple=True)
+        cve_lookup.show_and_export(results, multiple=True)
 
     else:
         return
 
 # ******************************************************************************************
-# Main Application Logic
+# Main CLI Application Logic
+# ******************************************************************************************
 
 def main():
     print_banner()
@@ -135,6 +141,8 @@ def main():
             *[k for k in PLUGIN_TASKS.keys() if "Exploit" in k],
             Separator("=== Intelligence ==="),
             "🕵️ CVE Lookup (CHARLOTTE)",
+            Separator("=== Scoring & Analysis ==="),
+            *[k for k in PLUGIN_TASKS.keys() if "Triage" in k or "Assessment" in k],
             Separator(),
             "❌ Exit",
         ],
@@ -143,17 +151,20 @@ def main():
     if task == "❌ Exit":
         print("Goodbye, bestie 🖤")
         return
-    
-    # Handle CVE Lookup separately
+
     if task == "🕵️ CVE Lookup (CHARLOTTE)":
         run_cve_lookup()
         return
 
     plugin_key = PLUGIN_TASKS.get(task)
-    if plugin_key:
-        print(f"✨ CHARLOTTE is preparing to run: {plugin_key}")
-        # Minimal placeholder — this should prompt args later or route to cli_handler
-        run_plugin(plugin_key)
+
+    # --------------------------------------------------
+    # Plugin/Agent Execution Logic
+    # --------------------------------------------------
+    if plugin_key == "triage_agent":
+        run_triage_agent()  # 👈 Directly runs the agent logic
+    else:
+        run_plugin(plugin_key)  # 👈 Standard plugin handler
 
 # ******************************************************************************************
 # Entry Point

@@ -32,6 +32,7 @@ PLUGIN_TASKS = {
     "🮺 XSS Scan": "xss_scan",
     "🚨 Exploit Generator": "exploit_generation",
     "🔎 OWASP Amass Subdomain Recon": "owasp_amass",
+    "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent"
 }
 
 REQUIRED_ARGS = {
