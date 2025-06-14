@@ -130,14 +130,14 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
         choices=["📄 Markdown (.md)", "🧾 PDF (.pdf)", "🌐 HTML (.html)", "♻️ Resend Queued Reports", "❌ Skip report"]
     ).execute()
 
-    report_path = None
+    report_file = None
 
     if format_choice.startswith("📄"):
-        report_path = generate_markdown_report(enriched_findings)
+        report_file = generate_markdown_report(enriched_findings)
     elif format_choice.startswith("🧾"):
-        report_path = generate_pdf_report(enriched_findings)
+        report_file = generate_pdf_report(enriched_findings)
     elif format_choice.startswith("🌐"):
-        report_path = generate_html_report(enriched_findings)
+        report_file = generate_html_report(enriched_findings)
     elif format_choice.startswith("♻️"):
         resend_queued_reports()
         return
@@ -145,8 +145,8 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
         print("[*] Skipped report generation.")
         return
 
-    if dispatch and report_path:
-        dispatch_report(report_path)
+    if dispatch and report_file:
+        dispatch_report(report_file)
 
 # ==========================================================================================
 # MAIN EXECUTION BLOCK
