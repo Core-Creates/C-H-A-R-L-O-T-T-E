@@ -71,16 +71,19 @@ def print_banner():
 PLUGIN_TASKS = {
     "🧠 Reverse Engineer Binary (Symbolic Trace)": "reverse_engineering",
     "🔍 Binary Strings + Entropy Analysis": "binary_strings",
-    "🌐 Web Recon (Subdomains)": "web_recon",
-    "📡 Port Scan": "port_scan",
-    "💉 SQL Injection Scan": "sql_injection",
-    "🧼 XSS Scan": "xss_scan",
-    "🚨 Exploit Generator": "exploit_generation",
     "🔓 Binary Exploit (ROP Chain)": "binary_exploit",
     "🕵️ CVE Lookup (CHARLOTTE)": "cve_lookup",
+    "🚨 Exploit Generator": "exploit_generation",
+    "🔗 Link Analysis": "link_analysis",
+    "📡 NMAP Scan": "nmap_plugin",
+    "🧨 Predict Exploitability": "exploit_predictor",
+    "🔎 Search Exploit DB": "exploit_search",
+    "💉 SQL Injection Scan": "sql_injection",
     "🧪 Static Analysis (Binary)": "static_analysis",
     "📊 Vulnerability Assessment": "vulnerability_assessment",
     "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
+    "🌐 Web Recon (Subdomains)": "web_recon",
+    "🧼 XSS Scan": "xss_scan"
 }
 
 # ******************************************************************************************
