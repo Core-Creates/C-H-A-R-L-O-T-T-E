@@ -15,6 +15,7 @@ from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
 from core.roast_generator import get_summary_roast  # Adjust path based on your structure
 from core.charlotte_personality import CharlottePersonality
+from plugins.owasp_amass import run_plugin as run_amass_plugin  # Merged Amass plugin
 
 # ******************************************************************************************
 # Plugin Task + Argument Setup
@@ -29,6 +30,7 @@ PLUGIN_TASKS = {
     "💉 SQL Injection Scan": "sql_injection",
     "🮺 XSS Scan": "xss_scan",
     "🚨 Exploit Generator": "exploit_generation",
+    "🔎 OWASP Amass Subdomain Recon": "owasp_amass",
 }
 
 REQUIRED_ARGS = {
@@ -39,6 +41,7 @@ REQUIRED_ARGS = {
     "sql_injection": ["url"],
     "xss_scan": ["url"],
     "exploit_generation": ["vuln_description"],
+    "owasp_amass": ["domain"],
 }
 
 PLUGIN_DOCS = {
@@ -49,6 +52,7 @@ PLUGIN_DOCS = {
     "sql_injection": "Test URLs for injectable parameters that can expose or manipulate database contents.",
     "xss_scan": "Identify reflected or stored cross-site scripting flaws in web applications.",
     "exploit_generation": "Use LLMs or rule-based templates to generate proof-of-concept exploits from vulnerability descriptions.",
+    "owasp_amass": "Run OWASP Amass to enumerate subdomains using passive DNS and other sources.",
 }
 
 # List of CHARLOTTE's predefined mood+tone profiles available to the user
@@ -116,6 +120,8 @@ def explain_task(task, mood):
         print("  Symbolic tracing helps analyze binary behavior without execution.\n  Useful for malware analysis or understanding complex binaries.\n")
     elif task == "web_recon":
         print("  Web recon helps discover hidden subdomains and potential attack surfaces.\n")
+    elif task == "owasp_amass":
+        print("  OWASP Amass performs passive or active subdomain enumeration.\n  Great for expanding your domain's footprint and finding weak spots.\n")
     elif task == "port_scan":
         print("  Port scanning identifies open ports and services on a target system.\n")
     elif task == "sql_injection":
