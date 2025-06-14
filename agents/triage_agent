@@ -1,0 +1,142 @@
+# ******************************************************************************************
+# agents/triage_agent.py
+# Handles triage of vulnerabilities using rule-based scoring and classification.
+# Consumes scan data (e.g., from static analysis, CVE lookup, etc.)
+# Depends on logic from core/logic_modules/triage_rules.py
+# ******************************************************************************************
+
+import os
+import json
+from core.logic_modules.triage_rules import triage
+
+# ---------------------------------------------------------
+# Default path to scan results file (JSON format expected)
+# ---------------------------------------------------------
+SCAN_FILE = os.path.join("data", "findings.json")
+
+
+# ==========================================================================================
+# FUNCTION: load_findings()
+# Loads vulnerability scan results from a local JSON file
+# Returns a list of vulnerability dictionaries or an empty list if file not found
+# ==========================================================================================
+def load_findings(file_path=SCAN_FILE):
+    """
+    Load vulnerability scan data from a JSON file.
+
+    --------------------------------------------
+    Expected structure:
+    --------------------------------------------
+    [
+        {
+            "id": "CVE-2023-1234",
+            "cvss": 8.1,
+            "exploit_available": true,
+            "asset_value": 4,
+            "impact": "RCE",
+            "cwe": "CWE-119: Buffer Overflow"
+        },
+        ...
+    ]
+    """
+    if not os.path.exists(file_path):
+        print(f"[!] Scan file not found: {file_path}")
+        return []
+
+    with open(file_path, "r", encoding="utf-8") as f:
+        return json.load(f)
+
+
+# ==========================================================================================
+# FUNCTION: triage_findings()
+# Applies scoring logic to all findings using triage() from triage_rules.py
+# Appends calculated 'severity', 'score', and 'priority' to each vuln entry
+# ==========================================================================================
+def triage_findings(findings):
+    """
+    Apply triage scoring and classification to a list of findings.
+    
+    --------------------------------------------
+    Output structure:
+    --------------------------------------------
+    [
+        {
+            ...original fields...,
+            "severity": "High",
+            "score": 82,
+            "priority": "🚨 High"
+        },
+        ...
+    ]
+    """
+    enriched = []
+    for vuln in findings:
+        result = triage(vuln)     # Call rule-based scoring logic
+        vuln.update(result)       # Append triage output to vuln entry
+        enriched.append(vuln)
+    return enriched
+
+
+# ==========================================================================================
+# FUNCTION: display_summary()
+# Prints the top N triaged findings sorted by score in descending order
+# Used for quick CLI-based review of critical vulnerabilities
+# ==========================================================================================
+def display_summary(findings, limit=10):
+    """
+    Print a summary of the top N findings sorted by score.
+    """
+    sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
+
+    print("\n===== 🧠 TRIAGE RESULTS (Top {0}) =====".format(limit))
+    for vuln in sorted_findings[:limit]:
+        print(f"- {vuln.get('id', 'N/A')}: {vuln['priority']} | {vuln['severity']} | Score: {vuln['score']}")
+        print(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')}")
+        print()
+
+
+# ==========================================================================================
+# FUNCTION: save_results()
+# Writes enriched/triaged findings to an output file for downstream use
+# ==========================================================================================
+def save_results(findings, output_file="data/triaged_findings.json"):
+    """
+    Save triaged findings to a new JSON file.
+    """
+    with open(output_file, "w", encoding="utf-8") as f:
+        json.dump(findings, f, indent=4)
+    print(f"[+] Triaged results saved to {output_file}")
+
+
+# ==========================================================================================
+# FUNCTION: run_triage_agent()
+# Orchestrates the full triage process:
+#   1. Loads scan file
+#   2. Applies triage logic
+#   3. Displays top N results
+#   4. Saves to output file
+# ==========================================================================================
+def run_triage_agent():
+    """
+    Entry point for the triage agent.
+    """
+    print("[*] Loading scan findings...")
+    findings = load_findings()
+
+    if not findings:
+        print("[!] No findings to triage. Exiting.")
+        return
+
+    print("[*] Running triage logic...")
+    enriched_findings = triage_findings(findings)
+
+    display_summary(enriched_findings)
+    save_results(enriched_findings)
+
+
+# ==========================================================================================
+# MAIN EXECUTION BLOCK
+# Enables standalone use: `python agents/triage_agent.py`
+# ==========================================================================================
+if __name__ == "__main__":
+    run_triage_agent()
