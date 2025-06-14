@@ -62,6 +62,8 @@ charlotte/
 |   |  └── nmap_plugin.py   # nmap plugin
 |   |
 │   ├── vulnscan/           # XSS, SQLi detectors, etc.
+|   |
+|   |
 │   └── re/                 # Binary plugins: strings, ghidra, symbolic tracing
 │       ├── bin_strings.py  # 🔍 String & entropy analysis plugin
 │       ├── symbolic_trace.py 
@@ -72,7 +74,7 @@ charlotte/
 │   └── filetools.py        # File/directory helpers
 │
 |
-└── personality_config.json   ← CHARLOTTE's saved mode lives here
+├── personality_config.json   ← CHARLOTTE's saved mode lives here
 ├── cli.py                  # CLI interface for scans, tasks, queries
 └── README.md
 ```
