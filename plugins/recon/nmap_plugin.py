@@ -8,6 +8,10 @@ Author: CHARLOTTE (network voyeur extraordinaire)
 """
 
 import nmap
+import json
+import os
+from datetime import datetime
+from core.logic_modules import recon_heuristics  # Assuming this module exists
 
 # ────────────────────────────────────────────────────────────────────────────────
 # Define available scan types and their corresponding Nmap flags + descriptions
@@ -43,27 +47,58 @@ def choose_scan():
 # ────────────────────────────────────────────────────────────────────────────────
 # Core Nmap scanning logic using python-nmap wrapper
 # Executes selected scan type on target with specified ports
+# Logs results to JSON and runs recon heuristics scoring
 # ────────────────────────────────────────────────────────────────────────────────
 def run_nmap_scan(scan_type, target, ports):
     print(f"\n[+] Running {scan_type['name']} on {target}:{ports}")
     scanner = nmap.PortScanner()
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    output_path = os.path.join("data", f"nmap_results_{target}_{timestamp}.json")
+    os.makedirs("data", exist_ok=True)
+
+    scan_output = []
+
     try:
-        # Run the scan using provided scan type and port range
         scanner.scan(hosts=target, arguments=f"{scan_type['arg']} -p {ports}")
     except Exception as e:
         print(f"[ERROR] Nmap failed to run: {e}")
         return
 
-    # ───── Parse and print scan results ─────
     for host in scanner.all_hosts():
         print(f"\nScan Results for {host}")
         print(f"  Host Status: {scanner[host].state()}")
+
+        host_record = []
+
         for proto in scanner[host].all_protocols():
             print(f"  Protocol: {proto.upper()}")
-            ports = scanner[host][proto].keys()
-            for port in sorted(ports):
+            port_list = scanner[host][proto].keys()
+
+            for port in sorted(port_list):
                 state = scanner[host][proto][port]['state']
-                print(f"    Port {port}: {state}")
+                banner = scanner[host][proto][port].get('product', '') + ' ' + scanner[host][proto][port].get('version', '')
+                print(f"    Port {port}: {state} - {banner.strip()}")
+
+                host_record.append({"port": port, "banner": banner.strip()})
+
+        # Run recon heuristics on the host record
+        heuristic_result = recon_heuristics.triage_host(host_record)
+        print(f"\n[⚙️  Heuristic Score: {heuristic_result['score']} - {heuristic_result['rating']}]")
+        for finding in heuristic_result['findings']:
+            print(f"  → {finding}")
+
+        scan_output.append({
+            "host": host,
+            "state": scanner[host].state(),
+            "ports": host_record,
+            "heuristics": heuristic_result
+        })
+
+    # Save results to file
+    with open(output_path, "w") as f:
+        json.dump(scan_output, f, indent=4)
+
+    print(f"\n[📁 Results saved to {output_path}]")
 
 # ────────────────────────────────────────────────────────────────────────────────
 # CHARLOTTE plugin entry point for interactive CLI scan
@@ -81,5 +116,8 @@ def run_plugin():
 # ────────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     run_plugin()
-# ────────────────────────────────────────────────────────────────────────────────
-# End of nmap_plugin.py
+# This plugin is designed to be imported and used within a larger CHARLOTTE framework.
+# It provides an interactive Nmap scanning experience with human-readable output.
+# It can be integrated into the CHARLOTTE CLI or used as a standalone script.
+# Ensure the plugin is loaded correctly in the CHARLOTTE framework  to access its functionality.
+# This code is part of the CHARLOTTE project, a network reconnaissance tool.
