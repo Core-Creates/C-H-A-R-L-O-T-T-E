@@ -1,13 +1,17 @@
 # ******************************************************************************************
 # agents/triage_agent.py
 # Handles triage of vulnerabilities using rule-based scoring and classification.
-# Consumes scan data (e.g., from static analysis, CVE lookup, etc.)
-# Depends on logic from core/logic_modules/triage_rules.py
+# Supports optional Markdown and PDF report generation.
+# Depends on core/logic_modules/triage_rules.py
 # ******************************************************************************************
 
 import os
 import json
 from core.logic_modules.triage_rules import triage
+from InquirerPy import inquirer
+import markdown2
+from reportlab.lib.pagesizes import letter
+from reportlab.pdfgen import canvas
 
 # ==========================================================================================
 # FUNCTION: load_findings()
@@ -72,8 +76,8 @@ def triage_findings(findings):
     """
     enriched = []
     for vuln in findings:
-        result = triage(vuln)     # Call rule-based scoring logic
-        vuln.update(result)       # Append triage output to vuln entry
+        result = triage(vuln)
+        vuln.update(result)
         enriched.append(vuln)
     return enriched
 
@@ -102,9 +106,59 @@ def save_results(findings, output_file="data/triaged_findings.json"):
     """
     Save triaged findings to a new JSON file.
     """
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(findings, f, indent=4)
     print(f"[+] Triaged results saved to {output_file}")
+
+# ==========================================================================================
+# FUNCTION: generate_markdown_report()
+# Generates a readable triage report in Markdown format
+# ==========================================================================================
+def generate_markdown_report(findings, output_file="reports/triage_report.md"):
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
+
+    lines = ["# 🧠 CHARLOTTE Vulnerability Triage Report\n"]
+
+    for vuln in sorted_findings:
+        lines.append(f"## {vuln.get('id', 'Unknown ID')}")
+        lines.append(f"- **Priority**: {vuln['priority']}")
+        lines.append(f"- **Severity**: {vuln['severity']}")
+        lines.append(f"- **Score**: {vuln['score']}")
+        lines.append(f"- **CWE**: {vuln.get('cwe', 'N/A')}")
+        lines.append(f"- **Impact**: {vuln.get('impact', 'N/A')}")
+        lines.append("")
+
+    with open(output_file, "w", encoding="utf-8") as f:
+        f.write("\n".join(lines))
+
+    print(f"[+] Markdown report saved to {output_file}")
+    return output_file
+
+# ==========================================================================================
+# FUNCTION: generate_pdf_report()
+# Renders triage results as a PDF report using ReportLab
+# ==========================================================================================
+def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
+    os.makedirs(os.path.dirname(output_file), exist_ok=True)
+    c = canvas.Canvas(output_file, pagesize=letter)
+    width, height = letter
+    text = c.beginText(40, height - 50)
+    text.setFont("Helvetica", 12)
+    text.textLine("🧠 CHARLOTTE Vulnerability Triage Report\n")
+
+    sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
+    for vuln in sorted_findings:
+        text.textLine(f"ID: {vuln.get('id', 'Unknown ID')}")
+        text.textLine(f"  Priority: {vuln['priority']} | Severity: {vuln['severity']} | Score: {vuln['score']}")
+        text.textLine(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')}")
+        text.textLine("")
+
+    c.drawText(text)
+    c.save()
+    print(f"[+] PDF report saved to {output_file}")
+    return output_file
 
 # ==========================================================================================
 # FUNCTION: run_triage_agent()
@@ -112,7 +166,8 @@ def save_results(findings, output_file="data/triaged_findings.json"):
 #   1. Loads scan file (custom path supported)
 #   2. Applies triage logic
 #   3. Displays top N results
-#   4. Saves to output file
+#   4. Saves JSON results
+#   5. Prompts user to generate report in Markdown or PDF
 # ==========================================================================================
 def run_triage_agent(scan_file="data/findings.json"):
     """
@@ -132,6 +187,19 @@ def run_triage_agent(scan_file="data/findings.json"):
     display_summary(enriched_findings)
     save_results(enriched_findings)
 
+    # Prompt for report export
+    format_choice = inquirer.select(
+        message="Select report output format:",
+        choices=["📄 Markdown (.md)", "🧾 PDF (.pdf)", "❌ Skip report"]
+    ).execute()
+
+    if format_choice.startswith("📄"):
+        generate_markdown_report(enriched_findings)
+    elif format_choice.startswith("🧾"):
+        generate_pdf_report(enriched_findings)
+    else:
+        print("[*] Skipped report generation.")
+
 # ==========================================================================================
 # MAIN EXECUTION BLOCK
 # Enables standalone use: `python agents/triage_agent.py`
@@ -140,3 +208,5 @@ if __name__ == "__main__":
     run_triage_agent()
 # This allows the script to be run directly for testing or standalone triage
 # purposes, without needing to go through the main CLI flow.
+# It can also be imported as a module in other scripts.
+# This modular design allows for easy integration into larger workflows.
