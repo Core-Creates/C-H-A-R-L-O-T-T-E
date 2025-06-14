@@ -113,7 +113,7 @@ def save_results(findings, output_file="data/triaged_findings.json"):
 
 # ==========================================================================================
 # FUNCTION: generate_markdown_report()
-# Generates a readable triage report in Markdown format
+# Generates a readable triage report in Markdown format with linked CVEs
 # ==========================================================================================
 def generate_markdown_report(findings, output_file="reports/triage_report.md"):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
@@ -122,13 +122,17 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
     lines = ["# 🧠 CHARLOTTE Vulnerability Triage Report\n"]
 
     for vuln in sorted_findings:
-        lines.append(f"## {vuln.get('id', 'Unknown ID')}")
+        cve_id = vuln.get('id', 'Unknown ID')
+        cve_link = f"https://nvd.nist.gov/vuln/detail/{cve_id}" if cve_id.startswith("CVE-") else None
+        lines.append(f"## [{cve_id}]({cve_link})" if cve_link else f"## {cve_id}")
         lines.append(f"- **Priority**: {vuln['priority']}")
         lines.append(f"- **Severity**: {vuln['severity']}")
         lines.append(f"- **Score**: {vuln['score']}")
         lines.append(f"- **CWE**: {vuln.get('cwe', 'N/A')}")
         lines.append(f"- **Impact**: {vuln.get('impact', 'N/A')}")
         lines.append("")
+        lines.append("-" * 80)
+    lines.append("\nEnd of Report")
 
     with open(output_file, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -150,15 +154,24 @@ def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
 
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
     for vuln in sorted_findings:
-        text.textLine(f"ID: {vuln.get('id', 'Unknown ID')}")
+        cve_id = vuln.get('id', 'Unknown ID')
+        text.textLine(f"ID: {cve_id}")
+
+        # Add CVE URL if applicable
+        if cve_id.startswith("CVE-"):
+            cve_link = f"https://nvd.nist.gov/vuln/detail/{cve_id}"
+            text.textLine(f"Link: {cve_link}")
+
         text.textLine(f"  Priority: {vuln['priority']} | Severity: {vuln['severity']} | Score: {vuln['score']}")
         text.textLine(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')}")
-        text.textLine("")
+        text.textLine("-" * 80)
 
+    text.textLine("\nEnd of Report")
     c.drawText(text)
     c.save()
     print(f"[+] PDF report saved to {output_file}")
     return output_file
+
 
 # ==========================================================================================
 # FUNCTION: run_triage_agent()
