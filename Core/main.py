@@ -156,16 +156,20 @@ def main():
         run_cve_lookup()
         return
 
-    plugin_key = PLUGIN_TASKS.get(task)
+# --------------------------------------------------
+# Plugin/Agent Execution Logic
+# --------------------------------------------------
+plugin_key = PLUGIN_TASKS.get(task)
 
-    # --------------------------------------------------
-    # Plugin/Agent Execution Logic
-    # --------------------------------------------------
-    if plugin_key == "triage_agent":
-        run_triage_agent()  # 👈 Directly runs the agent logic
-    else:
-        run_plugin(plugin_key)  # 👈 Standard plugin handler
-
+if plugin_key == "triage_agent":
+    scan_path = inquirer.text(
+        message="Enter path to scan file (press Enter for default: data/findings.json):"
+    ).execute()
+    scan_path = scan_path.strip() or "data/findings.json"
+    run_triage_agent(scan_file=scan_path)
+else:
+    run_plugin(plugin_key)
+    
 # ******************************************************************************************
 # Entry Point
 # ******************************************************************************************
