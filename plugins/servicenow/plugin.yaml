@@ -9,7 +9,7 @@ description: >
   Allows CHARLOTTE to auto-generate ServiceNow incident tickets based on triaged findings.
   Prompts for credentials on first use and submits tickets via the ServiceNow REST API.
 
-entry_point: plugins.integration.servicenow.servicenow_setup:main
+entry_point: plugins.servicenow.servicenow_setup:main
 run_after_config: true
 
 inputs: []
