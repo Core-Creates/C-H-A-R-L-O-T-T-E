@@ -11,14 +11,13 @@ import markdown2
 from InquirerPy import inquirer
 from reportlab.pdfgen import canvas
 from reportlab.lib.pagesizes import letter
+from reportlab.lib import colors
 from core.logic_modules.triage_rules import triage
-# Importing the exploit predictor module for future use
 from core.logic_modules.exploit_predictor import predict_exploitability
 
 # ==========================================================================================
 # FUNCTION: load_findings()
 # Loads vulnerability scan results from a local JSON file
-# Returns a list of vulnerability dictionaries or an empty list if file not found or invalid
 # ==========================================================================================
 def load_findings(file_path):
     """
@@ -62,7 +61,7 @@ def load_findings(file_path):
 def triage_findings(findings):
     """
     Apply triage scoring and classification to a list of findings.
-    
+
     --------------------------------------------
     Output structure:
     --------------------------------------------
@@ -80,24 +79,21 @@ def triage_findings(findings):
     for vuln in findings:
         result = triage(vuln)
         vuln.update(result)
+        prediction = predict_exploitability(vuln)
+        vuln.update(prediction)
         enriched.append(vuln)
     return enriched
 
 # ==========================================================================================
 # FUNCTION: display_summary()
-# Prints the top N triaged findings sorted by score in descending order
-# Used for quick CLI-based review of critical vulnerabilities
+# CLI summary of top N triaged findings
 # ==========================================================================================
 def display_summary(findings, limit=10):
-    """
-    Print a summary of the top N findings sorted by score.
-    """
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
-
     print("\n===== 🧠 TRIAGE RESULTS (Top {0}) =====".format(limit))
     for vuln in sorted_findings[:limit]:
         print(f"- {vuln.get('id', 'N/A')}: {vuln['priority']} | {vuln['severity']} | Score: {vuln['score']}")
-        print(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')}")
+        print(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')} | Exploit: {vuln.get('exploit_prediction')} ({vuln.get('confidence')})")
         print()
 
 # ==========================================================================================
@@ -105,9 +101,6 @@ def display_summary(findings, limit=10):
 # Writes enriched/triaged findings to an output file for downstream use
 # ==========================================================================================
 def save_results(findings, output_file="data/triaged_findings.json"):
-    """
-    Save triaged findings to a new JSON file.
-    """
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(findings, f, indent=4)
@@ -115,17 +108,11 @@ def save_results(findings, output_file="data/triaged_findings.json"):
 
 # ==========================================================================================
 # FUNCTION: generate_markdown_report()
-# Generates a readable triage report in Markdown format with linked CVEs
-# ==========================================================================================
-# ==========================================================================================
-# FUNCTION: generate_markdown_report()
-# Generates a readable triage report in Markdown format with linked CVEs and summary table
 # ==========================================================================================
 def generate_markdown_report(findings, output_file="reports/triage_report.md"):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
 
-    # Count by severity for summary table
     severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
     for f in sorted_findings:
         severity = f.get("severity", "Unknown")
@@ -133,8 +120,6 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
             severity_counts[severity] += 1
 
     lines = ["# 🧠 CHARLOTTE Vulnerability Triage Report\n"]
-
-    # Add Summary Table
     lines.append("## 📊 Summary by Severity")
     lines.append("| Severity | Count |")
     lines.append("|----------|-------|")
@@ -142,7 +127,14 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
         lines.append(f"| {level} | {severity_counts[level]} |")
     lines.append("\n---\n")
 
-    # Detailed Findings
+    lines.append("## 🔥 Critical Exploitable Vulnerabilities")
+    for vuln in sorted_findings:
+        if vuln.get("severity") == "Critical" and vuln.get("exploit_prediction") == "Exploit Likely":
+            cve_id = vuln.get('id', 'Unknown ID')
+            link = f"https://nvd.nist.gov/vuln/detail/{cve_id}" if cve_id.startswith("CVE-") else None
+            lines.append(f"- [{cve_id}]({link}) → {vuln['impact']} | Score: {vuln['score']} | {vuln['confidence']}")
+    lines.append("\n---\n")
+
     for vuln in sorted_findings:
         cve_id = vuln.get('id', 'Unknown ID')
         cve_link = f"https://nvd.nist.gov/vuln/detail/{cve_id}" if cve_id.startswith("CVE-") else None
@@ -152,10 +144,8 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
         lines.append(f"- **Score**: {vuln['score']}")
         lines.append(f"- **CWE**: {vuln.get('cwe', 'N/A')}")
         lines.append(f"- **Impact**: {vuln.get('impact', 'N/A')}")
-        lines.append("")
-        lines.append("-" * 80)
-
-    lines.append("\nEnd of Report")
+        lines.append(f"- **Exploitability**: {vuln.get('exploit_prediction')} ({vuln.get('confidence')})")
+        lines.append("\n---\n")
 
     with open(output_file, "w", encoding="utf-8") as f:
         f.write("\n".join(lines))
@@ -163,14 +153,10 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
     print(f"[+] Markdown report saved to {output_file}")
     return output_file
 
-
 # ==========================================================================================
 # FUNCTION: generate_pdf_report()
-# Renders triage results as a PDF report using ReportLab with red highlights for critical
 # ==========================================================================================
 def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
-    from reportlab.lib import colors
-
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     c = canvas.Canvas(output_file, pagesize=letter)
     width, height = letter
@@ -181,8 +167,6 @@ def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
     text.textLine("")
 
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
-
-    # Summary Table
     severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
     for f in sorted_findings:
         severity = f.get("severity", "Unknown")
@@ -194,26 +178,26 @@ def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
         text.textLine(f"  {level}: {severity_counts[level]}")
     text.textLine("-" * 70)
 
-    # Detailed Findings
     for vuln in sorted_findings:
-        cve_id = vuln.get('id', 'Unknown ID')
         severity = vuln.get("severity", "").lower()
-        priority = vuln.get("priority", "")
-        score = vuln.get("score", 0)
-        cwe = vuln.get("cwe", "N/A")
-        impact = vuln.get("impact", "N/A")
+        exploit_likely = vuln.get("exploit_prediction", "") == "Exploit Likely"
+        is_critical = severity == "critical"
 
-        # Highlight Critical in red
-        if severity == "critical":
+        if is_critical and exploit_likely:
             c.setFillColor(colors.red)
+            text.setFont("Helvetica-Bold", 12)
         else:
             c.setFillColor(colors.black)
+            text.setFont("Helvetica", 12)
 
+        cve_id = vuln.get('id', 'Unknown ID')
         text.textLine(f"\nID: {cve_id}")
         if cve_id.startswith("CVE-"):
             text.textLine(f"Link: https://nvd.nist.gov/vuln/detail/{cve_id}")
-        text.textLine(f"  Priority: {priority} | Severity: {severity.capitalize()} | Score: {score}")
-        text.textLine(f"  CWE: {cwe} | Impact: {impact}")
+
+        text.textLine(f"  Priority: {vuln.get('priority')} | Severity: {vuln.get('severity')} | Score: {vuln.get('score')}")
+        text.textLine(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')}")
+        text.textLine(f"  Exploitability: {vuln.get('exploit_prediction')} ({vuln.get('confidence')})")
         text.textLine("-" * 70)
 
     c.drawText(text)
@@ -221,21 +205,10 @@ def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
     print(f"[+] PDF report saved to {output_file}")
     return output_file
 
-
 # ==========================================================================================
 # FUNCTION: run_triage_agent()
-# Orchestrates the full triage process:
-#   1. Loads scan file (custom path supported)
-#   2. Applies triage logic
-#   3. Displays top N results
-#   4. Saves JSON results
-#   5. Prompts user to generate report in Markdown or PDF
 # ==========================================================================================
 def run_triage_agent(scan_file="data/findings.json"):
-    """
-    Entry point for the triage agent.
-    Accepts optional custom scan path from main.py or CLI.
-    """
     print(f"[*] Loading scan findings from: {scan_file}")
     findings = load_findings(scan_file)
 
@@ -243,13 +216,12 @@ def run_triage_agent(scan_file="data/findings.json"):
         print("[!] No findings to triage. Exiting.")
         return
 
-    print("[*] Running triage logic...")
+    print("[*] Running triage logic with exploit prediction...")
     enriched_findings = triage_findings(findings)
 
     display_summary(enriched_findings)
     save_results(enriched_findings)
 
-    # Prompt for report export
     format_choice = inquirer.select(
         message="Select report output format:",
         choices=["📄 Markdown (.md)", "🧾 PDF (.pdf)", "❌ Skip report"]
@@ -264,10 +236,11 @@ def run_triage_agent(scan_file="data/findings.json"):
 
 # ==========================================================================================
 # MAIN EXECUTION BLOCK
-# Enables standalone use: `python agents/triage_agent.py`
 # ==========================================================================================
 if __name__ == "__main__":
     run_triage_agent()
+# This block allows the script to be run directly from the command line.
+# It will execute the triage agent with the default scan file.
 # This allows the script to be run directly for testing or standalone triage
 # purposes, without needing to go through the main CLI flow.
 # It can also be imported as a module in other scripts.
