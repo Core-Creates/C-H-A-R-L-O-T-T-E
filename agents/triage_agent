@@ -111,7 +111,7 @@ def save_results(findings, output_file="data/triaged_findings.json"):
 # ==========================================================================================
 # FUNCTION: run_triage_agent()
 # ==========================================================================================
-def run_triage_agent(scan_file="data/findings.json"):
+def run_triage_agent(scan_file="data/findings.json", dispatch=True):
     print(f"[*] Loading scan findings from: {scan_file}")
     findings = load_findings(scan_file)
 
@@ -140,7 +140,7 @@ def run_triage_agent(scan_file="data/findings.json"):
     else:
         print("[*] Skipped report generation.")
 
-    if report_path:
+    if dispatch and report_path:
         dispatch_report(report_path)
 
 # ==========================================================================================
