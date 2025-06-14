@@ -16,6 +16,7 @@ from core.plugin_manager import run_plugin
 from core.roast_generator import get_summary_roast  # Adjust path based on your structure
 from core.charlotte_personality import CharlottePersonality
 from plugins.owasp_amass import run_plugin as run_amass_plugin  # Merged Amass plugin
+from plugins.nmap_scan import run_plugin as run_nmap_plugin     # Merged Nmap plugin
 
 # ******************************************************************************************
 # Plugin Task + Argument Setup
@@ -26,8 +27,7 @@ PLUGIN_TASKS = {
     "🧠 Reverse Engineer Binary (Symbolic Trace)": "reverse_engineering",
     "🔍 Binary Strings + Entropy Analysis": "binary_strings",
     "🌐 Web Recon (Subdomains)": "web_recon",
-    "📱 Port Scan": "port_scan",
-    "📡 Nmap Network Scanner": "nmap_scan",
+    "📱 Nmap Network Scanner": "nmap_scan",
     "💉 SQL Injection Scan": "sql_injection",
     "🮺 XSS Scan": "xss_scan",
     "🚨 Exploit Generator": "exploit_generation",
@@ -38,7 +38,6 @@ REQUIRED_ARGS = {
     "reverse_engineering": ["file"],
     "binary_strings": ["file"],
     "web_recon": ["domain"],
-    "port_scan": ["target"],
     "nmap_scan": ["target", "ports"],
     "sql_injection": ["url"],
     "xss_scan": ["url"],
@@ -50,7 +49,6 @@ PLUGIN_DOCS = {
     "binary_strings": "Extract printable ASCII strings from binaries and score them by entropy to highlight suspicious or encoded data.",
     "reverse_engineering": "Symbolically trace executable behavior without runtime execution to analyze malware or reverse binaries.",
     "web_recon": "Perform DNS recon to identify subdomains and expand attack surface for web targets.",
-    "port_scan": "Scan a host for open TCP/UDP ports and detect available network services.",
     "nmap_scan": "Run an interactive Nmap scan using various techniques like SYN, UDP, or Aggressive scan modes.",
     "sql_injection": "Test URLs for injectable parameters that can expose or manipulate database contents.",
     "xss_scan": "Identify reflected or stored cross-site scripting flaws in web applications.",
@@ -125,8 +123,8 @@ def explain_task(task, mood):
         print("  Web recon helps discover hidden subdomains and potential attack surfaces.\n")
     elif task == "owasp_amass":
         print("  OWASP Amass performs passive or active subdomain enumeration.\n  Great for expanding your domain's footprint and finding weak spots.\n")
-    elif task == "port_scan":
-        print("  Port scanning identifies open ports and services on a target system.\n")
+    elif task == "nmap_scan":
+        print("  Nmap is my favorite. Classic recon, updated with heuristics.\n  Let’s scan and see what secrets your network is whispering.\n")
     elif task == "sql_injection":
         print("  SQL injection scans look for vulnerabilities in web applications.\n")
     elif task == "xss_scan":
@@ -151,3 +149,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+# ******************************************************************************************
+# This is the main entry point for the CHARLOTTE CLI.   
