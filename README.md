@@ -41,6 +41,13 @@ charlotte/
 │   ├── exploit_agent.py    # POC generator based on findings
 │   └── triage_agent.py     # Ranks issues using scoring or LLM
 ├── core/
+|   ├── logic_modules
+|   |  ├── exploit_predictor.py
+|   |  ├── recon_heuristics.py
+|   |  ├── report_utils.py
+|   |  └── triage_rules.py
+|   |  
+|   |
 │   ├── charlotte_personality.py # Toggles self-contained/extended modes
 │   ├── code_reasoner.py    # Toggles self-contained/extended modes
 │   ├── cve_lookup.py       # CVE scanner (local DB or online API)
