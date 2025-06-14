@@ -7,6 +7,7 @@
 
 import os
 import json
+import logging
 from InquirerPy import inquirer
 from core.logic_modules.triage_rules import triage
 from core.logic_modules.exploit_predictor import predict_exploitability
@@ -16,6 +17,9 @@ from core.logic_modules.report_utils import (
     generate_html_report
 )
 from core.report_dispatcher import dispatch_report
+
+# Setup logger
+logging.basicConfig(level=logging.INFO, format='[%(levelname)s] %(message)s')
 
 # ==========================================================================================
 # FUNCTION: load_findings()
@@ -109,6 +113,16 @@ def save_results(findings, output_file="data/triaged_findings.json"):
     print(f"[+] Triaged results saved to {output_file}")
 
 # ==========================================================================================
+# FUNCTION: queue_report_fallback()
+# Logs a failed dispatch for manual follow-up
+# ==========================================================================================
+def queue_report_fallback(report_path):
+    queue_file = "data/report_queue.log"
+    with open(queue_file, "a") as f:
+        f.write(f"DISPATCH FAILED: {report_path}\n")
+    logging.warning(f"[!] Report dispatch failed. Queued for manual handling: {queue_file}")
+
+# ==========================================================================================
 # FUNCTION: run_triage_agent()
 # ==========================================================================================
 def run_triage_agent(scan_file="data/findings.json", dispatch=True):
@@ -141,7 +155,11 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
         print("[*] Skipped report generation.")
 
     if dispatch and report_path:
-        dispatch_report(report_path)
+        try:
+            dispatch_report(report_path)
+        except Exception as e:
+            logging.error(f"Dispatch failed: {e}")
+            queue_report_fallback(report_path)
 
 # ==========================================================================================
 # MAIN EXECUTION BLOCK
