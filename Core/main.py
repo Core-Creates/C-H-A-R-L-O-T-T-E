@@ -162,6 +162,9 @@ def main():
 # --------------------------------------------------
 # Plugin/Agent Execution Logic
 # --------------------------------------------------
+# --------------------------------------------------
+# Plugin/Agent Execution Logic
+# --------------------------------------------------
 plugin_key = PLUGIN_TASKS.get(task)
 
 if plugin_key == "triage_agent":
@@ -170,9 +173,34 @@ if plugin_key == "triage_agent":
     ).execute()
     scan_path = scan_path.strip() or "data/findings.json"
     run_triage_agent(scan_file=scan_path)
+
+elif plugin_key == "exploit_predictor":
+    from core.logic_modules.exploit_predictor import batch_predict
+    from agents.triage_agent import load_findings, save_results
+
+    scan_path = inquirer.text(
+        message="Enter path to scan file (press Enter for default: data/findings.json):"
+    ).execute()
+    scan_path = scan_path.strip() or "data/findings.json"
+
+    try:
+        findings = load_findings(scan_path)
+        enriched = batch_predict(findings)
+        output_path = "data/findings_with_predictions.json"
+        save_results(output_path, enriched)
+
+        print(f"\n[✔] Exploit predictions saved to {output_path}")
+        print("Use '🧮 Vulnerability Triage' to further refine prioritization.\n")
+    except Exception as e:
+        print(f"[!] Error processing exploit prediction: {e}")
+
 else:
     run_plugin(plugin_key)
-    
+    print(f"\n[✔] Running plugin: {plugin_key}...\n")
+    if plugin_key == "cve_lookup":
+        run_cve_lookup()
+    else:
+        print(f"[✔] Plugin '{plugin_key}' executed successfully.\n")
 # ******************************************************************************************
 # Entry Point
 # ******************************************************************************************

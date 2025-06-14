@@ -7,11 +7,13 @@
 
 import os
 import json
-from core.logic_modules.triage_rules import triage
-from InquirerPy import inquirer
 import markdown2
-from reportlab.lib.pagesizes import letter
+from InquirerPy import inquirer
 from reportlab.pdfgen import canvas
+from reportlab.lib.pagesizes import letter
+from core.logic_modules.triage_rules import triage
+# Importing the exploit predictor module for future use
+from core.logic_modules.exploit_predictor import predict_exploitability
 
 # ==========================================================================================
 # FUNCTION: load_findings()
