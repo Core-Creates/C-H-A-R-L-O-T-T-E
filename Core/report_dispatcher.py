@@ -1,6 +1,6 @@
 # ******************************************************************************************
 # core/report_dispatcher.py
-# Handles sending reports to analysts or ticketing systems (e.g., email, ServiceNow)
+# Handles sending reports to analysts or ticketing systems (e.g., email, ServiceNow, Slack/Teams)
 # Depends on user_config.py settings saved in data/user_settings.json
 # ******************************************************************************************
 
@@ -12,6 +12,7 @@ from email.message import EmailMessage
 import requests
 
 SETTINGS_FILE = os.path.join("data", "user_settings.json")
+QUEUE_FILE = os.path.join("data", "report_queue.log")
 
 # ==========================================================================================
 # FUNCTION: load_user_settings()
@@ -87,17 +88,60 @@ def send_servicenow_ticket(file_path, short_description="CHARLOTTE Triage Report
     print("[+] Report attached to ServiceNow incident.")
 
 # ==========================================================================================
+# FUNCTION: send_webhook()
+# Sends report notification to Slack or Teams via webhook
+# ==========================================================================================
+def send_webhook(file_path):
+    config = load_user_settings().get("webhook", {})
+    if not config.get("url"):
+        print("[!] Webhook URL not configured.")
+        return
+
+    message = {
+        "text": f"CHARLOTTE Triage Report generated: {os.path.basename(file_path)}. Please review the attached file in the local reports directory or dashboard."
+    }
+
+    try:
+        response = requests.post(config["url"], json=message)
+        response.raise_for_status()
+        print("[+] Webhook notification sent.")
+    except Exception as e:
+        print(f"[!] Webhook dispatch failed: {e}")
+        raise
+
+# ==========================================================================================
+# FUNCTION: queue_report()
+# Appends failed dispatch file path to a queue log
+# ==========================================================================================
+def queue_report(file_path):
+    with open(QUEUE_FILE, "a", encoding="utf-8") as f:
+        f.write(file_path + "\n")
+    print(f"[!] Report queued for later dispatch: {file_path}")
+
+# ==========================================================================================
 # FUNCTION: dispatch_report()
-# Master dispatcher that checks config and sends to destination
+# Master dispatcher that checks config and sends to destination with fallback
 # ==========================================================================================
 def dispatch_report(file_path):
-    settings = load_user_settings()
-    destination = settings.get("default_dispatch")
+    try:
+        settings = load_user_settings()
+        destination = settings.get("default_dispatch")
 
-    if destination == "email":
-        send_email_report(file_path)
-    elif destination == "servicenow":
-        send_servicenow_ticket(file_path)
-    else:
-        print("[!] No valid dispatch method configured. Report saved locally.")
-    print(f"[+] Report dispatched successfully: {file_path}")
+        if destination == "email":
+            send_email_report(file_path)
+        elif destination == "servicenow":
+            send_servicenow_ticket(file_path)
+        else:
+            print("[!] No valid dispatch method configured. Report saved locally.")
+
+        # Always try webhook if enabled
+        if settings.get("webhook", {}).get("enabled"):
+            send_webhook(file_path)
+
+        print(f"[+] Report dispatched successfully: {file_path}")
+
+    except Exception as e:
+        print(f"[!] Dispatch failed: {e}")
+        queue_report(file_path)
+        print("[i] You can reattempt dispatch via the CLI queue resend option.")
+# ==========================================================================================
