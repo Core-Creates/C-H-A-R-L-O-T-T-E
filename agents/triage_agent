@@ -15,6 +15,7 @@ from core.logic_modules.report_utils import (
     generate_pdf_report,
     generate_html_report
 )
+from core.report_dispatcher import dispatch_report
 
 # ==========================================================================================
 # FUNCTION: load_findings()
@@ -129,14 +130,18 @@ def run_triage_agent(scan_file="data/findings.json"):
         choices=["📄 Markdown (.md)", "🧾 PDF (.pdf)", "🌐 HTML (.html)", "❌ Skip report"]
     ).execute()
 
+    report_path = None
     if format_choice.startswith("📄"):
-        generate_markdown_report(enriched_findings)
+        report_path = generate_markdown_report(enriched_findings)
     elif format_choice.startswith("🧾"):
-        generate_pdf_report(enriched_findings)
+        report_path = generate_pdf_report(enriched_findings)
     elif format_choice.startswith("🌐"):
-        generate_html_report(enriched_findings)
+        report_path = generate_html_report(enriched_findings)
     else:
         print("[*] Skipped report generation.")
+
+    if report_path:
+        dispatch_report(report_path)
 
 # ==========================================================================================
 # MAIN EXECUTION BLOCK
@@ -149,5 +154,3 @@ if __name__ == "__main__":
 # This modular design allows for easy integration into larger workflows.
 # This allows the script to be run directly for testing or standalone triage
 # purposes, without needing to go through the main CLI flow.
-
-
