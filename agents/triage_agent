@@ -115,12 +115,32 @@ def save_results(findings, output_file="data/triaged_findings.json"):
 # FUNCTION: generate_markdown_report()
 # Generates a readable triage report in Markdown format with linked CVEs
 # ==========================================================================================
+# ==========================================================================================
+# FUNCTION: generate_markdown_report()
+# Generates a readable triage report in Markdown format with linked CVEs and summary table
+# ==========================================================================================
 def generate_markdown_report(findings, output_file="reports/triage_report.md"):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
 
+    # Count by severity for summary table
+    severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+    for f in sorted_findings:
+        severity = f.get("severity", "Unknown")
+        if severity in severity_counts:
+            severity_counts[severity] += 1
+
     lines = ["# 🧠 CHARLOTTE Vulnerability Triage Report\n"]
 
+    # Add Summary Table
+    lines.append("## 📊 Summary by Severity")
+    lines.append("| Severity | Count |")
+    lines.append("|----------|-------|")
+    for level in ["Critical", "High", "Medium", "Low"]:
+        lines.append(f"| {level} | {severity_counts[level]} |")
+    lines.append("\n---\n")
+
+    # Detailed Findings
     for vuln in sorted_findings:
         cve_id = vuln.get('id', 'Unknown ID')
         cve_link = f"https://nvd.nist.gov/vuln/detail/{cve_id}" if cve_id.startswith("CVE-") else None
@@ -132,6 +152,7 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
         lines.append(f"- **Impact**: {vuln.get('impact', 'N/A')}")
         lines.append("")
         lines.append("-" * 80)
+
     lines.append("\nEnd of Report")
 
     with open(output_file, "w", encoding="utf-8") as f:
@@ -140,33 +161,59 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
     print(f"[+] Markdown report saved to {output_file}")
     return output_file
 
+
 # ==========================================================================================
 # FUNCTION: generate_pdf_report()
-# Renders triage results as a PDF report using ReportLab
+# Renders triage results as a PDF report using ReportLab with red highlights for critical
 # ==========================================================================================
 def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
+    from reportlab.lib import colors
+
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     c = canvas.Canvas(output_file, pagesize=letter)
     width, height = letter
     text = c.beginText(40, height - 50)
+    text.setFont("Helvetica-Bold", 14)
+    text.textLine("🧠 CHARLOTTE Vulnerability Triage Report")
     text.setFont("Helvetica", 12)
-    text.textLine("🧠 CHARLOTTE Vulnerability Triage Report\n")
+    text.textLine("")
 
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
+
+    # Summary Table
+    severity_counts = {"Critical": 0, "High": 0, "Medium": 0, "Low": 0}
+    for f in sorted_findings:
+        severity = f.get("severity", "Unknown")
+        if severity in severity_counts:
+            severity_counts[severity] += 1
+
+    text.textLine("📊 Summary by Severity:")
+    for level in ["Critical", "High", "Medium", "Low"]:
+        text.textLine(f"  {level}: {severity_counts[level]}")
+    text.textLine("-" * 70)
+
+    # Detailed Findings
     for vuln in sorted_findings:
         cve_id = vuln.get('id', 'Unknown ID')
-        text.textLine(f"ID: {cve_id}")
+        severity = vuln.get("severity", "").lower()
+        priority = vuln.get("priority", "")
+        score = vuln.get("score", 0)
+        cwe = vuln.get("cwe", "N/A")
+        impact = vuln.get("impact", "N/A")
 
-        # Add CVE URL if applicable
+        # Highlight Critical in red
+        if severity == "critical":
+            c.setFillColor(colors.red)
+        else:
+            c.setFillColor(colors.black)
+
+        text.textLine(f"\nID: {cve_id}")
         if cve_id.startswith("CVE-"):
-            cve_link = f"https://nvd.nist.gov/vuln/detail/{cve_id}"
-            text.textLine(f"Link: {cve_link}")
+            text.textLine(f"Link: https://nvd.nist.gov/vuln/detail/{cve_id}")
+        text.textLine(f"  Priority: {priority} | Severity: {severity.capitalize()} | Score: {score}")
+        text.textLine(f"  CWE: {cwe} | Impact: {impact}")
+        text.textLine("-" * 70)
 
-        text.textLine(f"  Priority: {vuln['priority']} | Severity: {vuln['severity']} | Score: {vuln['score']}")
-        text.textLine(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')}")
-        text.textLine("-" * 80)
-
-    text.textLine("\nEnd of Report")
     c.drawText(text)
     c.save()
     print(f"[+] PDF report saved to {output_file}")
