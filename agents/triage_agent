@@ -18,8 +18,8 @@ from core.logic_modules.report_utils import (
 from core.report_dispatcher import dispatch_report, resend_queued_reports
 
 # ServiceNow integration
-from plugins.integration.servicenow.servicenow_client import create_incident
-from plugins.integration.servicenow.servicenow_setup import configure_servicenow
+from plugins.servicenow.servicenow_client import create_incident
+from plugins.servicenow.servicenow_setup import configure_servicenow
 
 SERVICENOW_CONFIG_PATH = "data/servicenow_config.json"
 

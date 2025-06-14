@@ -1,0 +1,31 @@
+# ==========================================================================================
+# CHARLOTTE Plugin Registration - ServiceNow Integration
+# ==========================================================================================
+
+name: servicenow_integration
+label: 🛎️ Auto-Ticketing via ServiceNow
+category: integration
+description: >
+  Allows CHARLOTTE to auto-generate ServiceNow incident tickets based on triaged findings.
+  Prompts for credentials on first use and submits tickets via the ServiceNow REST API.
+
+entry_point: plugins.integration.servicenow.servicenow_setup:main
+run_after_config: true
+
+inputs: []
+outputs: 
+  - config file written to data/servicenow_config.json
+  - ServiceNow incident(s) created for critical findings
+
+permissions_required:
+  - outbound_network: true
+  - local_file_write: true
+
+tags:
+  - servicenow
+  - integration
+  - incident-response
+  - ticketing
+
+author: CHARLOTTE Core Team
+version: 1.0.0

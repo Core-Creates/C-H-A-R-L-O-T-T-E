@@ -63,10 +63,10 @@ charlotte/
 │
 │
 ├── plugins/
-│   |── integration/
-│   |   └── servicenow/
-│   |       ├── servicenow_client.py        # Handles auth and incident creation
-│   |       └── servicenow_setup.py         # One-time config wizard
+│   |── servicenow/
+│   |   ├── servicenow_client.py        # Handles auth and incident creation
+│   |   ├── servicenow_setup.py         # One-time config wizard
+|   |   └── plugin.yaml
 |   |
 |   |
 │   |── re/                 # Binary plugins: strings, ghidra, symbolic tracing
