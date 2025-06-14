@@ -81,7 +81,11 @@ charlotte/
 |   |
 │   ├── vulnscan/           # XSS, SQLi detectors, etc.
 |   |
-|   
+|
+├── poc_templates/         # <-- 🧠 stays here (root-level directory, sibling to core/)
+│   ├── CWE-77_Command_Injection.py
+│   ├── CWE-119_Buffer_Overflow.py
+│   └──   
 |
 ├── utils/
 │   ├── logger.py           # Logging setup
