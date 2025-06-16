@@ -7,12 +7,13 @@
 import os
 import json
 import smtplib
+import argparse
 import mimetypes
 from email.message import EmailMessage
 import requests
 
 SETTINGS_FILE = os.path.join("data", "user_settings.json")
-QUEUE_FILE = os.path.join("data", "report_queue.log")
+QUEUE_FILE = os.path.join("data", "queued_reports.json")
 
 # ==========================================================================================
 # FUNCTION: load_user_settings()
@@ -111,11 +112,23 @@ def send_webhook(file_path):
 
 # ==========================================================================================
 # FUNCTION: queue_report()
-# Appends failed dispatch file path to a queue log
+# Appends failed dispatch file path to a JSON-based queue
 # ==========================================================================================
 def queue_report(file_path):
-    with open(QUEUE_FILE, "a", encoding="utf-8") as f:
-        f.write(file_path + "\n")
+    queue = []
+    if os.path.exists(QUEUE_FILE):
+        try:
+            with open(QUEUE_FILE, "r", encoding="utf-8") as f:
+                queue = json.load(f)
+        except Exception:
+            pass  # Assume corrupted or empty queue
+
+    if file_path not in queue:
+        queue.append(file_path)
+
+    with open(QUEUE_FILE, "w", encoding="utf-8") as f:
+        json.dump(queue, f, indent=4)
+
     print(f"[!] Report queued for later dispatch: {file_path}")
 
 # ==========================================================================================
@@ -145,3 +158,61 @@ def dispatch_report(file_path):
         queue_report(file_path)
         print("[i] You can reattempt dispatch via the CLI queue resend option.")
 # ==========================================================================================
+# ==========================================================================================
+# FUNCTION: resend_queued_reports()
+# Attempts to resend any failed reports stored in the queue
+# ==========================================================================================
+def resend_queued_reports():
+    if not os.path.exists(QUEUE_FILE):
+        print("[*] No queued reports to resend.")
+        return
+
+    try:
+        with open(QUEUE_FILE, "r", encoding="utf-8") as f:
+            queue = json.load(f)
+    except Exception as e:
+        print(f"[!] Failed to read queue: {e}")
+        return
+
+    if not queue:
+        print("[*] Report queue is empty.")
+        return
+
+    failed = []
+    print(f"[*] Attempting to resend {len(queue)} reports...")
+
+    for path in queue:
+        if os.path.exists(path):
+            try:
+                dispatch_report(path)
+            except Exception as e:
+                print(f"[!] Failed to resend: {path} | {e}")
+                failed.append(path)
+        else:
+            print(f"[!] Missing file: {path}")
+            failed.append(path)
+
+    if failed:
+        with open(QUEUE_FILE, "w", encoding="utf-8") as f:
+            json.dump(failed, f, indent=4)
+        print(f"[!] {len(failed)} reports remain in the queue.")
+    else:
+        os.remove(QUEUE_FILE)
+        print("[+] All queued reports resent successfully.")
+        
+# ==========================================================================================
+# ==========================================================================================
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="CHARLOTTE Report Dispatcher CLI")
+    parser.add_argument("file_path", nargs="?", help="Path to the report file to dispatch")
+    parser.add_argument("--resend", action="store_true", help="Resend all queued reports instead of dispatching a new one")
+    args = parser.parse_args()
+
+    if args.resend:
+        resend_queued_reports()
+    elif args.file_path and os.path.exists(args.file_path):
+        dispatch_report(args.file_path)
+    else:
+        print("[!] Please provide a valid report path or use --resend")
+# or ensure the queue file exists for resending reports.")
+# """

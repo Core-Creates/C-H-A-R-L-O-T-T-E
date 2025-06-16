@@ -4,22 +4,19 @@
 
 import os
 import sys
-import json
-import cve_lookup
 from datetime import datetime
 from InquirerPy import inquirer
-from agents.triage_agent import run_triage_agent
-from plugin_manager import run_plugin, load_plugins
-from charlotte_personality import CharlottePersonality
 from InquirerPy.separator import Separator
 
-# ******************************************************************************************
-# Utility Setup
-# Ensure root project path is in sys.path for relative imports
-# ******************************************************************************************
+# Fix import resolution for project-local packages like agents/, core/, etc.
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
+
+from agents.triage_agent import run_triage_agent, load_findings, save_results
+from plugin_manager import run_plugin, load_plugins
+from charlotte_personality import CharlottePersonality
+import cve_lookup
 
 # Initialize CHARLOTTE personality
 charlotte = CharlottePersonality()
@@ -122,9 +119,6 @@ def run_cve_lookup():
         results = cve_lookup.search_by_product_year(product, year)
         cve_lookup.show_and_export(results, multiple=True)
 
-    else:
-        return
-
 # ******************************************************************************************
 # Main CLI Application Logic
 # ******************************************************************************************
@@ -137,15 +131,15 @@ def main():
         message="What would you like CHARLOTTE to do?",
         choices=[
             Separator("=== Binary Ops ==="),
-            *[k for k in PLUGIN_TASKS.keys() if "Binary" in k],
+            *[k for k in PLUGIN_TASKS if "Binary" in k],
             Separator("=== Recon ==="),
-            *[k for k in PLUGIN_TASKS.keys() if "Scan" in k or "Recon" in k],
+            *[k for k in PLUGIN_TASKS if "Scan" in k or "Recon" in k],
             Separator("=== Exploitation ==="),
-            *[k for k in PLUGIN_TASKS.keys() if "Exploit" in k],
+            *[k for k in PLUGIN_TASKS if "Exploit" in k],
             Separator("=== Intelligence ==="),
             "🕵️ CVE Lookup (CHARLOTTE)",
             Separator("=== Scoring & Analysis ==="),
-            *[k for k in PLUGIN_TASKS.keys() if "Triage" in k or "Assessment" in k],
+            *[k for k in PLUGIN_TASKS if "Triage" in k or "Assessment" in k],
             Separator(),
             "❌ Exit",
         ],
@@ -159,51 +153,44 @@ def main():
         run_cve_lookup()
         return
 
-# --------------------------------------------------
-# Plugin/Agent Execution Logic
-# --------------------------------------------------
-# --------------------------------------------------
-# Plugin/Agent Execution Logic
-# --------------------------------------------------
-plugin_key = PLUGIN_TASKS.get(task)
+    plugin_key = PLUGIN_TASKS.get(task)
 
-if plugin_key == "triage_agent":
-    scan_path = inquirer.text(
-        message="Enter path to scan file (press Enter for default: data/findings.json):"
-    ).execute()
-    scan_path = scan_path.strip() or "data/findings.json"
-    run_triage_agent(scan_file=scan_path)
+    if plugin_key == "triage_agent":
+        scan_path = inquirer.text(
+            message="Enter path to scan file (press Enter for default: data/findings.json):"
+        ).execute()
+        scan_path = scan_path.strip() or "data/findings.json"
+        run_triage_agent(scan_file=scan_path)
 
-elif plugin_key == "exploit_predictor":
-    from core.logic_modules.exploit_predictor import batch_predict
-    from agents.triage_agent import load_findings, save_results
+    elif plugin_key == "exploit_predictor":
+        from core.logic_modules.exploit_predictor import batch_predict
 
-    scan_path = inquirer.text(
-        message="Enter path to scan file (press Enter for default: data/findings.json):"
-    ).execute()
-    scan_path = scan_path.strip() or "data/findings.json"
+        scan_path = inquirer.text(
+            message="Enter path to scan file (press Enter for default: data/findings.json):"
+        ).execute()
+        scan_path = scan_path.strip() or "data/findings.json"
 
-    try:
-        findings = load_findings(scan_path)
-        enriched = batch_predict(findings)
-        output_path = "data/findings_with_predictions.json"
-        save_results(output_path, enriched)
+        try:
+            findings = load_findings(scan_path)
+            enriched = batch_predict(findings)
+            output_path = "data/findings_with_predictions.json"
+            save_results(enriched, output_file=output_path)
 
-        print(f"\n[✔] Exploit predictions saved to {output_path}")
-        print("Use '🧮 Vulnerability Triage' to further refine prioritization.\n")
-    except Exception as e:
-        print(f"[!] Error processing exploit prediction: {e}")
+            print(f"\n[✔] Exploit predictions saved to {output_path}")
+            print("Use '🧮 Vulnerability Triage' to further refine prioritization.\n")
+        except Exception as e:
+            print(f"[!] Error processing exploit prediction: {e}")
 
-else:
-    run_plugin(plugin_key)
-    print(f"\n[✔] Running plugin: {plugin_key}...\n")
-    if plugin_key == "cve_lookup":
-        run_cve_lookup()
     else:
-        print(f"[✔] Plugin '{plugin_key}' executed successfully.\n")
+        run_plugin(plugin_key)
+        print(f"\n[✔] Running plugin: {plugin_key}...\n")
+
 # ******************************************************************************************
 # Entry Point
 # ******************************************************************************************
 
 if __name__ == "__main__":
     main()
+
+# ******************************************************************************************
+# This is the main entry point for the CHARLOTTE CLI application.
