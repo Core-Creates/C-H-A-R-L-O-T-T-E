@@ -32,7 +32,37 @@ PLUGIN_REGISTRY = {
 # Dynamically loads and executes the requested plugin module from PLUGIN_REGISTRY
 # ******************************************************************************************
 
-def load_plugin(task: str, args: Dict) -> str:
+# ******************************************************************************************
+# Unified Plugin Loader (Populates internal registry from both static and dynamic sources)
+# ******************************************************************************************
+
+def load_plugins():
+    """
+    Loads both statically defined and dynamically discovered plugins.
+    Prints a summary table of available plugins (optional).
+    """
+    print("📦 Loading CHARLOTTE Plugins...")
+
+    # Load static plugins
+    print("🔌 Static Plugins:")
+    for key, (category, module_name) in PLUGIN_REGISTRY.items():
+        print(f"  • {key:20s} → plugins/{category}/{module_name}.py")
+
+    # Load dynamic plugins via plugin.yaml
+    dynamic_plugins = discover_plugins()
+    if dynamic_plugins:
+        print("\n🧩 Dynamic Plugins:")
+        for plugin in dynamic_plugins:
+            label = plugin.get("label", "Unnamed Plugin")
+            description = plugin.get("description", "No description provided")
+            print(f"  • {label:30s} :: {description}")
+    else:
+        print("⚠️  No dynamic plugins found.")
+
+    print("✅ Plugin system ready.\n")
+
+
+def run_plugin(task: str, args: Dict) -> str:
     """
     Loads and executes a statically registered plugin.
 
