@@ -32,7 +32,7 @@ PLUGIN_REGISTRY = {
 # Dynamically loads and executes the requested plugin module from PLUGIN_REGISTRY
 # ******************************************************************************************
 
-def run_plugin(task: str, args: Dict) -> str:
+def load_plugin(task: str, args: Dict) -> str:
     """
     Loads and executes a statically registered plugin.
 
