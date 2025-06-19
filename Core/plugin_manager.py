@@ -16,10 +16,11 @@ from typing import Dict, List
 # ******************************************************************************************
 
 PLUGIN_REGISTRY = {
+    "nmap_scan": ("recon", "nmap_plugin"),                   # 📡 Nmap port scanner
+    "subdomain_enum": ("recon", "owasp_amass"),              # 🌐 Subdomain enumeration using OWASP Amass
     "reverse_engineering": ("re", "symbolic_trace"),         # 🧠 Binary symbolic tracer
     "binary_strings": ("re", "bin_strings"),                 # 🔍 Strings & entropy scan
     "web_recon": ("recon", "subdomain_enum"),                # 🌐 Subdomain discovery
-    "port_scan": ("recon", "nmap_plugin"),                   # 📡 Basic port scan
     "xss_scan": ("vulnscan", "xss_detector"),                # 🧼 Cross-site scripting test
     "sql_injection": ("vulnscan", "sql_injection"),          # 💉 SQLi vulnerability test
     "exploit_generation": ("agents", "exploit_agent"),       # 🚨 LLM-generated exploit suggestions
