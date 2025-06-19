@@ -1,5 +1,5 @@
 # ******************************************************************************************
-# main.py - Minimal Launcher for CHARLOTTE with Banner and Plugin Hook
+# main.py - Minimal Launcher for CHARLOTTE with Banner and Plugin Hook (with Loop)
 # ******************************************************************************************
 
 import os
@@ -57,14 +57,14 @@ PLUGIN_TASKS = {
     "🚨 Exploit Generator": "exploit_generation",
     "🔗 Link Analysis": "link_analysis",
     "📡 NMAP Scan": "nmap_plugin",
-    "🧨 Predict Exploitability": "exploit_predictor",
+    "🫸 Predict Exploitability": "exploit_predictor",
     "🔎 Search Exploit DB": "exploit_search",
-    "💉 SQL Injection Scan": "sql_injection",
-    "🧪 Static Analysis (Binary)": "static_analysis",
-    "📊 Vulnerability Assessment": "vulnerability_assessment",
-    "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
+    "📈 Vulnerability Assessment": "vulnerability_assessment",
+    "🧽 Vulnerability Triage (Score + Prioritize)": "triage_agent",
     "🌐 Web Recon (OWASP Amass)": "owasp_amass",
-    "🧼 XSS Scan": "xss_scan"
+    "🧼 XSS Scan": "xss_scan",
+    "📉 Static Analysis (Binary)": "static_analysis",
+    "📉 SQL Injection Scan": "sql_injection"
 }
 
 # ******************************************************************************************
@@ -104,70 +104,71 @@ def run_cve_lookup():
         cve_lookup.show_and_export(results, multiple=True)
 
 # ******************************************************************************************
-# Main CLI Application Logic
+# Main CLI Application Logic (Looped)
 # ******************************************************************************************
 
 def main():
     print_banner()
     load_plugins()
 
-    task = inquirer.select(
-        message="What would you like CHARLOTTE to do?",
-        choices=[
-            Separator("=== Binary Ops ==="),
-            *[k for k in PLUGIN_TASKS if "Binary" in k],
-            Separator("=== Recon ==="),
-            *[k for k in PLUGIN_TASKS if "Scan" in k or "Recon" in k],
-            Separator("=== Exploitation ==="),
-            *[k for k in PLUGIN_TASKS if "Exploit" in k],
-            Separator("=== Intelligence ==="),
-            "🕵️ CVE Lookup (CHARLOTTE)",
-            Separator("=== Scoring & Analysis ==="),
-            *[k for k in PLUGIN_TASKS if "Triage" in k or "Assessment" in k],
-            Separator(),
-            "❌ Exit",
-        ],
-    ).execute()
-
-    if task == "❌ Exit":
-        print("Goodbye, bestie 🖤")
-        return
-
-    if task == "🕵️ CVE Lookup (CHARLOTTE)":
-        run_cve_lookup()
-        return
-
-    plugin_key = PLUGIN_TASKS.get(task)
-
-    if plugin_key == "triage_agent":
-        scan_path = inquirer.text(
-            message="Enter path to scan file (press Enter for default: data/findings.json):"
+    while True:
+        task = inquirer.select(
+            message="What would you like CHARLOTTE to do?",
+            choices=[
+                Separator("=== Binary Ops ==="),
+                *[k for k in PLUGIN_TASKS if "Binary" in k],
+                Separator("=== Recon ==="),
+                *[k for k in PLUGIN_TASKS if "Scan" in k or "Recon" in k],
+                Separator("=== Exploitation ==="),
+                *[k for k in PLUGIN_TASKS if "Exploit" in k],
+                Separator("=== Intelligence ==="),
+                "🕵️ CVE Lookup (CHARLOTTE)",
+                Separator("=== Scoring & Analysis ==="),
+                *[k for k in PLUGIN_TASKS if "Triage" in k or "Assessment" in k],
+                Separator(),
+                "❌ Exit",
+            ],
         ).execute()
-        scan_path = scan_path.strip() or "data/findings.json"
-        run_triage_agent(scan_file=scan_path)
 
-    elif plugin_key == "exploit_predictor":
-        from core.logic_modules.exploit_predictor import batch_predict
+        if task == "❌ Exit":
+            print("Goodbye, bestie 🖤")
+            break
 
-        scan_path = inquirer.text(
-            message="Enter path to scan file (press Enter for default: data/findings.json):"
-        ).execute()
-        scan_path = scan_path.strip() or "data/findings.json"
+        if task == "🕵️ CVE Lookup (CHARLOTTE)":
+            run_cve_lookup()
+            continue
 
-        try:
-            findings = load_findings(scan_path)
-            enriched = batch_predict(findings)
-            output_path = "data/findings_with_predictions.json"
-            save_results(enriched, output_file=output_path)
+        plugin_key = PLUGIN_TASKS.get(task)
 
-            print(f"\n[✔] Exploit predictions saved to {output_path}")
-            print("Use '🧮 Vulnerability Triage' to further refine prioritization.\n")
-        except Exception as e:
-            print(f"[!] Error processing exploit prediction: {e}")
+        if plugin_key == "triage_agent":
+            scan_path = inquirer.text(
+                message="Enter path to scan file (press Enter for default: data/findings.json):"
+            ).execute()
+            scan_path = scan_path.strip() or "data/findings.json"
+            run_triage_agent(scan_file=scan_path)
 
-    else:
-        run_plugin(plugin_key)
-        print(f"\n[✔] Running plugin: {plugin_key}...\n")
+        elif plugin_key == "exploit_predictor":
+            from core.logic_modules.exploit_predictor import batch_predict
+
+            scan_path = inquirer.text(
+                message="Enter path to scan file (press Enter for default: data/findings.json):"
+            ).execute()
+            scan_path = scan_path.strip() or "data/findings.json"
+
+            try:
+                findings = load_findings(scan_path)
+                enriched = batch_predict(findings)
+                output_path = "data/findings_with_predictions.json"
+                save_results(enriched, output_file=output_path)
+
+                print(f"\n[✔] Exploit predictions saved to {output_path}")
+                print("Use '🧽 Vulnerability Triage' to further refine prioritization.\n")
+            except Exception as e:
+                print(f"[!] Error processing exploit prediction: {e}")
+
+        else:
+            run_plugin(plugin_key)
+            print(f"\n[✔] Running plugin: {plugin_key}...\n")
 
 # ******************************************************************************************
 # Entry Point
