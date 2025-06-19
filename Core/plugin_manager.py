@@ -35,57 +35,73 @@ PLUGIN_REGISTRY = {
 # ******************************************************************************************
 # Unified Plugin Loader (Populates internal registry from both static and dynamic sources)
 # ******************************************************************************************
-
 def load_plugins():
     """
-    Loads both statically defined and dynamically discovered plugins.
-    Prints a summary table of available plugins (optional).
+    Loads both static and dynamic plugins.
+    Dynamically discovered plugins are merged into PLUGIN_REGISTRY at runtime.
     """
     print("📦 Loading CHARLOTTE Plugins...")
 
-    # Load static plugins
+    # Static plugins
     print("🔌 Static Plugins:")
     for key, (category, module_name) in PLUGIN_REGISTRY.items():
-        print(f"  • {key:20s} → plugins/{category}/{module_name}.py")
+        print(f"  • {key:25s} → plugins/{category}/{module_name}.py")
 
-    # Load dynamic plugins via plugin.yaml
+    # Dynamic plugins
+    print("\n🧩 Dynamic Plugins:")
     dynamic_plugins = discover_plugins()
-    if dynamic_plugins:
-        print("\n🧩 Dynamic Plugins:")
-        for plugin in dynamic_plugins:
-            label = plugin.get("label", "Unnamed Plugin")
-            description = plugin.get("description", "No description provided")
-            print(f"  • {label:30s} :: {description}")
-    else:
-        print("⚠️  No dynamic plugins found.")
+    for plugin in dynamic_plugins:
+        label = plugin.get("label", f"plugin_{plugin['name']}")
+        description = plugin.get("description", "No description")
+        entry_point = plugin.get("entry_point")
+        version = plugin.get("version", "0.1")
+        author = plugin.get("author", "Unknown")
+
+        if not entry_point:
+            print(f"  ⚠️  Skipping '{label}' – No entry_point defined.")
+            continue
+
+        registry_key = label.lower().replace(" ", "_").replace("-", "_")
+        if registry_key in PLUGIN_REGISTRY:
+            print(f"  ⚠️  Skipping '{label}' – Conflicts with static plugin key.")
+            continue
+
+        # ✅ THIS IS WHAT WAS MISSING
+        PLUGIN_REGISTRY[registry_key] = ("dynamic", entry_point)
+
+        print(f"  • {label:25s} :: {description} (v{version} by {author})")
 
     print("✅ Plugin system ready.\n")
+# Load all plugins at startup
 
+# ******************************************************************************************
+# Static Plugin loader
+# ******************************************************************************************
 
-def run_plugin(task: str, args: Dict) -> str:
+def run_plugin(task: str, args: Dict = {}) -> str:
     """
-    Loads and executes a statically registered plugin.
-
-    Args:
-        task *str* = Key from PLUGIN_REGISTRY
-        args *Dict* = Arguments passed to plugin's `run(args)` function
-
-    Returns:
-        *str* = Plugin output or error message
+    Loads and executes the requested plugin module.
+    Supports both statically registered and dynamically discovered plugins.
     """
     if task not in PLUGIN_REGISTRY:
         return f"[ERROR] No plugin registered for task '{task}'"
 
-    category, module_name = PLUGIN_REGISTRY[task]
-    module_path = f"plugins.{category}.{module_name}"
+    category, module_info = PLUGIN_REGISTRY[task]
 
+    if category == "dynamic":
+        # module_info is an entry_point string like "plugins.myplugin.module:run"
+        return run_dynamic_plugin(module_info, args)
+
+    # Static plugin: load from plugins/<category>/<module_name>.py
     try:
+        module_path = f"plugins.{category}.{module_info}"
         plugin = importlib.import_module(module_path)
         if not hasattr(plugin, "run"):
-            return f"[ERROR] Plugin '{module_name}' has no 'run(args)' function."
+            return f"[ERROR] Plugin '{module_info}' has no 'run(args)' function."
         return plugin.run(args)
     except Exception as e:
         return f"[PLUGIN ERROR]: {str(e)}\n{traceback.format_exc()}"
+
 
 # ******************************************************************************************
 # Dynamic Plugin Discovery (plugin.yaml-based)
@@ -111,16 +127,18 @@ def discover_plugins() -> List[Dict]:
                 print(f"[!] Failed to load plugin.yaml from {folder}: {e}")
     return plugins
 
-def run_dynamic_plugin(entry_point: str):
-    """Runs a plugin from entry_point = 'module.submodule:function'."""
+def run_dynamic_plugin(entry_point: str, args: Dict = {}) -> str:
+    """Runs a plugin from entry_point = 'module.submodule:function' with optional args."""
     try:
         module_name, func_name = entry_point.split(":")
         module = importlib.import_module(module_name)
         func = getattr(module, func_name)
-        return func()
+        return func(args)
     except Exception as e:
         print(f"[!] Failed to execute plugin: {e}")
         traceback.print_exc()
+        return f"[PLUGIN ERROR]: {e}"
+
 
 def list_plugins() -> List[str]:
     """Returns a list of plugin labels and descriptions."""

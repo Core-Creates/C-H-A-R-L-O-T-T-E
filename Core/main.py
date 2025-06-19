@@ -32,7 +32,7 @@ def print_banner():
     RESET = "\033[0m"
     skull_banner = f"""{PURPLE}
         
-           ......      
+           .....      
         ...........    🔮  C - H - A - R - L - O - T - T - E  🔮
        '.....,.....,
       '...... . . . .
