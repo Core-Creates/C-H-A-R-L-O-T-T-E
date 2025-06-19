@@ -143,6 +143,7 @@ def run_plugin(chain_followups=True):
             run_next_plugin("http_banner", targets=target_list, output_dir=folder)
     else:
         print("\n[ℹ️] No follow-up plugins chained. You can run them manually later.")
+        
 
 # ******************************************************************************************
 # Optional: standalone CLI usage
