@@ -3,6 +3,7 @@
 # ******************************************************************************************
 
 import os
+import random
 import sys
 import json
 import yaml
@@ -131,7 +132,12 @@ def main():
                 ],
             ).execute()
         except KeyboardInterrupt:
-            print("\n[✖] Canceled by user. Exiting...\n")
+            exit_lines = [
+                "\n[✖] Interrupted... Running away dramatically 🕷️💨\n",
+                "\n[✖] Ugh. Fine. Exiting. Hope you're happy. 🖤\n",
+                "\n[✖] CHARLOTTE has left the building. 😒\n"
+            ]
+            print(random.choice(exit_lines))
             break
 
         if task == "❌ Exit":
@@ -179,7 +185,10 @@ def main():
 # ******************************************************************************************
 
 if __name__ == "__main__":
-    main()
+    try:
+        main()
+    except KeyboardInterrupt:
+        print("\n[✖] CHARLOTTE terminated. Stay safe out there.\n")
 
 # ******************************************************************************************
 # This is the main entry point for the CHARLOTTE CLI application.
