@@ -63,7 +63,7 @@ PLUGIN_TASKS = {
     "🧪 Static Analysis (Binary)": "static_analysis",
     "📊 Vulnerability Assessment": "vulnerability_assessment",
     "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
-    "🌐 Web Recon (Subdomains)": "web_recon",
+    "🌐 Web Recon (OWASP Amass)": "owasp_amass",
     "🧼 XSS Scan": "xss_scan"
 }
 
