@@ -112,23 +112,27 @@ def main():
     load_plugins()
 
     while True:
-        task = inquirer.select(
-            message="What would you like CHARLOTTE to do?",
-            choices=[
-                Separator("=== Binary Ops ==="),
-                *[k for k in PLUGIN_TASKS if "Binary" in k],
-                Separator("=== Recon ==="),
-                *[k for k in PLUGIN_TASKS if "Scan" in k or "Recon" in k],
-                Separator("=== Exploitation ==="),
-                *[k for k in PLUGIN_TASKS if "Exploit" in k],
-                Separator("=== Intelligence ==="),
-                "🕵️ CVE Lookup (CHARLOTTE)",
-                Separator("=== Scoring & Analysis ==="),
-                *[k for k in PLUGIN_TASKS if "Triage" in k or "Assessment" in k],
-                Separator(),
-                "❌ Exit",
-            ],
-        ).execute()
+        try:
+            task = inquirer.select(
+                message="What would you like CHARLOTTE to do?",
+                choices=[
+                    Separator("=== Binary Ops ==="),
+                    *[k for k in PLUGIN_TASKS if "Binary" in k],
+                    Separator("=== Recon ==="),
+                    *[k for k in PLUGIN_TASKS if "Scan" in k or "Recon" in k],
+                    Separator("=== Exploitation ==="),
+                    *[k for k in PLUGIN_TASKS if "Exploit" in k],
+                    Separator("=== Intelligence ==="),
+                    "🕵️ CVE Lookup (CHARLOTTE)",
+                    Separator("=== Scoring & Analysis ==="),
+                    *[k for k in PLUGIN_TASKS if "Triage" in k or "Assessment" in k],
+                    Separator(),
+                    "❌ Exit",
+                ],
+            ).execute()
+        except KeyboardInterrupt:
+            print("\n[✖] Canceled by user. Exiting...\n")
+            break
 
         if task == "❌ Exit":
             print("Goodbye, bestie 🖤")
