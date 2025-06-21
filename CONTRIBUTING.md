@@ -19,19 +19,28 @@ CHARLOTTE is a modular AI assistant built to assist in:
    git clone https://github.com/<your-username>/C-H-A-R-L-O-T-T-E.git
    cd C-H-A-R-L-O-T-T-E
    ```
+3. **🌀 Create and Activate Virtual Environment**
+   From your CHARLOTTE project root:
 
-3. **Install Dependencies**
-   Make sure you have Python 3.9+ installed. Then:
+   ```bash
+   python -m venv .venv
+   ```
+   .venv\Scripts\activate  # Windows
+   source .venv/bin/activate  # macOS/Linux
+
+
+4. **Install Dependencies**
+   Make sure you have Python 3.11 installed. Then:
    ```bash
    pip install -r requirements.txt
    ```
 
-4. **Run CHARLOTTE Locally**
+5. **Run CHARLOTTE Locally**
    ```bash
    python charlotte.py
    ```
 
-5. **Explore the Code**
+6. **Explore the Code**
    Key folders:
    - `core/`: Core logic and decision engine
    - `plugins/`: Modular tasks CHARLOTTE can perform (e.g., disassemblers, analyzers)
@@ -60,6 +69,8 @@ We're working on increasing test coverage — feel free to help with that too!
 
 - Follow [PEP8](https://www.python.org/dev/peps/pep-0008/)  
 - Use descriptive commit messages (`feat:`, `fix:`, `refactor:` etc.)
+- Please add code blocks to break up certain sections of code example
+   in the main.py use *** or ===
 - Add comments in CHARLOTTE's signature tone if you're brave 😈
 
 ## 🧵 Branching Strategy
@@ -73,9 +84,9 @@ We're working on increasing test coverage — feel free to help with that too!
 
 ## 💬 Need Help?
 
-- Open an issue
-- Ask in Discussions (if enabled)
-- Or send a haunted whisper to the maintainers via GitHub
+- Open an issue (https://github.com/users/Core-Creates/projects/2/views/1)
+- Send a haunted whisper to the maintainers via discord
+- Or whisper your message to the void... CHARLOTTE might answer 🖤
 
 ---
 
