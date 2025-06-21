@@ -13,7 +13,7 @@ from reportlab.lib import colors
 # FUNCTION: generate_html_report()
 # Renders triage results as a basic HTML report with exploit and severity highlighting
 # ==========================================================================================
-def generate_html_report(findings, output_file="reports/triage_report.html"):
+def generate_html_report(findings, output_file="reports/triage_report.html", include_fields=None):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
 
@@ -55,20 +55,27 @@ def generate_html_report(findings, output_file="reports/triage_report.html"):
         html.append(f"<p><strong>Score:</strong> {vuln.get('score')}</p>")
         html.append(f"<p><strong>Impact:</strong> {vuln.get('impact')}</p>")
         html.append(f"<p><strong>CWE:</strong> {vuln.get('cwe')}</p>")
-        html.append(f"<p><strong>Exploitability:</strong> {vuln.get('exploit_prediction')} ({vuln.get('confidence')})</p></div>")
+        html.append(f"<p><strong>Exploitability:</strong> {vuln.get('exploit_prediction')} ({vuln.get('confidence')})</p>")
+        if include_fields:
+            if "cve_description" in include_fields and vuln.get("cve_description"):
+                html.append(f"<p><strong>Description:</strong> {vuln['cve_description']}</p>")
+            if "tags" in include_fields and vuln.get("tags"):
+                html.append(f"<p><strong>Tags:</strong> {', '.join(vuln['tags'])}</p>")
+            if "emoji_tags" in include_fields and vuln.get("emoji_tags"):
+                html.append(f"<p><strong>🚩 Auto Tags:</strong> {', '.join(vuln['emoji_tags'])}</p>")
+        html.append("</div>")
 
     html.append("</body></html>")
     with open(output_file, "w", encoding="utf-8") as f:
         f.write("\n".join(html))
     print(f"[+] HTML report saved to {output_file}")
     return output_file
-# ******************************************************************************************
 
 # ==========================================================================================
 # FUNCTION: generate_markdown_report()
 # Generates a Markdown report from vulnerability data
 # ==========================================================================================
-def generate_markdown_report(findings, output_file="reports/triage_report.md"):
+def generate_markdown_report(findings, output_file="reports/triage_report.md", include_fields=None):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
 
@@ -104,6 +111,13 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
         lines.append(f"- **CWE**: {vuln.get('cwe', 'N/A')}")
         lines.append(f"- **Impact**: {vuln.get('impact', 'N/A')}")
         lines.append(f"- **Exploitability**: {vuln.get('exploit_prediction')} ({vuln.get('confidence')})")
+        if include_fields:
+            if "cve_description" in include_fields and vuln.get("cve_description"):
+                lines.append(f"- **Description**: {vuln['cve_description']}")
+            if "tags" in include_fields and vuln.get("tags"):
+                lines.append(f"- **Tags**: {', '.join(vuln['tags'])}")
+            if "emoji_tags" in include_fields and vuln.get("emoji_tags"):
+                lines.append(f"- **🚩 Auto Tags**: {', '.join(vuln['emoji_tags'])}")
         lines.append("\n---\n")
 
     with open(output_file, "w", encoding="utf-8") as f:
@@ -116,7 +130,7 @@ def generate_markdown_report(findings, output_file="reports/triage_report.md"):
 # FUNCTION: generate_pdf_report()
 # Generates a color-coded PDF vulnerability report
 # ==========================================================================================
-def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
+def generate_pdf_report(findings, output_file="reports/triage_report.pdf", include_fields=None):
     os.makedirs(os.path.dirname(output_file), exist_ok=True)
     c = canvas.Canvas(output_file, pagesize=letter)
     width, height = letter
@@ -158,6 +172,13 @@ def generate_pdf_report(findings, output_file="reports/triage_report.pdf"):
         text.textLine(f"  Priority: {vuln.get('priority')} | Severity: {vuln.get('severity')} | Score: {vuln.get('score')}")
         text.textLine(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')}")
         text.textLine(f"  Exploitability: {vuln.get('exploit_prediction')} ({vuln.get('confidence')})")
+        if include_fields:
+            if "cve_description" in include_fields and vuln.get("cve_description"):
+                text.textLine(f"  Description: {vuln['cve_description'][:200]}")
+            if "tags" in include_fields and vuln.get("tags"):
+                text.textLine(f"  Tags: {', '.join(vuln['tags'])}")
+            if "emoji_tags" in include_fields and vuln.get("emoji_tags"):
+                text.textLine(f"  🚩 Auto Tags: {', '.join(vuln['emoji_tags'])}")
         text.textLine("-" * 70)
 
     c.drawText(text)
