@@ -76,6 +76,7 @@ def triage_findings(findings):
     - cve_description: Text from the CVE dataset
     - tags: Any classification labels from the dataset
     - source_dataset: Indicates data origin
+    - emoji_tags: Auto-tagged labels based on description keywords
     """
     print("[*] Enriching findings with CVE metadata...")
     cve_map = load_cve_data()  # Load once for performance
@@ -100,6 +101,19 @@ def triage_findings(findings):
             vuln["cve_description"] = "No CVE enrichment found."
             vuln["tags"] = []
 
+        # Auto-tagging based on keywords
+        desc = vuln["cve_description"].lower()
+        emoji_tags = []
+        if "wormable" in desc:
+            emoji_tags.append("🚨 wormable")
+        if "remote code execution" in desc or "rce" in desc:
+            emoji_tags.append("🔥 critical RCE")
+        if "buffer overflow" in desc:
+            emoji_tags.append("🧠 buffer overflow")
+        if "privilege escalation" in desc:
+            emoji_tags.append("🔐 privilege escalation")
+        vuln["emoji_tags"] = emoji_tags
+
         enriched.append(vuln)
 
     return enriched
@@ -118,6 +132,8 @@ def display_summary(findings, limit=10):
             print(f"  Desc: {vuln['cve_description'][:100]}...")
         if vuln.get("tags"):
             print(f"  Tags: {', '.join(vuln['tags'])}")
+        if vuln.get("emoji_tags"):
+            print(f"  🚩 {', '.join(vuln['emoji_tags'])}")
         print()
 
 # ==========================================================================================
@@ -156,11 +172,11 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
     report_file = None
 
     if format_choice.startswith("📄"):
-        report_file = generate_markdown_report(enriched_findings)
+        report_file = generate_markdown_report(enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"])
     elif format_choice.startswith("🧾"):
-        report_file = generate_pdf_report(enriched_findings)
+        report_file = generate_pdf_report(enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"])
     elif format_choice.startswith("🌐"):
-        report_file = generate_html_report(enriched_findings)
+        report_file = generate_html_report(enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"])
     elif format_choice.startswith("♻️"):
         resend_queued_reports()
         return
