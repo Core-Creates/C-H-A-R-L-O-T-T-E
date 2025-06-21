@@ -200,9 +200,17 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
 # ==========================================================================================
 if __name__ == "__main__":
     run_triage_agent()
-# This block allows the script to be run directly from the command line.
-# It will execute the triage agent with the default scan file.
-# It can also be imported as a module in other scripts.
-# This modular design allows for easy integration into larger workflows.
-# This allows the script to be run directly for testing or standalone triage
-# purposes, without needing to go through the main CLI flow.
+
+    # This block allows the script to be run directly from the command line.
+    # It will execute the triage agent with the default scan file.
+    # It can also be imported as a module in other scripts.
+    # This modular design allows for easy integration into larger workflows.
+    # This allows the script to be run directly for testing or standalone triage
+    # purposes, without needing to go through the main CLI flow.
+
+    # =================== CVE Lookup Example ====================
+    # Useful for debugging or offline CVE validation
+    cve_map = load_cve_data()
+    finding = cve_map.get("CVE-2023-XXXX", None)
+    if finding:
+        print(f"Description: {finding['description']}")
