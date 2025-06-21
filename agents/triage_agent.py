@@ -16,6 +16,7 @@ from core.logic_modules.report_utils import (
     generate_html_report
 )
 from core.report_dispatcher import dispatch_report, resend_queued_reports
+from core.cve_data_loader import load_cve_data  # Loads CVE dataset from Hugging Face
 
 # ServiceNow integration
 from plugins.servicenow.servicenow_client import create_incident, maybe_create_tickets
@@ -65,31 +66,42 @@ def load_findings(file_path):
 # FUNCTION: triage_findings()
 # Applies scoring logic to all findings using triage() from triage_rules.py
 # Appends calculated 'severity', 'score', and 'priority' to each vuln entry
+# Enriches findings with CVE description and tags from Hugging Face dataset
 # ==========================================================================================
 def triage_findings(findings):
     """
-    Apply triage scoring and classification to a list of findings.
+    Apply triage scoring, exploit prediction, and CVE enrichment.
 
-    --------------------------------------------
-    Output structure:
-    --------------------------------------------
-    [
-        {
-            ...original fields...,
-            "severity": "High",
-            "score": 82,
-            "priority": "🚨 High"
-        },
-        ...
-    ]
+    Enrichment adds:
+    - cve_description: Text from the CVE dataset
+    - tags: Any classification labels from the dataset
+    - source_dataset: Indicates data origin
     """
+    print("[*] Enriching findings with CVE metadata...")
+    cve_map = load_cve_data()  # Load once for performance
+
     enriched = []
     for vuln in findings:
         result = triage(vuln)
         vuln.update(result)
+
         prediction = predict_exploitability(vuln)
         vuln.update(prediction)
+
+        # CVE enrichment block
+        cve_id = vuln.get("id")
+        cve_info = cve_map.get(cve_id)
+
+        if cve_info:
+            vuln["cve_description"] = cve_info.get("description", "No description available.")
+            vuln["tags"] = cve_info.get("tags", [])
+            vuln["source_dataset"] = "Bouquets/Cybersecurity-LLM-CVE"
+        else:
+            vuln["cve_description"] = "No CVE enrichment found."
+            vuln["tags"] = []
+
         enriched.append(vuln)
+
     return enriched
 
 # ==========================================================================================
@@ -102,6 +114,10 @@ def display_summary(findings, limit=10):
     for vuln in sorted_findings[:limit]:
         print(f"- {vuln.get('id', 'N/A')}: {vuln['priority']} | {vuln['severity']} | Score: {vuln['score']}")
         print(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')} | Exploit: {vuln.get('exploit_prediction')} ({vuln.get('confidence')})")
+        if vuln.get("cve_description"):
+            print(f"  Desc: {vuln['cve_description'][:100]}...")
+        if vuln.get("tags"):
+            print(f"  Tags: {', '.join(vuln['tags'])}")
         print()
 
 # ==========================================================================================
@@ -116,6 +132,7 @@ def save_results(findings, output_file="data/triaged_findings.json"):
 
 # ==========================================================================================
 # FUNCTION: run_triage_agent()
+# Full triage pipeline: Load -> Analyze -> Report -> Dispatch
 # ==========================================================================================
 def run_triage_agent(scan_file="data/findings.json", dispatch=True):
     print(f"[*] Loading scan findings from: {scan_file}")
@@ -154,14 +171,14 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
     if dispatch and report_file:
         dispatch_report(report_file)
 
-    # Ask about ticket creation
     auto_ticket = inquirer.confirm(
-    message="Auto-create ServiceNow tickets for critical findings?",
-    default=True
+        message="Auto-create ServiceNow tickets for critical findings?",
+        default=True
     ).execute()
 
     if auto_ticket:
         maybe_create_tickets(enriched_findings)
+
 # ==========================================================================================
 # MAIN EXECUTION BLOCK
 # ==========================================================================================
