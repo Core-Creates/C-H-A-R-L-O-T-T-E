@@ -39,6 +39,13 @@ CHARLOTTE is a modular AI assistant built to assist in:
    ```bash
    python charlotte.py
    ```
+   
+   **Special Note if using Docker**
+   ## 🐳 Running with Docker Compose
+
+   ```bash
+   docker-compose run charlotte
+   ```
 
 6. **Explore the Code**
    Key folders:
