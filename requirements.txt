@@ -1,7 +1,9 @@
 # This file lists the dependencies required for the project.
 # Use pip to install these packages.
 PyYAML
+yaml
 InquirerPy
 markdown2
 reportlab
 requests
+datasets
