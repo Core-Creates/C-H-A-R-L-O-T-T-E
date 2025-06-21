@@ -1,9 +1,24 @@
-# This file lists the dependencies required for the project.
-# Use pip to install these packages.
-PyYAML
-yaml
-InquirerPy
-markdown2
-reportlab
-requests
-datasets
+# CHARLOTTE - Dependency List
+# Compatible with Python 3.11
+
+# CLI input handling
+InquirerPy>=0.3.4
+
+# CVE report formatting
+markdown2>=2.4.10
+reportlab>=4.0.4
+
+# HTTP and API requests
+requests>=2.32.0
+
+# YAML file handling
+PyYAML>=6.0.1
+
+# Vulnerability dataset access (Hugging Face)
+datasets>=2.18.0
+
+# Optional: If using embeddings / transformers later
+# sentence-transformers>=2.5.1
+# huggingface-hub>=0.24.0
+# Optional: If using OpenAI API for embeddings
+# openai>=0.27.8
