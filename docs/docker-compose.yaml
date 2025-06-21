@@ -1,0 +1,20 @@
+version: '3.9'
+
+services:
+  charlotte:
+    container_name: charlotte-dev
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: charlotte-dev
+    volumes:
+      - .:/app               # Mount project directory for live code sync
+      - ~/.huggingface:/root/.huggingface  # Share Hugging Face credentials
+    environment:
+      HF_TOKEN: ${HF_TOKEN}  # Optional Hugging Face token (can also login in container)
+      SERVICENOW_INSTANCE: ${SERVICENOW_INSTANCE}
+      SERVICENOW_USER: ${SERVICENOW_USER}
+      SERVICENOW_PASSWORD: ${SERVICENOW_PASSWORD}
+    working_dir: /app
+    stdin_open: true
+    tty: true
