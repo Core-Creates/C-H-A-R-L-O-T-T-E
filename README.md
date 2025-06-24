@@ -80,20 +80,29 @@ charlotte/
 |   |  └── nmap_plugin.py   # nmap plugin
 |   |
 │   ├── vulnscan/           # XSS, SQLi detectors, etc.
-|   |
+│       └─ web_scanner/
+│           └─ burp_suite_plugin.py     # Pure Python scanner
+|
+|
 |
 ├── poc_templates/         # <-- 🧠 stays here (root-level directory, sibling to core/)
 │   ├── CWE-77_Command_Injection.py
 │   ├── CWE-119_Buffer_Overflow.py
 │   └──   
 |
+├─ scripts/
+│  └─ launch_burp_service.sh
+|
+|
 ├── utils/
 │   ├── logger.py           # Logging setup
 │   └── filetools.py        # File/directory helpers
 │
 |
-├── personality_config.json   ← CHARLOTTE's saved mode lives here
+├─ build.gradle
 ├── cli.py                  # CLI interface for scans, tasks, queries
+├── personality_config.json   ← CHARLOTTE's saved mode lives here
+├─ settings.gradle
 └── README.md
 ```
 

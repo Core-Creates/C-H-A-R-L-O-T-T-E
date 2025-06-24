@@ -11,3 +11,4 @@ jar {
     version = '1.0.0'
     destinationDirectory = file("$rootDir/dist") // All plugin jars land here
 }
+// Define the source sets
