@@ -1,0 +1,3 @@
+rootProject.name = "charlotte-plugins"
+
+include("plugins:burp") // Add other plugin projects as needed

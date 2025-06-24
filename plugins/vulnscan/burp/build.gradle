@@ -1,0 +1,13 @@
+apply plugin: 'java'
+
+dependencies {
+    // Add your plugin’s specific dependencies here
+    // e.g., implementation files("/path/to/burp/extender/api.jar") 
+}
+
+// You can configure the artifact (Jar) output:
+jar {
+    archiveBaseName = 'burp-helper'
+    version = '1.0.0'
+    destinationDirectory = file("$rootDir/dist") // All plugin jars land here
+}

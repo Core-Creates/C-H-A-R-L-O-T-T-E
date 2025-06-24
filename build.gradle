@@ -1,0 +1,17 @@
+allprojects {
+    repositories {
+        mavenCentral()
+    }
+}
+
+subprojects {
+    apply plugin: 'java'
+
+    sourceCompatibility = JavaVersion.VERSION_11
+    targetCompatibility = JavaVersion.VERSION_11
+
+    dependencies {
+        // All plugin projects can inherit common dependencies here
+    }
+}
+// Add any additional configuration or tasks common to all subprojects here
