@@ -11,8 +11,23 @@ CHARLOTTE is a modular AI assistant built to assist in:
 
 ## 🛠️ Getting Started
 
+
 1. **Fork the Repo**
    - Click the “Fork” button at the top right of the repository.
+
+
+*Make on your computer or in CodeSpaces*
+---
+## 2 below are how to setup a codespace in your browser
+*Ignore if wanting to download and run directly on computer*
+2. **Setup Code Space**
+   - click the code button on the github page
+   - select code spaces
+   - then click on the codespace that is setup
+
+## OR
+
+---
 
 2. **Clone Your Fork**
    ```bash
