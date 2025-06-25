@@ -122,7 +122,7 @@ def run(args):
 # ------------------------------------------------------------------------------------------
 
 if __name__ == "__main__":
-    print("🔎 HARLOTTE CVE Lookup Tool")
+    print("🔎 CHARLOTTE CVE Lookup Tool")
     ids_input = input("Enter CVE ID(s) (comma-separated): ").strip()
     year = input("Filter by year (optional): ").strip()
     cve_ids = [c.strip().upper() for c in ids_input.split(",") if c.strip()]
