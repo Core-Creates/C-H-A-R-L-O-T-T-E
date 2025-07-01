@@ -121,15 +121,38 @@ def run(args):
 # Standalone Test Mode
 # ------------------------------------------------------------------------------------------
 
+# ------------------------------------------------------------------------------------------
+# Standalone Test Mode for CHARLOTTE CVE Lookup Tool
+# Supports both full CVE IDs (e.g., CVE-2023-1234) and short IDs (e.g., 1234, if year is
+# also supplied). Provides robust input handling, error messages, and clean output.
+# ------------------------------------------------------------------------------------------
 if __name__ == "__main__":
     print("🔎 CHARLOTTE CVE Lookup Tool")
-    ids_input = input("Enter CVE ID(s) (comma-separated): ").strip()
-    year = input("Filter by year (optional): ").strip()
-    cve_ids = [c.strip().upper() for c in ids_input.split(",") if c.strip()]
+    ids_input = input("Enter CVE ID(s) (comma-separated or just numbers): ").strip()
+    year = input("Filter by year (optional, required if using just numbers): ").strip()
+
+    cve_ids = []
+    for c in ids_input.split(","):
+        c = c.strip()
+        if not c:
+            continue
+        if c.upper().startswith("CVE-"):
+            # Already fully-qualified CVE ID
+            cve_ids.append(c.upper())
+        elif c.isdigit():
+            # Short number, needs a year
+            if not year:
+                print(f"[!] Year required for short CVE ID '{c}'. Skipping.")
+                continue
+            cve_ids.append(f"CVE-{year}-{c.zfill(4)}")
+        else:
+            # Unrecognized format
+            print(f"[!] Invalid CVE ID format: '{c}'. Skipping.")
 
     results = fetch_cves_batch(cve_ids, year_filter=year or None)
     for cid, data in results.items():
         print("═" * 60)
         print(summarize_cve(data))
+
 # ------------------------------------------------------------------------------------------
 # This module is designed to be imported and used by the main application.
