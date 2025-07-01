@@ -56,8 +56,9 @@ charlotte/
 │   ├── main.py             # Entry point logic + CLI control
 │   ├── plugin_manager.py   # Loads plugins dynamically
 |   ├── report_dispatcher.py
-│   └── reverse_engineer.py # Binary analysis logic (symbolic, static)
-│
+│   ├── reverse_engineer.py # Binary analysis logic (symbolic, static)
+│   └── user_config.py
+|
 ├── data/
 │   ├── findings.json       # Stores scan output & metadata
 │   └── fingerprints/       # Known vuln/function patterns
