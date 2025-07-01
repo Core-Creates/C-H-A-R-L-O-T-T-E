@@ -127,6 +127,7 @@ def run(args):
 # also supplied). Provides robust input handling, error messages, and clean output.
 # ------------------------------------------------------------------------------------------
 if __name__ == "__main__":
+<<<<<<< HEAD
     print("🔎 CHARLOTTE CVE Lookup Tool")
     ids_input = input("Enter CVE ID(s) (comma-separated or just numbers): ").strip()
     year = input("Filter by year (optional, required if using just numbers): ").strip()
@@ -148,6 +149,12 @@ if __name__ == "__main__":
         else:
             # Unrecognized format
             print(f"[!] Invalid CVE ID format: '{c}'. Skipping.")
+=======
+    print("🔎 HARLOTTE CVE Lookup Tool")
+    ids_input = input("Enter CVE ID(s) (comma-separated): ").strip()
+    year = input("Filter by year (optional): ").strip()
+    cve_ids = [c.strip().upper() for c in ids_input.split(",") if c.strip()]
+>>>>>>> parent of afee65d (edited misspelling of CHARLOTTE in cve lookup tool)
 
     results = fetch_cves_batch(cve_ids, year_filter=year or None)
     for cid, data in results.items():
