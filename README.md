@@ -55,6 +55,7 @@ charlotte/
 │   ├── llm_interface.py    # Routes prompts to local or remote LLMs
 │   ├── main.py             # Entry point logic + CLI control
 │   ├── plugin_manager.py   # Loads plugins dynamically
+|   ├── report_dispatcher.py
 │   └── reverse_engineer.py # Binary analysis logic (symbolic, static)
 │
 ├── data/
