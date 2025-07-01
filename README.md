@@ -98,8 +98,11 @@ charlotte/
 |
 |
 ├── utils/
+|   ├── __init__.py
 │   ├── logger.py           # Logging setup
-│   └── filetools.py        # File/directory helpers
+│   ├── filetools.py        # File/directory helpers
+│   └── utils.py
+|
 │
 |
 ├─ build.gradle
