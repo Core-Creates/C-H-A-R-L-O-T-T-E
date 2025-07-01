@@ -52,6 +52,7 @@ charlotte/
 │   ├── code_reasoner.py    # Toggles self-contained/extended modes
 │   ├── config.py           # Toggles self-contained/extended modes
 │   ├── cve_lookup.py       # CVE scanner (local DB or online API)
+|   ├── data_loader.py
 │   ├── llm_interface.py    # Routes prompts to local or remote LLMs
 │   ├── main.py             # Entry point logic + CLI control
 │   ├── plugin_manager.py   # Loads plugins dynamically
