@@ -24,54 +24,25 @@ PLUGIN_REGISTRY = {
     "sql_injection": ("vulnscan", "sql_injection"),          # 💉 SQLi vulnerability test
     "exploit_generation": ("agents", "exploit_agent"),       # 🚨 LLM-generated exploit suggestions
     "servicenow_setup": ("servicenow", "servicenow_setup"),  # 🛎️ Initial ServiceNow config wizard
+    "severity_predictor": ("ml", "predict_severity"),        # 🤖 Predicts CVE severity using NN model
+    "vulnscore": ("vulnscore", "vulnscore_plugin"),          # ⚖️ Combines severity + exploitability
 }
-
 
 # ******************************************************************************************
 # Static Plugin Executor
 # Dynamically loads and executes the requested plugin module from PLUGIN_REGISTRY
 # ******************************************************************************************
 
-# ******************************************************************************************
-# Unified Plugin Loader (Populates internal registry from both static and dynamic sources)
-# ******************************************************************************************
-
-def load_plugins():
-    """
-    Loads both statically defined and dynamically discovered plugins.
-    Prints a summary table of available plugins (optional).
-    """
-    print("📦 Loading CHARLOTTE Plugins...")
-
-    # Load static plugins
-    print("🔌 Static Plugins:")
-    for key, (category, module_name) in PLUGIN_REGISTRY.items():
-        print(f"  • {key:20s} → plugins/{category}/{module_name}.py")
-
-    # Load dynamic plugins via plugin.yaml
-    dynamic_plugins = discover_plugins()
-    if dynamic_plugins:
-        print("\n🧩 Dynamic Plugins:")
-        for plugin in dynamic_plugins:
-            label = plugin.get("label", "Unnamed Plugin")
-            description = plugin.get("description", "No description provided")
-            print(f"  • {label:30s} :: {description}")
-    else:
-        print("⚠️  No dynamic plugins found.")
-
-    print("✅ Plugin system ready.\n")
-
-
 def run_plugin(task: str, args: Dict) -> str:
     """
     Loads and executes a statically registered plugin.
 
     Args:
-        task *str* = Key from PLUGIN_REGISTRY
-        args *Dict* = Arguments passed to plugin's `run(args)` function
+        task (str): Key from PLUGIN_REGISTRY
+        args (Dict): Arguments passed to plugin's `run(args)` function
 
     Returns:
-        *str* = Plugin output or error message
+        str: Plugin output or error message
     """
     if task not in PLUGIN_REGISTRY:
         return f"[ERROR] No plugin registered for task '{task}'"
@@ -88,8 +59,31 @@ def run_plugin(task: str, args: Dict) -> str:
         return f"[PLUGIN ERROR]: {str(e)}\n{traceback.format_exc()}"
 
 # ******************************************************************************************
-# Dynamic Plugin Discovery (plugin.yaml-based)
-# Supports CLI-accessible or auto-triggered extensions
+# Unified Plugin Loader (Populates internal registry from both static and dynamic sources)
+# ******************************************************************************************
+
+def load_plugins():
+    """Prints all available static and dynamic plugins."""
+    print("📦 Loading CHARLOTTE Plugins...")
+
+    print("🔌 Static Plugins:")
+    for key, (category, module_name) in PLUGIN_REGISTRY.items():
+        print(f"  • {key:20s} → plugins/{category}/{module_name}.py")
+
+    dynamic_plugins = discover_plugins()
+    if dynamic_plugins:
+        print("\n🧩 Dynamic Plugins:")
+        for plugin in dynamic_plugins:
+            label = plugin.get("label", "Unnamed Plugin")
+            description = plugin.get("description", "No description provided")
+            print(f"  • {label:30s} :: {description}")
+    else:
+        print("⚠️  No dynamic plugins found.")
+
+    print("✅ Plugin system ready.\n")
+
+# ******************************************************************************************
+# Dynamic Plugin Discovery
 # ******************************************************************************************
 
 PLUGIN_DIR = "plugins"
@@ -145,6 +139,4 @@ if __name__ == "__main__":
     print("\n🧩 Discovered Plugins:")
     for item in list_plugins():
         print(f"  - {item}")
- 
-# ******************************************************************************************
-# End of plugin_manager.py
+    print("\n✅ Plugin system initialized.")
