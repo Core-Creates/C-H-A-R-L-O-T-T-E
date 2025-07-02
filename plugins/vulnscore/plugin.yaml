@@ -1,0 +1,10 @@
+
+label: "Vulnerability Score Analyzer"
+description: "Combines severity prediction and exploitability logic to determine risk level and recommended action."
+entry_point: "plugins.vulnscore.vulnscore_plugin:run_vulnscore_plugin"
+version: "1.0"
+author: "CHARLOTTE Core"
+tags:
+  - severity
+  - exploitability
+  - triage
