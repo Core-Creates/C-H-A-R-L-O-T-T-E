@@ -96,7 +96,9 @@ charlotte/
 ├─ scripts/
 |  ├── __init__.py
 │  ├── cache_model.py  
-│  └─ launch_burp_service.sh
+│  ├── launch_burp_service.sh
+|  └── train_severity_model.py
+|
 |
 |
 ├── utils/
