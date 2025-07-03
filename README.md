@@ -41,6 +41,10 @@ charlotte/
 │   ├── exploit_agent.py    # POC generator based on findings
 │   └── triage_agent.py     # Ranks issues using scoring or LLM
 ├── core/
+|   ├──integrations
+|   |  ├── burp_integration.py
+|   |
+|   |
 |   ├── logic_modules
 |   |  ├── exploit_predictor.py
 |   |  ├── recon_heuristics.py
