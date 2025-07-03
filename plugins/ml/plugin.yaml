@@ -1,0 +1,14 @@
+
+label: "Severity Predictor"
+description: "Predicts CVE severity class (Low, Medium, High, Critical) using a trained neural network model."
+entry_point: "plugins.ml.predict_severity:run"
+version: "1.0"
+author: "CHARLOTTE Core"
+tags:
+  - severity
+  - machine_learning
+  - triage
+dependencies:
+  - name: "tensorflow"
+    version: ">=2.0"  # Ensure TensorFlow is installed
+    
