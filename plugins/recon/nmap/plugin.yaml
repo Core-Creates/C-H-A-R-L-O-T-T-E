@@ -1,0 +1,7 @@
+id: nmap_scan
+name: Nmap Scan
+category: recon
+description: Interactive and headless Nmap scanning with heuristic triage and device priority ranking.
+entrypoint: plugins/recon/namp/nmap_plugin.py
+tags: [nmap, recon, scanning, priority]
+enabled: true
