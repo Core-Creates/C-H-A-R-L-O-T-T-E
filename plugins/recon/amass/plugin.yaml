@@ -1,0 +1,26 @@
+name: owasp_amass
+version: 1.0
+description: |
+  OWASP Amass subdomain enumeration plugin for CHARLOTTE. Supports passive/active modes, outputs JSON, and can chain results to Nmap and HTTP banner plugins.
+author: CHARLOTTE (touched by shadows)
+entry_point: owasp_amass.py
+function: run_plugin
+category: recon
+inputs:
+  - name: domain
+    type: string
+    description: Target domain to scan (e.g. example.com)
+  - name: chain_followups
+    type: boolean
+    default: true
+    description: Chain results to Nmap and HTTP banner plugins after enumeration.
+outputs:
+  - name: subdomain_json
+    type: file
+    description: CHARLOTTE-compatible JSON file with parsed subdomain results.
+requirements:
+  - amass
+  - python (standard library)
+  - InquirerPy
+notes: |
+  Requires OWASP Amass to be installed and available in PATH. Results are saved in data/findings/.
