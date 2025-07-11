@@ -64,6 +64,16 @@ charlotte/
 │   ├── findings.json       # Stores scan output & metadata
 │   └── fingerprints/       # Known vuln/function patterns
 │
+|
+|
+├── installer
+|   ├── ghidra
+|   |   ├── ghidra_installer.ps1
+│   |   ├── ghidra_installer.py
+|   |   └── ghidra_installer.sh
+|   |
+|   |
+│   └── binary_ninja
 │
 ├── plugins/
 │   |── servicenow/
