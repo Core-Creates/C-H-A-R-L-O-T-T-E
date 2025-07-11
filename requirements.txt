@@ -32,7 +32,7 @@ python-nmap
 scapy>=2.5.0
 
 # Optional: If using SQLite for database operations
-sqlite3>=3.41.0
+sqlite3
 
 # Optional: If using Pandas for data manipulation
 pandas>=2.1.3
@@ -59,7 +59,7 @@ sqlalchemy>=2.0.20
 # Optional: If using Pytest for testing
 pytest>=8.3.2
 
-tabulate>=0.9.0
+tabulate
 
 # Optional: If using Click for command line interfaces
 click>=8.1.7
