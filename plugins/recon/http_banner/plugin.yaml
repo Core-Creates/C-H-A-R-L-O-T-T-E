@@ -1,0 +1,26 @@
+name: http_banner
+version: 1.0
+description: |
+  Simple HTTP banner grabber. Connects to each target on port 80, sends a HEAD request, and saves the HTTP response banner.
+author: Your Name
+entry_point: http_banner.py
+function: run_plugin
+category: recon
+inputs:
+  - name: targets
+    type: list
+    description: List of hostnames or IP addresses to scan.
+  - name: output_dir
+    type: string
+    default: data/findings
+    description: Directory to save banner results.
+outputs:
+  - name: banner_files
+    type: files
+    description: HTTP banner text files for each host.
+requirements:
+  - socket
+  - os
+notes: |
+  Only supports HTTP (port 80). Requires Python
+  3.x. Ensure the target is reachable and that you have permission to scan it.
