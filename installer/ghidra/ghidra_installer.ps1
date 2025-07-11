@@ -24,3 +24,4 @@ if (!(Test-Path $ghidraDir)) {
 Write-Host "[+] Ghidra installed at $ghidraDir"
 Write-Host "[+] GHIDRA_PATH environment variable set."
 Write-Host "[✓] You can launch it with: C:\ghidra_10.4_PUBLIC\ghidraRun.bat"
+
