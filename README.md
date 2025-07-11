@@ -41,26 +41,22 @@ charlotte/
 │   ├── exploit_agent.py    # POC generator based on findings
 │   └── triage_agent.py     # Ranks issues using scoring or LLM
 ├── core/
-|   ├──integrations
-|   |  ├── burp_integration.py
-|   |
-|   |
-|   ├── logic_modules
-|   |  ├── exploit_predictor.py
-|   |  ├── recon_heuristics.py
-|   |  ├── report_utils.py
-|   |  └── triage_rules.py
-|   |  
-|   |
+│   ├── integrations/
+│   │   └── burp_integration.py
+│   ├── logic_modules/
+│   │   ├── exploit_predictor.py
+│   │   ├── recon_heuristics.py
+│   │   ├── report_utils.py
+│   │   └── triage_rules.py
 │   ├── charlotte_personality.py # Toggles self-contained/extended modes
-│   ├── code_reasoner.py    # Toggles self-contained/extended modes
-│   ├── config.py           # Toggles self-contained/extended modes
+│   ├── code_reasoner.py    # LLM-powered reasoning
+│   ├── config.py           # Configuration and mode toggling
 │   ├── cve_lookup.py       # CVE scanner (local DB or online API)
-|   ├── data_loader.py
+│   ├── data_loader.py
 │   ├── llm_interface.py    # Routes prompts to local or remote LLMs
 │   ├── main.py             # Entry point logic + CLI control
 │   ├── plugin_manager.py   # Loads plugins dynamically
-|   ├── report_dispatcher.py
+│   ├── report_dispatcher.py
 │   ├── reverse_engineer.py # Binary analysis logic (symbolic, static)
 │   └── user_config.py
 |
@@ -83,8 +79,17 @@ charlotte/
 |   |
 |   |
 │   |── recon/              # Subdomain enum, port scans, etc.
-|   |  ├── owasp_amass.py   # OWASP Amass plugin
-|   |  └── nmap_plugin.py   # nmap plugin
+│   |   ├── amass/
+│   |   │   ├── owasp_amass.py   # OWASP Amass plugin
+│   |   │   └── plugin.yaml
+│   |   ├── http_banner/
+│   |   │   ├── http_banner.py   # HTTP banner grabber plugin
+│   |   │   └── plugin.yaml
+│   |   ├── nmap
+|   |   |   ├── nmap_plugin.py       # Nmap plugin
+|   |   |   └── plugin.yaml
+|   |   |
+│   |   └── (other recon plugins)
 |   |
 │   ├── vulnscan/           # XSS, SQLi detectors, etc.
 │       └─ web_scanner/

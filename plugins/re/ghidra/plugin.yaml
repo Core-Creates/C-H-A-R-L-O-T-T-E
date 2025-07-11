@@ -1,0 +1,36 @@
+name: ghidra_headless
+version: 1.1
+description: |
+  CHARLOTTE plugin to run Ghidra headless analyzer on a binary. Supports automation of scripts, batch disassembly, and data extraction. Cross-platform for Windows and Linux.
+author: CHARLOTTE
+entry_point: ghidra.py
+function: run
+category: reverse_engineering
+inputs:
+  - name: target_path
+    type: string
+    description: Path to the target binary to analyze.
+  - name: script_path
+    type: string
+    required: false
+    description: Optional path to a Ghidra script to run after analysis.
+  - name: project_name
+    type: string
+    default: charlotte_project
+    description: Name for the temporary Ghidra project.
+outputs:
+  - name: output
+    type: string
+    description: Ghidra headless analyzer output.
+requirements:
+  - Python 3.8+
+  - Ghidra 10.4+
+  - Ghidra must be installed and the GHIDRA_PATH environment variable set, or default install path used.
+install_instructions: |
+  # Ghidra Installation
+  1. Download Ghidra from the official site: https://ghidra-sre.org/
+  2. Extract the archive to a directory (e.g., C:\ghidra_10.4_PUBLIC or /opt/ghidra_10.4_PUBLIC).
+  3. Set the GHIDRA_PATH environment variable to the Ghidra install directory, or use the default path as above.
+  4. Ensure Java is installed and available in your PATH.
+notes: |
+  This plugin automates Ghidra's headless analyzer. For custom scripts, provide the script_path argument. Output is printed to stdout and returned as a string.
