@@ -31,8 +31,6 @@ python-nmap
 # Optional: If using Scapy for network packet manipulation
 scapy>=2.5.0
 
-# Optional: If using SQLite for database operations
-sqlite3
 
 # Optional: If using Pandas for data manipulation
 pandas>=2.1.3
