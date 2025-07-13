@@ -12,6 +12,10 @@ import os
 import sys
 import json
 from InquirerPy import inquirer
+
+# Add project root to sys.path for module imports
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+
 from core.logic_modules.triage_rules import triage
 from core.logic_modules.exploit_predictor import predict_exploitability
 from core.logic_modules.report_utils import (
@@ -28,7 +32,6 @@ from plugins.servicenow.servicenow_setup import configure_servicenow
 
 SERVICENOW_CONFIG_PATH = "data/servicenow_config.json"
 
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # ==========================================================================================
 # FUNCTION: load_findings()
