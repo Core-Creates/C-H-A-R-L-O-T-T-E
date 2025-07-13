@@ -4,7 +4,7 @@ CVE_DATA_PATH = "data/all_cve_data.xml"
 
 def load_cve_data(path=CVE_DATA_PATH):
     """
-    Loads CVE dataset from a local JSON file using core.data_loader.parse_xml_file.
+    Loads CVE dataset from a local xml file using core.data_loader.parse_xml_file.
     Returns a dict mapping CVE IDs to their metadata.
     """
     data = parse_xml_file(path)
