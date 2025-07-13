@@ -1,6 +1,6 @@
 from core.data_loader import load_json_file
 
-CVE_DATA_PATH = "data/cve_dataset.json"
+CVE_DATA_PATH = "data/cve_cache.json"
 
 def load_cve_data(path=CVE_DATA_PATH):
     """
