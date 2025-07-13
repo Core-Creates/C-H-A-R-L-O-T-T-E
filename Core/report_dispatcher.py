@@ -101,3 +101,29 @@ def dispatch_report(file_path):
     else:
         print("[!] No valid dispatch method configured. Report saved locally.")
     print(f"[+] Report dispatched successfully: {file_path}")
+
+# ==========================================================================================
+# FUNCTION: resend_queued_reports()
+# Resends any reports that failed to dispatch previously
+# ==========================================================================================
+def resend_queued_reports():
+    settings = load_user_settings()
+    queue_file = settings.get("report_queue_file", "data/report_queue.json")
+
+    if not os.path.exists(queue_file):
+        print("[*] No queued reports to resend.")
+        return
+
+    with open(queue_file, "r", encoding="utf-8") as f:
+        queued_reports = json.load(f)
+
+    for report in queued_reports:
+        try:
+            dispatch_report(report["file_path"])
+            print(f"[+] Successfully resent report: {report['file_path']}")
+        except Exception as e:
+            print(f"[!] Failed to resend report {report['file_path']}: {e}")
+
+    # Clear the queue after processing
+    os.remove(queue_file)
+    print("[+] Cleared report queue after resending.")
