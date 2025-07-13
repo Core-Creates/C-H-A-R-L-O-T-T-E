@@ -7,7 +7,7 @@ import os
 import sys
 import platform
 
-bn = None  # Fallback reference to prevent NameErrors if import fails
+bn = None  # Global fallback reference
 
 # ────────────────────────────────────────────────────────────────────────────────
 # CHARLOTTE Plugin: Binary Ninja Compatibility Layer
@@ -32,20 +32,29 @@ try_patch_binaryninja_path()
 # Try importing Binary Ninja API
 # ────────────────────────────────────────────────────────────────────────────────
 
+# Attempt to import Binary Ninja API and handle license validation
+# If import fails, print a warning and set bn to None
 try:
-    import binaryninja as bn
-    from binaryninja import BinaryViewType, license
+    import binaryninja
+    from binaryninja import BinaryViewType
+    bn = binaryninja
+    print("[+] Binary Ninja API successfully imported.")
 
-    if not license.is_valid():
-        print(
-            "\n[!] Binary Ninja license is invalid or missing."
-            "\n    → Please launch Binary Ninja GUI once and activate your license."
-            "\n    → CHARLOTTE will continue, but core analysis may fail.\n"
-        )
+    # Optional license validation if available
+    try:
+        import binaryninja.license as license
+        if not license.is_valid():
+            print(
+                "\n[!] Binary Ninja license is invalid or missing."
+                "\n    → Please launch Binary Ninja GUI once and activate your license."
+                "\n    → CHARLOTTE will continue, but core analysis may fail.\n"
+            )
+    except ImportError:
+        print("[*] Binary Ninja 'license' module not found. Skipping license validation (older API version).")
 
-except ImportError:
+except Exception as e:
     print(
-        "\n[!] Binary Ninja API is not installed or not found in this environment.\n"
+        f"\n[!] Failed to load Binary Ninja API: {type(e).__name__}: {e}\n"
         "    → Make sure to run install_api.py from your Binary Ninja install directory:\n"
         f"       python \"C:/Program Files/Vector35/BinaryNinja/scripts/install_api.py\" --install {sys.prefix}\n"
         "    → CHARLOTTE will continue, but Binary Ninja features will be skipped.\n"
@@ -64,11 +73,17 @@ def run(target_path):
     if not os.path.isfile(target_path):
         print(f"[!] File not found: {target_path}")
         return
-    bv = bn.BinaryViewType.get_view_of_file(target_path)
+    try:
+        bv = bn.BinaryViewType['PE'].open(target_path)
+    except Exception as e:
+        print(f"[!] Failed to open binary in Binary Ninja: {e}")
+        return
+
     bv.update_analysis_and_wait()
     print(f"[CHARLOTTE] Functions in {target_path}:")
     for func in bv.functions:
         print(f" - {func.name}")
+
 
 # ────────────────────────────────────────────────────────────────────────────────
 # CLI usage
