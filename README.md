@@ -9,7 +9,7 @@ A modular, AI-augmented offensive security framework — designed for autonomy, 
 
 ## 🔍 Purpose
 
-CHARLOTTE is built for multi-phase offensive security tasks, enabling both manual and automated workflows:
+CHARLOTTE is built for multi-phase defensive and offensive security tasks, enabling both manual and automated workflows:
 
 - **Recon** – Subdomain enumeration, port scanning, passive intel gathering  
 - **Logic** – LLM-powered reasoning, prompt routing, symbolic analysis  
