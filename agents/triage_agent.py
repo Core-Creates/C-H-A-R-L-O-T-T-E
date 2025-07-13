@@ -1,3 +1,4 @@
+
 # ******************************************************************************************
 # agents/triage_agent.py
 # Handles triage of vulnerabilities using rule-based scoring and classification.
@@ -5,7 +6,10 @@
 # Depends on core/logic_modules/triage_rules.py and report_utils.py
 # ******************************************************************************************
 
+# Ensure project root is in sys.path for package imports
+
 import os
+import sys
 import json
 from InquirerPy import inquirer
 from core.logic_modules.triage_rules import triage
@@ -23,6 +27,8 @@ from plugins.servicenow.servicenow_client import create_incident, maybe_create_t
 from plugins.servicenow.servicenow_setup import configure_servicenow
 
 SERVICENOW_CONFIG_PATH = "data/servicenow_config.json"
+
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
 # ==========================================================================================
 # FUNCTION: load_findings()
