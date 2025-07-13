@@ -1,13 +1,13 @@
-from core.data_loader import load_json_file
+from core.data_loader import parse_xml_file
 
-CVE_DATA_PATH = "data/cve_cache.json"
+CVE_DATA_PATH = "data/all_cve_data.xml"
 
 def load_cve_data(path=CVE_DATA_PATH):
     """
-    Loads CVE dataset from a local JSON file using core.data_loader.load_json_file.
+    Loads CVE dataset from a local JSON file using core.data_loader.parse_xml_file.
     Returns a dict mapping CVE IDs to their metadata.
     """
-    data = load_json_file(path)
+    data = parse_xml_file(path)
     if not data:
         print(f"[!] CVE dataset not found at {path}. Returning empty map.")
         return {}
