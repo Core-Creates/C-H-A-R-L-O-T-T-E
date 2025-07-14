@@ -36,12 +36,28 @@ def autoscript_exploits(report_data, client, rhost, lhost, lport):
             if script_path:
                 vuln["exploit_script"] = script_path
 
+# ==========================================================================================
+# FUNCTION: enrich_report_with_exploits()
+# Attempts to enrich report with matching Metasploit modules and optionally generate scripts
+# ==========================================================================================
 def enrich_report_with_exploits(report_data, client):
+    settings = load_user_settings()
+    defaults = settings.get("exploit_defaults", {})
+
+    if settings.get("auto_script_exploits") and client:
+        autoscript_exploits(
+            report_data, client,
+            defaults.get("rhost"),
+            defaults.get("lhost"),
+            defaults.get("lport")
+        )
+
     for vuln in report_data.get("vulnerabilities", []):
         cve_id = vuln.get("cve_id")
         if cve_id:
             exploits = find_exploit_for_cve(client, cve_id)
             vuln["metasploit_modules"] = exploits
+
 # ==========================================================================================
 # FUNCTION: send_email_report()
 # Sends triage report via email with file attachment
