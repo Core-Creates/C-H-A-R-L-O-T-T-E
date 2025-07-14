@@ -11,6 +11,9 @@ import requests
 import mimetypes
 from email.message import EmailMessage
 from plugins.exploitation.metasploit.msf_mapper import find_exploit_for_cve
+from plugins.exploitation.metasploit.cve_autoscript import generate_exploit_script
+# ==========================================================================================
+# CONSTANTS
 
 SETTINGS_FILE = os.path.join("data", "user_settings.json")
 
@@ -24,7 +27,14 @@ def load_user_settings():
     with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
-
+# If Metasploit is connected, generate scripts for all CVEs with exploits
+def autoscript_exploits(report_data, client, rhost, lhost, lport):
+    for vuln in report_data.get("vulnerabilities", []):
+        cve_id = vuln.get("cve_id")
+        if vuln.get("metasploit_modules"):
+            script_path = generate_exploit_script(cve_id, client, rhost, lhost, lport)
+            if script_path:
+                vuln["exploit_script"] = script_path
 
 def enrich_report_with_exploits(report_data, client):
     for vuln in report_data.get("vulnerabilities", []):

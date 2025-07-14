@@ -68,3 +68,4 @@ scikit-learn>=1.4.0
 
 tqdm
 
+pymetasploit3
