@@ -53,4 +53,6 @@ if __name__ == "__main__":
     show_menu()
     selected_scan = get_choice()
     target = input("\nEnter the target URL (e.g. http://example.com/page.php?id=1): ").strip()
+    if not target.startswith(("http://", "https://")):
+        target = "http://" + target
     run_scan(selected_scan, target)
