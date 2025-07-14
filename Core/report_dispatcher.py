@@ -7,9 +7,10 @@
 import os
 import json
 import smtplib
+import requests
 import mimetypes
 from email.message import EmailMessage
-import requests
+from plugins.exploitation.metasploit.msf_mapper import find_exploit_for_cve
 
 SETTINGS_FILE = os.path.join("data", "user_settings.json")
 
@@ -23,6 +24,14 @@ def load_user_settings():
     with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
         return json.load(f)
 
+
+
+def enrich_report_with_exploits(report_data, client):
+    for vuln in report_data.get("vulnerabilities", []):
+        cve_id = vuln.get("cve_id")
+        if cve_id:
+            exploits = find_exploit_for_cve(client, cve_id)
+            vuln["metasploit_modules"] = exploits
 # ==========================================================================================
 # FUNCTION: send_email_report()
 # Sends triage report via email with file attachment
