@@ -1,0 +1,2 @@
+load msgrpc ServerHost=127.0.0.1 ServerPort=55553 User=msf Pass=msf SSL=false
+exit
