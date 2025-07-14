@@ -90,6 +90,18 @@ def save_device_with_priority(host, priority, settings):
     save_device_settings(settings)
     print(f"[✔️] Device {host} saved with priority: {priority}")
 
+def extract_services_for_msf(nmap_json_path):
+    """Extracts ports and services useful for Metasploit."""
+    with open(nmap_json_path, "r") as f:
+        data = json.load(f)
+
+    candidates = []
+    for host, results in data.items():
+        for port, svc in results.get("ports", {}).items():
+            if "http" in svc["name"] or "smb" in svc["name"] or "ftp" in svc["name"]:
+                candidates.append((host, svc["name"], port))
+    return candidates
+
 # ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
 # Plugin functions
 # ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────

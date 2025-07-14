@@ -5,6 +5,16 @@ import subprocess
 import webbrowser
 from tkinter import Tk, Label, Button, messagebox, Toplevel
 
+def launch_metasploit_plugin():
+    try:
+        subprocess.Popen([
+            sys.executable,
+            os.path.join(os.path.dirname(__file__), "..", "plugins", "exploitation", "metasploit_plugin.py")
+        ])
+    except Exception as e:
+        messagebox.showerror("Error", f"Failed to launch Metasploit plugin: {e}")
+
+
 def open_ghidra_installer():
     subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "ghidra", "ghidra_installer.py")])
 
@@ -42,7 +52,7 @@ def show_vulnscan_window(parent):
     Label(win, text="Vulnscan Tools", font=("Arial", 14, "bold")).pack(pady=10)
     # Add vulnscan tool installers here as needed
     Button(win, text="Back", width=30, command=win.destroy).pack(pady=20)
-    
+
 def show_exploitation_window(parent):
     win = Toplevel(parent)
     win.title("Exploitation Installers")
