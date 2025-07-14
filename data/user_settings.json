@@ -1,7 +1,9 @@
-"auto_script_exploits": true,
-"exploit_defaults": {
-    "rhost": "192.168.1.100",
-    "lhost": "192.168.1.7",
-    "lport": "4444"
+{
+    "auto_script_exploits": true,
+    "exploit_defaults": {
+        "rhost": "192.168.1.100",
+        "lhost": "192.168.1.7",
+        "lport": "4444"
+    }
 }
 
