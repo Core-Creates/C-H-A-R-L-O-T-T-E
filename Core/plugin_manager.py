@@ -23,6 +23,9 @@ PLUGIN_REGISTRY = {
     "xss_scan": ("vulnscan", "xss_detector"),                # 🧼 Cross-site scripting test
     "sql_injection": ("vulnscan", "sql_injection"),          # 💉 SQLi vulnerability test
     "exploit_generation": ("agents", "exploit_agent"),       # 🚨 LLM-generated exploit suggestions
+    "triage_vulnerabilities": ("agents", "triage_agent"),    # 📊 Vulnerability triage and scoring
+    "report_dispatcher": ("report", "report_dispatcher"),    # 📤 Report generation and dispatch
+    'Metasploit': ("exploitation", "metasploit_plugin"),     # 🦠 Metasploit RPC interface
     "servicenow_setup": ("servicenow", "servicenow_setup"),  # 🛎️ Initial ServiceNow config wizard
     "severity_predictor": ("ml", "predict_severity"),        # 🤖 Predicts CVE severity using NN model
     "vulnscore": ("vulnscore", "vulnscore_plugin"),          # ⚖️ Combines severity + exploitability
