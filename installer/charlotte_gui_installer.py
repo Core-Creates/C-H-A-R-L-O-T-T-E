@@ -42,6 +42,15 @@ def show_vulnscan_window(parent):
     Label(win, text="Vulnscan Tools", font=("Arial", 14, "bold")).pack(pady=10)
     # Add vulnscan tool installers here as needed
     Button(win, text="Back", width=30, command=win.destroy).pack(pady=20)
+    
+def show_exploitation_window(parent):
+    win = Toplevel(parent)
+    win.title("Exploitation Installers")
+    win.geometry("350x150")
+    Label(win, text="Exploitation Tools", font=("Arial", 14, "bold")).pack(pady=10)
+    # Add exploitation tool installers here as needed
+    Button(win, text="Back", width=30, command=win.destroy).pack(pady=20)
+
 
 def main():
     root = Tk()
@@ -54,6 +63,7 @@ def main():
     Button(root, text="Reverse Engineering (re)", width=30, command=lambda: show_re_window(root)).pack(pady=5)
     Button(root, text="Recon", width=30, command=lambda: show_recon_window(root)).pack(pady=5)
     Button(root, text="Vulnscan", width=30, command=lambda: show_vulnscan_window(root)).pack(pady=5)
+    Button(root, text="Exploitation", width=30, command=lambda: show_exploitation_window(root)).pack(pady=5)
     Button(root, text="About", width=30, command=show_about).pack(pady=20)
     Button(root, text="Exit", width=30, command=root.quit).pack(pady=5)
 
