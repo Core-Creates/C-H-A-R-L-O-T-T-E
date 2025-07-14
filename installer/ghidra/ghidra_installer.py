@@ -8,7 +8,7 @@ def is_windows():
     return platform.system() == "Windows"
 
 def elevate_windows():
-    powershell_script = os.path.abspath("ghidra_installer.ps1")
+    powershell_script = os.path.join(os.path.dirname(__file__), "ghidra_installer.ps1")
     if not os.path.exists(powershell_script):
         print(f"[!] PowerShell script not found: {powershell_script}")
         sys.exit(1)
