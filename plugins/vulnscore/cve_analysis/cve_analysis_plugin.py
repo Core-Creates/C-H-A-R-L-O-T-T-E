@@ -4,9 +4,26 @@
 # ******************************************************************************************
 
 import os
+import sys
 import json
-from core.utils import load_nmap_results  # CHARLOTTE’s helper (or inject path directly)
-from plugins.exploitation.metasploit import metasploit_plugin
+
+# ============================================================================
+# core/__init__.py
+# Dynamically locate CHARLOTTE root and add to Python path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+# Ensure CHARLOTTE core and plugins are importable
+try:
+    from core.utils import load_nmap_results  # CHARLOTTE's Nmap parser helper
+    from core import cve_lookup               # Optional: your future CVE database interface
+    from plugins.exploitation.metasploit import metasploit_plugin
+except ImportError as e:
+    print(f"[!] Import failed: {e}")
+    print("[!] Ensure you are running this plugin from within the CHARLOTTE framework directory.")
+    sys.exit(1)
+
 
 # ==========================================================================================
 # FUNCTION: mock_cve_lookup()
@@ -50,7 +67,7 @@ def analyze_services_and_exploit(client, nmap_path, lhost, lport):
             name = svc.get("name", "")
             version = svc.get("version", "")
 
-            cve_list = mock_cve_lookup(name, version)
+            cve_list = cve_lookup(name, version)
             if not cve_list:
                 print(f"[-] No CVEs found for {name} {version}")
                 continue
