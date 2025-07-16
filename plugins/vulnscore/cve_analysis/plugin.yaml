@@ -1,0 +1,4 @@
+- name: cve_analysis
+  category: vulnscore
+  path: plugins/vulnscore/cve_analysis_plugin.py
+  description: Analyze Nmap results, match CVEs, and chain Metasploit exploits
