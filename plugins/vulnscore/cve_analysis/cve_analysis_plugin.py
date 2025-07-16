@@ -16,7 +16,7 @@ if ROOT_DIR not in sys.path:
 
 # Ensure CHARLOTTE core and plugins are importable
 try:
-    from core.utils import load_nmap_results  # CHARLOTTE's Nmap parser helper
+    from utils import load_nmap_results  # CHARLOTTE's Nmap parser helper
     from core import cve_lookup               # Optional: your future CVE database interface
     from plugins.exploitation.metasploit import metasploit_plugin
 except ImportError as e:
