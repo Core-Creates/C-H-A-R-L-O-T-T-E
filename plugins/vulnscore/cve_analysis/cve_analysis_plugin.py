@@ -7,8 +7,6 @@ import os
 import sys
 import json
 
-# ============================================================================
-# core/__init__.py
 # Dynamically locate CHARLOTTE root and add to Python path
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
 if ROOT_DIR not in sys.path:
@@ -16,14 +14,13 @@ if ROOT_DIR not in sys.path:
 
 # Ensure CHARLOTTE core and plugins are importable
 try:
-    from utils import load_nmap_results  # CHARLOTTE's Nmap parser helper
-    from core import cve_lookup               # Optional: your future CVE database interface
+    from utils.load_nmap_results import load_nmap_results  # CHARLOTTE's Nmap parser helper
+    from core import cve_lookup                            # Optional: your future CVE database interface
     from plugins.exploitation.metasploit import metasploit_plugin
 except ImportError as e:
     print(f"[!] Import failed: {e}")
     print("[!] Ensure you are running this plugin from within the CHARLOTTE framework directory.")
     sys.exit(1)
-
 
 # ==========================================================================================
 # FUNCTION: mock_cve_lookup()
@@ -52,14 +49,12 @@ def rank_and_sort_cves(cves):
 # Parses Nmap scan results, finds CVEs, and launches best exploit
 # ==========================================================================================
 def analyze_services_and_exploit(client, nmap_path, lhost, lport):
-    if not os.path.exists(nmap_path):
-        print(f"[!] Nmap JSON results not found: {nmap_path}")
+    hosts = load_nmap_results(nmap_path)
+    if not hosts:
+        print("[!] No hosts found in parsed Nmap results.")
         return
 
-    with open(nmap_path, "r", encoding="utf-8") as f:
-        scan_data = json.load(f)
-
-    for host_data in scan_data.get("hosts", []):
+    for host_data in hosts:
         rhost = host_data.get("ip")
         services = host_data.get("services", [])
 
@@ -67,7 +62,12 @@ def analyze_services_and_exploit(client, nmap_path, lhost, lport):
             name = svc.get("name", "")
             version = svc.get("version", "")
 
-            cve_list = cve_lookup(name, version)
+            # Use real CVE lookup if available, fallback to mock
+            try:
+                cve_list = cve_lookup.find(service=name, version=version)
+            except Exception:
+                cve_list = mock_cve_lookup(name, version)
+
             if not cve_list:
                 print(f"[-] No CVEs found for {name} {version}")
                 continue
@@ -87,7 +87,7 @@ def analyze_services_and_exploit(client, nmap_path, lhost, lport):
 
                 if result and result.get("status") == "success":
                     print(f"[✓] Exploit succeeded for {cve_id} on {rhost}")
-                    break  # stop after first successful exploit
+                    break  # Stop after first success
                 else:
                     print(f"[✗] Exploit failed or unavailable for {cve_id}")
 
@@ -107,7 +107,10 @@ if __name__ == "__main__":
         )
     else:
         print("[!] Failed to connect to Metasploit RPC server")
+
 # ******************************************************************************************
 # End of cve_analysis_plugin.py
 # ******************************************************************************************
 # This script is designed to be run as part of the CHARLOTTE vulnerability assessment framework.
+# It integrates Nmap scan results with CVE analysis and Metasploit exploit execution.
+# Ensure you have the necessary permissions and configurations set up for Metasploit or other tools.
