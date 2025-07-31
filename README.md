@@ -62,7 +62,11 @@ charlotte/
 |
 ├── data/
 │   ├── findings.json       # Stores scan output & metadata
-│   └── fingerprints/       # Known vuln/function patterns
+│   ├── fingerprints/       # Known vuln/function patterns
+|   ├── parsed
+|        ├── charlotte_features.csv     ← Feature-only CSV
+|        ├── charlotte_labels.csv       ← Label-only CSV
+|        └── charlotte_dataset.csv      ← Combined for training
 │   └── model_weights/
 │       ├── severity_net.pt
 │       └── scaler_severity.pkl
