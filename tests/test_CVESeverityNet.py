@@ -1,0 +1,40 @@
+import unittest
+import torch
+import os
+from models.cve_severity_predictor import CVESeverityNet, predict_severity, load_model, load_scaler
+
+class TestCVESeverityPredictor(unittest.TestCase):
+
+    def test_model_forward_pass(self):
+        """Test forward pass with dummy input"""
+        model = CVESeverityNet()
+        dummy_input = torch.rand(1, 5)  # Batch size 1, 5 input features
+        output = model(dummy_input)
+        self.assertEqual(output.shape, (1, 4))  # Expect 4 logits (Low, Medium, High, Critical)
+
+    def test_model_file_exists(self):
+        """Check if the model weights file exists"""
+        model_path = "data/model_weights/severity_net.pt"
+        self.assertTrue(os.path.exists(model_path), f"Missing model file: {model_path}")
+
+    def test_scaler_file_exists(self):
+        """Check if the scaler file exists"""
+        scaler_path = "data/model_weights/scaler_severity.pkl"
+        self.assertTrue(os.path.exists(scaler_path), f"Missing scaler file: {scaler_path}")
+
+    def test_predict_severity_output(self):
+        """Test if prediction returns a valid severity class"""
+        sample_input = [7.5, 6.4, 2.8, 1, 15]  # Example feature vector
+        prediction = predict_severity(sample_input)
+        self.assertIn(prediction, ["Low", "Medium", "High", "Critical"], "Invalid severity prediction")
+
+    def test_predict_consistency(self):
+        """Test that prediction runs twice and produces consistent output for same input"""
+        input_sample = [6.1, 5.5, 3.0, 0, 9]
+        pred1 = predict_severity(input_sample)
+        pred2 = predict_severity(input_sample)
+        self.assertEqual(pred1, pred2, "Predictions should be consistent across runs")
+
+if __name__ == "__main__":
+    unittest.main()
+        scaler = load_scaler()
