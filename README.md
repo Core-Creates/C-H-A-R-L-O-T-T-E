@@ -129,6 +129,7 @@ charlotte/
 |   ├── __init__.py
 │   ├── logger.py           # Logging setup
 │   ├── filetools.py        # File/directory helpers
+|   ├── parse_cvrf.py
 │   └── utils.py
 |
 │
