@@ -1,17 +1,22 @@
 # ******************************************************************************************
 # scripts/train_severity_model.py
-# Trains CVESeverityNet using CVRF XML data (allitems-cvrf.xml)
+# Trains CVESeverityNet using pre-parsed CVE data from CSVs
+# This script expects:
+#   - data/parsed/features.csv
+#   - data/parsed/labels.csv
+# These can be generated using: python utils/parse_cvrf.py data/allitems-cvrf.xml
 # ******************************************************************************************
-import os
-import sys
+
 import torch
-import joblib
 import torch.nn as nn
 import torch.optim as optim
 import numpy as np
+import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
-import xml.etree.ElementTree as ET
+import os
+import sys
+import joblib
 
 # Add CHARLOTTE root directory to sys.path
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -22,83 +27,78 @@ if ROOT_DIR not in sys.path:
 from models.cve_severity_predictor import CVESeverityNet
 
 # ==========================================================================================
-# PARSE CVRF XML DATA
+# STEP 1: LOAD PRE-PARSED CVE DATA FROM CSV FILES
 # ==========================================================================================
-def parse_cvrf_xml(xml_path):
-    """
-    Parse CVRF XML to extract features and severity labels.
-    Expected output: features (X) and severity labels (y)
-    """
-    tree = ET.parse(xml_path)
-    root = tree.getroot()
 
-    X = []
-    y = []
+# Paths to preprocessed feature and label files
+FEATURES_CSV = "data/parsed/features.csv"
+LABELS_CSV = "data/parsed/labels.csv"
 
-    for vuln in root.findall(".//{http://www.icasi.org/CVRF/schema/vuln/1.1}Vulnerability"):
-        # Extract CVSS data (default to 0.0 if not present)
-        cvss_base = float(vuln.findtext(".//{http://www.first.org/cvss/v3.0}BaseScore", default="0.0"))
-        impact = float(vuln.findtext(".//{http://www.first.org/cvss/v3.0}ImpactScore", default="0.0"))
-        exploitability = float(vuln.findtext(".//{http://www.first.org/cvss/v3.0}ExploitabilityScore", default="0.0"))
+# Load feature vectors (X) and severity class labels (y)
+print("[*] Loading parsed CVE features and labels from CSV...")
+X = pd.read_csv(FEATURES_CSV).values  # Shape: [n_samples, 5]
+y = pd.read_csv(LABELS_CSV).values.ravel()  # Shape: [n_samples] as a flat array
 
-        # Heuristic: Check if remote attack vector (1 if remote, 0 otherwise)
-        attack_vector = vuln.findtext(".//{http://www.first.org/cvss/v3.0}AttackVector", default="LOCAL").upper()
-        is_remote = 1 if attack_vector == "NETWORK" else 0
-
-        # CWE ID (convert to integer ID, default to 0)
-        cwe_id = vuln.findtext(".//{http://www.mitre.org/cwe}CWE", default="0")
-        try:
-            cwe_id = int(cwe_id.split("-")[1]) if "-" in cwe_id else int(cwe_id)
-        except ValueError:
-            cwe_id = 0
-
-        # Severity mapping
-        severity = vuln.findtext(".//{http://www.first.org/cvss/v3.0}BaseSeverity", default="LOW").upper()
-        severity_map = {"LOW": 0, "MEDIUM": 1, "HIGH": 2, "CRITICAL": 3}
-        y_class = severity_map.get(severity, 0)
-
-        X.append([cvss_base, impact, exploitability, is_remote, cwe_id])
-        y.append(y_class)
-
-    return np.array(X), np.array(y)
+print(f"[+] Loaded {X.shape[0]} CVE entries with {X.shape[1]} features.")
 
 # ==========================================================================================
-# LOAD DATA
+# STEP 2: NORMALIZE FEATURES
 # ==========================================================================================
-xml_file = "data/allitems-cvrf.xml"
-X, y = parse_cvrf_xml(xml_file)
 
-print(f"[+] Parsed {len(X)} CVE entries from {xml_file}")
-
-# Normalize input features
+# Standardize input features to zero mean and unit variance
+# This is critical so the model can train efficiently without large variance in inputs
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# Train/test split
-X_train, X_val, y_train, y_val = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+# ==========================================================================================
+# STEP 3: SPLIT INTO TRAINING AND VALIDATION SETS
+# ==========================================================================================
 
-# Convert to torch tensors
+# Split the data into training and validation sets (80% train / 20% val)
+X_train, X_val, y_train, y_val = train_test_split(
+    X_scaled, y, test_size=0.2, random_state=42, stratify=y  # Maintain class balance
+)
+
+# Convert data to PyTorch tensors for model training
 X_train = torch.tensor(X_train, dtype=torch.float32)
 y_train = torch.tensor(y_train, dtype=torch.long)
 X_val = torch.tensor(X_val, dtype=torch.float32)
 y_val = torch.tensor(y_val, dtype=torch.long)
 
 # ==========================================================================================
-# TRAIN MODEL
+# STEP 4: DEFINE MODEL, LOSS FUNCTION, OPTIMIZER
 # ==========================================================================================
-model = CVESeverityNet()
+
+# Initialize model with:
+#   - 5 input features (from CSV)
+#   - 32 hidden units (adjustable)
+#   - 4 output classes (Low, Medium, High, Critical)
+model = CVESeverityNet(input_dim=5)
+
+# Define loss function: CrossEntropyLoss is standard for multi-class classification
 criterion = nn.CrossEntropyLoss()
+
+# Use Adam optimizer for fast and adaptive learning
 optimizer = optim.Adam(model.parameters(), lr=0.001)
 
-for epoch in range(50):
-    model.train()
+# ==========================================================================================
+# STEP 5: TRAINING LOOP
+# ==========================================================================================
+
+print("[*] Starting training loop...")
+for epoch in range(50):  # Train for 50 epochs
+    model.train()  # Enable training mode (for layers like dropout, if any)
+
+    # Forward pass and compute training loss
     outputs = model(X_train)
     loss = criterion(outputs, y_train)
 
+    # Backward pass and optimizer step
     optimizer.zero_grad()
     loss.backward()
     optimizer.step()
 
+    # Validation step every 10 epochs to monitor generalization
     if epoch % 10 == 0:
         model.eval()
         val_outputs = model(X_val)
@@ -107,9 +107,23 @@ for epoch in range(50):
         print(f"Epoch {epoch} - Loss: {loss.item():.4f}, Val Acc: {acc:.4f}")
 
 # ==========================================================================================
-# SAVE MODEL + SCALER
+# STEP 6: SAVE TRAINED MODEL AND SCALER
 # ==========================================================================================
+
+# Ensure output directory exists
 os.makedirs("data/model_weights", exist_ok=True)
+
+# Save model weights (PyTorch format) and scaler object (joblib)
 torch.save(model.state_dict(), "data/model_weights/severity_net.pt")
 joblib.dump(scaler, "data/model_weights/scaler_severity.pkl")
-print("[*] Model and scaler saved.")
+
+print("[✓] Training complete. Model and scaler saved to data/model_weights/")
+print("[✓] You can now use the model to predict CVE severity classes.")
+
+# ==========================================================================================
+# END OF TRAINING SCRIPT
+# ==========================================================================================
+# You can now use the trained model to predict severity classes for new CVE data.
+# Simply load the model and scaler, normalize your input features, and call predict_severity()
+# from models/cve_severity_predictor.py with the normalized features.
+# ==========================================================================================
