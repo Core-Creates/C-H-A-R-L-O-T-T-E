@@ -90,14 +90,17 @@ def main():
     parser.add_argument("--outdir", default="data/parsed", help="Directory to save features.csv and labels.csv")
     args = parser.parse_args()
 
-    # Prompt user if no XML file was passed via --xml_file
+    # Prompt user for XML file path if not provided
     if not args.xml_file:
-        args.xml_file = input("[?] Enter path to CVRF XML file (e.g., data/allitems-cvrf.xml): ").strip()
-        if not os.path.exists(args.xml_file):
-            print(f"[!] File not found: {args.xml_file}")
-            return
+        user_input = input("[?] Enter path to CVRF XML file (default = data/allitems-cvrf.xml): ").strip()
+        args.xml_file = user_input if user_input else "data/allitems-cvrf.xml"
 
-    # Prompt user for output directory if desired
+    # Verify the file exists
+    if not os.path.exists(args.xml_file):
+        print(f"[!] File not found: {args.xml_file}")
+        return
+
+    # Optional custom output dir
     print(f"[*] Output directory (default = {args.outdir})")
     custom_outdir = input("    Press Enter to accept or type a new path: ").strip()
     if custom_outdir:
@@ -105,12 +108,14 @@ def main():
 
     os.makedirs(args.outdir, exist_ok=True)
 
+    # Begin parsing
     print(f"[*] Parsing {args.xml_file} ...")
     X, y = parse_cvrf_xml(args.xml_file)
 
     features_path = os.path.join(args.outdir, "features.csv")
     labels_path = os.path.join(args.outdir, "labels.csv")
 
+    # Write to CSV
     write_csv(X, features_path, header=["cvss_base", "impact", "exploitability", "is_remote", "cwe_id"])
     write_csv(y, labels_path, header=["severity_class"])
 
