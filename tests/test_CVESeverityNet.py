@@ -1,6 +1,17 @@
-import unittest
-import torch
 import os
+import sys
+import torch
+import torch.nn as nn
+import torch.nn.functional as F
+import unittest
+
+
+# Add CHARLOTTE root directory to sys.path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+# Now you can import from models/cve_severity_predictor.py
 from models.cve_severity_predictor import CVESeverityNet, predict_severity, load_model, load_scaler
 
 class TestCVESeverityPredictor(unittest.TestCase):
@@ -37,4 +48,4 @@ class TestCVESeverityPredictor(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
-        scaler = load_scaler()
+    #scaler = load_scaler()

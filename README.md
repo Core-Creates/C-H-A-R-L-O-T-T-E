@@ -63,6 +63,9 @@ charlotte/
 ├── data/
 │   ├── findings.json       # Stores scan output & metadata
 │   └── fingerprints/       # Known vuln/function patterns
+│   └── model_weights/
+│       ├── severity_net.pt
+│       └── scaler_severity.pkl
 │
 |
 |
@@ -118,7 +121,9 @@ charlotte/
 │  ├── launch_burp_service.sh
 |  └── train_severity_model.py
 |
-|
+├─ tests
+│   ├── test_CVESeverityNet.py
+│   ├── test_report_utils.py
 |
 ├── utils/
 |   ├── __init__.py
