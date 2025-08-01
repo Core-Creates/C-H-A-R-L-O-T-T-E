@@ -9,6 +9,13 @@ Includes mood-weighted phrase generation and predefined chaotic-neutral profiles
 import random
 import datetime
 
+# Add CHARLOTTE root directory to sys.path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+    
+# Now you can import from models/cve_severity_predictor.py
+from models.cve_severity_predictor import predict_severity, predict_batch, load_model, load_scaler
 # ******************************************************************************************
 # Predefined Personality Modes (Used by CLI selector and config)
 # Each mode maps to sass, sarcasm, and chaos levels between 0.0 and 1.0.
@@ -19,7 +26,7 @@ PREDEFINED_MODES = {
     "mischief":     {"sass": 0.7, "sarcasm": 0.6, "chaos": 0.8},
     "goth_queen":   {"sass": 0.9, "sarcasm": 0.9, "chaos": 1.0},
     "apathetic_ai": {"sass": 0.3, "sarcasm": 0.4, "chaos": 0.2},
-    "gremlin_mode": {"sass": 0.8, "sarcasm": 0.7, "chaos": 0.95}
+    "gremlin_mode": {"sass": 0.8, "sarcasm": 0.3, "chaos": 0.95}
 }
 
 # ******************************************************************************************

@@ -8,12 +8,19 @@
 # ========================
 
 import os  # For file existence checks
+import sys  # For modifying sys.path to include CHARLOTTE root directory
 import torch  # PyTorch library for tensor computation and model handling
+import joblib  # For loading saved scaler objects (StandardScaler from sklearn)
+import pandas as pd  # For reading CSV files
+import numpy as np  # For numerical operations, array, and matrix operations
 import torch.nn as nn  # For building neural network layers
 import torch.nn.functional as F  # Functional API for activations like ReLU
-import numpy as np  # For array and matrix operations
-import joblib  # For loading saved scaler objects (StandardScaler from sklearn)
 from sklearn.preprocessing import StandardScaler  # Used to normalize input features
+
+# Add CHARLOTTE root directory to sys.path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
 
 # ========================
 # DEVICE CONFIGURATION
