@@ -14,7 +14,7 @@ import argparse
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
-    
+
 # Now you can import from models/cve_severity_predictor.py
 from models.cve_severity_predictor import predict_severity, predict_batch, load_model, load_scaler
 
@@ -24,10 +24,17 @@ from models.cve_severity_predictor import predict_severity, predict_batch, load_
 # ==========================================================================================
 def load_input_data(file_path):
     """
-    Loads a list of CVE feature vectors from a .csv or .json file.
+    Loads a list of CVE feature vectors from a .csv, .json (array), or .jsonl (newline-delimited) file.
+
+    Expected fields per record:
+        - cvss_base (float)
+        - cvss_impact (float)
+        - exploitability_score (float)
+        - is_remote (int: 0 or 1)
+        - cwe_id (int)
 
     Returns:
-        List[List[float]]: List of CVE records in expected format.
+        List[List[float]]: Parsed CVE records formatted for model prediction.
     """
     if not os.path.exists(file_path):
         print(f"[!] File not found: {file_path}")
@@ -39,7 +46,7 @@ def load_input_data(file_path):
     if ext == ".csv":
         with open(file_path, newline='', encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
-            for row in reader:
+            for i, row in enumerate(reader):
                 try:
                     features = [
                         float(row["cvss_base"]),
@@ -50,24 +57,47 @@ def load_input_data(file_path):
                     ]
                     data.append(features)
                 except (KeyError, ValueError) as e:
-                    print(f"[!] Skipping malformed row: {row} — {e}")
+                    print(f"[!] Skipping malformed CSV row #{i + 1}: {e}")
 
     elif ext == ".json":
-        with open(file_path, "r", encoding="utf-8") as jsonfile:
+        with open(file_path, "r", encoding="utf-8") as f:
+            first_line = f.readline().strip()
+            f.seek(0)
+
             try:
-                raw = json.load(jsonfile)
-                for entry in raw:
-                    features = [
-                        float(entry["cvss_base"]),
-                        float(entry["cvss_impact"]),
-                        float(entry["exploitability_score"]),
-                        int(entry["is_remote"]),
-                        int(entry["cwe_id"])
-                    ]
-                    data.append(features)
-            except (KeyError, ValueError, json.JSONDecodeError) as e:
-                print(f"[!] JSON parsing error: {e}")
+                if first_line.startswith("["):
+                    # Full JSON array
+                    raw = json.load(f)
+                else:
+                    # JSONL / newline-delimited JSON
+                    raw = []
+                    for i, line in enumerate(f, start=1):
+                        line = line.strip()
+                        if not line:
+                            continue
+                        try:
+                            obj = json.loads(line)
+                            raw.append(obj)
+                        except json.JSONDecodeError as e:
+                            print(f"[!] Skipping malformed JSONL line #{i}: {e}")
+
+                for i, entry in enumerate(raw):
+                    try:
+                        features = [
+                            float(entry["cvss_base"]),
+                            float(entry["cvss_impact"]),
+                            float(entry["exploitability_score"]),
+                            int(entry["is_remote"]),
+                            int(entry["cwe_id"])
+                        ]
+                        data.append(features)
+                    except (KeyError, ValueError) as e:
+                        print(f"[!] Skipping invalid entry #{i + 1}: {e}")
+
+            except json.JSONDecodeError as e:
+                print(f"[!] Failed to parse JSON file: {e}")
                 sys.exit(1)
+
     else:
         print(f"[!] Unsupported file format: {ext}")
         sys.exit(1)
