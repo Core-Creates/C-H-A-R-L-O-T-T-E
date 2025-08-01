@@ -64,9 +64,10 @@ charlotte/
 │   ├── findings.json       # Stores scan output & metadata
 │   ├── fingerprints/       # Known vuln/function patterns
 |   ├── parsed
-|        ├── charlotte_features.csv     ← Feature-only CSV
-|        ├── charlotte_labels.csv       ← Label-only CSV
-|        └── charlotte_dataset.csv      ← Combined for training
+|   |    ├── charlotte_features.csv     ← Feature-only CSV
+|   |    ├── charlotte_labels.csv       ← Label-only CSV
+|   |    └── charlotte_dataset.csv      ← Combined for training
+|   |
 │   └── model_weights/
 │       ├── severity_net.pt
 │       └── scaler_severity.pkl
@@ -131,10 +132,11 @@ charlotte/
 |
 ├── utils/
 |   ├── __init__.py
-│   ├── logger.py           # Logging setup
-│   ├── filetools.py        # File/directory helpers
 │   ├── load_nmap_results.py
+│   ├── logger.py           # Logging setup
+│   ├── file_tools.py        # File/directory helpers
 |   ├── parse_cvrf.py
+|   ├── parse_json.py
 │   └── utils.py
 |
 │
