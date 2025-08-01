@@ -129,6 +129,55 @@ def predict_severity(cve_features, model=None, scaler=None):
         severity_classes = ["Low", "Medium", "High", "Critical"]
         return severity_classes[pred]
 
+
+# ==========================================================================================
+# FUNCTION: predict_batch
+# Performs batch severity prediction for multiple CVEs (GPU-accelerated if available)
+# ==========================================================================================
+def predict_batch(cve_feature_list, model=None, scaler=None):
+    """
+    Performs batch prediction of CVE severity levels.
+
+    Args:
+        cve_feature_list (List[List[float]]): A list of CVE records, where each record is a
+            list of 5 features: [cvss_base, cvss_impact, exploitability_score, is_remote, cwe_id]
+        model (CVESeverityNet): Optional pre-loaded model
+        scaler (StandardScaler): Optional pre-loaded scaler
+
+    Returns:
+        List[str]: List of predicted severity classes for each CVE record
+            Each label is one of: ["Low", "Medium", "High", "Critical"]
+    """
+    if model is None:
+        model = load_model()
+    if scaler is None:
+        scaler = load_scaler()
+
+    with torch.no_grad():
+        # Convert input to NumPy array for batch processing
+        x = np.array(cve_feature_list)
+
+        # Normalize using pre-fitted scaler
+        x_scaled = scaler.transform(x)
+
+        # Convert to PyTorch tensor and move to correct device
+        tensor_input = torch.tensor(x_scaled, dtype=torch.float32).to(DEVICE)
+
+        # Run batch through the model
+        logits = model(tensor_input)
+
+        # Get predicted class index for each row in batch
+        preds = torch.argmax(logits, dim=1).cpu().numpy()
+
+        # Map indices to human-readable severity classes
+        severity_classes = ["Low", "Medium", "High", "Critical"]
+        return [severity_classes[i] for i in preds]
+# ==========================================================================================
+# END OF FUNCTION: predict_batch
+# ==========================================================================================
+
+
+
 # ******************************************************************************************
 # END OF models/cve_severity_predictor.py
 # ******************************************************************************************
