@@ -16,6 +16,11 @@ import joblib  # For loading saved scaler objects (StandardScaler from sklearn)
 from sklearn.preprocessing import StandardScaler  # Used to normalize input features
 
 # ========================
+# DEVICE CONFIGURATION
+# ========================
+DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
+# ========================
 # END OF IMPORTS
 # ========================
 
@@ -60,18 +65,11 @@ class CVESeverityNet(nn.Module):
 # ==========================================================================================
 def load_model(model_path="data/model_weights/severity_net.pt", input_dim=5):
     """
-    Loads the trained model from a .pt file and returns it.
-
-    Args:
-        model_path (str): Path to saved model weights
-        input_dim (int): Number of input features (default: 5)
-
-    Returns:
-        model (nn.Module): Loaded and ready-to-use PyTorch model
+    Loads the trained model and transfers it to GPU or CPU based on availability.
     """
-    model = CVESeverityNet(input_dim=input_dim)
+    model = CVESeverityNet(input_dim=input_dim).to(DEVICE)
     if os.path.exists(model_path):
-        model.load_state_dict(torch.load(model_path))
+        model.load_state_dict(torch.load(model_path, map_location=DEVICE))
         model.eval()
     else:
         raise FileNotFoundError(f"[!] Model file not found at {model_path}")
@@ -107,35 +105,27 @@ def predict_severity(cve_features, model=None, scaler=None):
     Predicts the severity class of a CVE using a trained neural network.
 
     Args:
-        cve_features (List[float]): Input features: 
+        cve_features (List[float]): Features: 
             [cvss_base, cvss_impact, exploitability_score, is_remote, cwe_id]
-        model (CVESeverityNet): Optional pre-loaded model instance
+        model (CVESeverityNet): Optional pre-loaded model
         scaler (StandardScaler): Optional pre-loaded scaler
 
     Returns:
-        str: Severity class: one of ["Low", "Medium", "High", "Critical"]
+        str: One of ["Low", "Medium", "High", "Critical"]
     """
-    # Load model and scaler if not passed in
     if model is None:
         model = load_model()
     if scaler is None:
         scaler = load_scaler()
 
     with torch.no_grad():
-        # Convert input to 2D NumPy array, then scale
         x = np.array([cve_features])
         x_scaled = scaler.transform(x)
+        tensor_input = torch.tensor(x_scaled, dtype=torch.float32).to(DEVICE)
 
-        # Convert scaled input to PyTorch tensor
-        tensor_input = torch.tensor(x_scaled, dtype=torch.float32)
-
-        # Feed input to the model
         logits = model(tensor_input)
-
-        # Take the highest scoring index
         pred = torch.argmax(logits, dim=1).item()
 
-        # Severity class mapping
         severity_classes = ["Low", "Medium", "High", "Critical"]
         return severity_classes[pred]
 
