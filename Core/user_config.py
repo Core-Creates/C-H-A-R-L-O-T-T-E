@@ -26,6 +26,11 @@ DEFAULT_SETTINGS = {
         "instance_url": "",
         "api_token": "",
         "default_assignment_group": "Security Operations"
+    },
+    "slack_enabled": False,
+    "slack": {
+        "webhook_url": "",
+        "channel": "#general"
     }
 }
 
@@ -75,11 +80,122 @@ def run_initial_setup():
             message="Default Assignment Group:",
             default="Security Operations"
         ).execute()
+    slack_enabled = inquirer.confirm(
+        message="Send alerts to Slack via webhook?",
+        default=False
+    ).execute()
+    if slack_enabled:
+        settings["slack_enabled"] = True
+        settings["slack"]["webhook_url"] = inquirer.text(message="Slack Incoming Webhook URL:").execute()
+        settings["slack"]["channel"] = inquirer.text(message="Default Slack channel (e.g. #general):", default="#general").execute()
+        settings["slack"]["username"] = inquirer.text(
+            message="Slack Bot Username (optional):",
+            default="CHARLOTTE"
+        ).execute()
+        settings["slack"]["icon_emoji"] = inquirer.text(
+            message="Slack Bot Icon Emoji (optional):",
+            default=":robot_face:"
+        ).execute()
+        settings["slack"]["channel"] = inquirer.text(
+            message="Slack Channel Name (optional, for direct messages):",
+            default="#general"
+        ).execute()
+        settings["slack"]["channel_id"] = inquirer.text(
+            message="Slack Channel ID (optional, for direct messages):",
+            default=""
+        ).execute()
+        settings["slack"]["team_name"] = inquirer.text(
+            message="Slack Team Name (optional, for direct messages):",
+            default=""
+        ).execute()
+        settings["slack"]["team_id"] = inquirer.text(
+            message="Slack Team ID (optional, for direct messages):",
+            default=""
+        ).execute()
+        settings["slack"]["thread_ts"] = inquirer.text(
+            message="Slack Thread Timestamp (optional, for threaded messages):",
+            default=""
+        ).execute()
+        settings["slack"]["attachments"] = inquirer.confirm(
+            message="Include attachments in Slack messages?",
+            default=True
+        ).execute()
+        settings["slack"]["markdown"] = inquirer.confirm(
+            message="Use Markdown formatting in Slack messages?",
+            default=True
+        ).execute()
+        settings["slack"]["notify"] = inquirer.confirm(
+            message="Notify users with @here or @channel?",
+            default=False
+        ).execute()
+        settings["slack"]["notify_users"] = inquirer.text(
+            message="Comma-separated list of user IDs to notify (optional):",
+            default=""
+        ).execute().split(",")
+        settings["slack"]["notify_groups"] = inquirer.text(
+            message="Comma-separated list of group IDs to notify (optional):",
+            default=""
+        ).execute().split(",")
+        settings["slack"]["notify_roles"] = inquirer.text(
+            message="Comma-separated list of role IDs to notify (optional):",
+            default=""
+        ).execute().split(",")
+        settings["slack"]["notify_channels"] = inquirer.text(
+            message="Comma-separated list of channel IDs to notify (optional):",
+            default=""
+        ).execute().split(",")
+        settings["slack"]["notify_everyone"] = inquirer.confirm(
+            message="Notify @everyone in the channel?",
+            default=False
+        ).execute()
+        settings["slack"]["configuration_url"] = inquirer.text(
+            message="Slack Configuration URL (optional, for more settings):",
+            default="https://api.slack.com/apps"
+        ).execute()
+        settings["slack"]["configuration_token"] = getpass(
+            "Slack Configuration Token (optional, for API access):"
+        )
+        settings["slack"]["configuration_client_id"] = inquirer.text(
+            message="Slack Configuration Client ID (optional, for OAuth):",
+            default=""
+        ).execute()
+    
+    # Confirm settings
+    print("\n🔧 Configuration Summary:"
+          f"\n- Report Format: {settings['report_format']}"
+          f"\n- Auto-send: {'Enabled' if settings['auto_send'] else 'Disabled'}"
+          f"\n- Email: {'Enabled' if settings['email_enabled'] else 'Disabled'}"
+          f"\n- ServiceNow: {'Enabled' if settings['servicenow_enabled'] else 'Disabled'}"
+          f"\n- Slack: {'Enabled' if settings['slack_enabled'] else 'Disabled'}")
+    
+    # Prompt to save settings
+    save = inquirer.confirm(
+        message="Save these settings?",
+        default=True
+    ).execute()
+    if not save:
+        print("\n❌ Configuration not saved. Exiting setup.")
+        return
+    print("\n✅ Configuration saved successfully!")
+    # Ensure config directory exists
+    if not os.path.exists("config"):
+        os.makedirs("config")
 
-    # Save to file
+    # Save settings to JSON file
     with open(CONFIG_FILE, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=4)
     print(f"\n✅ Configuration saved to {CONFIG_FILE}\n")
+    # Print final confirmation
+    print("CHARLOTTE is now configured and ready to assist you with CVE triage and reporting!")
+    print("You can always modify these settings later in the config/user_settings.json file.\n")
+    # Exit the setup
+    print("Thank you for setting up CHARLOTTE! Happy triaging! 🎉"
+          "\n\nYou can now run CHARLOTTE with your configured settings.\n"
+          "Use the command `python charlotte.py` to start the application.\n"
+          "\n\nIf you need to reconfigure, just run this script again.\n"
+            "\n\nFor any issues or feedback, please visit our GitHub repository:\n"
+          "Exiting setup. Have a great day! 😊"
+          "\n\n- The CHARLOTTE Team")
 
 
 if __name__ == "__main__":

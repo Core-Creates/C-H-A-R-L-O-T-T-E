@@ -36,7 +36,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # A feedforward neural network for CVE severity classification
 # ==========================================================================================
 class CVESeverityNet(nn.Module):
-    def __init__(self, input_dim=5, hidden_dim=32, output_dim=4):
+    def __init__(self, input_dim=7, hidden_dim=32, output_dim=4):
         """
         Initializes a 3-layer feedforward neural network for severity classification.
 
