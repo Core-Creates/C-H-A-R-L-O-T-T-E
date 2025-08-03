@@ -9,6 +9,7 @@ Includes mood-weighted phrase generation and predefined chaotic-neutral profiles
 import os
 import random
 import datetime
+import sys
 
 # Add CHARLOTTE root directory to sys.path
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
