@@ -6,6 +6,7 @@ Defines CHARLOTTE's personality and tone engine for expressive interaction.
 Includes mood-weighted phrase generation and predefined chaotic-neutral profiles.
 """
 
+import os
 import random
 import datetime
 
