@@ -13,7 +13,7 @@ from InquirerPy import inquirer
 from utils.logger import log_session
 from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
-from core.report_dispatcher # Handles report generation and dispatching
+from core import report_dispatcher # Handles report generation and dispatching 
 from core.charlotte_personality import CharlottePersonality
 from plugins.recon.amass.owasp_amass import run_plugin as run_amass_plugin  # Merged Amass plugin
 from plugins.recon.nmap.nmap_plugin import run_plugin as run_nmap_plugin     # Merged Nmap plugin
@@ -84,7 +84,7 @@ def create_charlotte_from_config(config):
     return CharlottePersonality(sass=sass, sarcasm=sarcasm, chaos=chaos, mode=mode)
 
 # ******************************************************************************************
-# Add command-line doc summary output
+# Plugin Documentation Helper
 # ******************************************************************************************
 
 def check_plugin_doc():
@@ -102,11 +102,22 @@ def check_plugin_doc():
             sys.exit(0)
 
 # ******************************************************************************************
+# Report Helper
+# ******************************************************************************************
+
+def handle_report(report_data):
+    if not report_data:
+        print("[!] No report data returned.")
+        return
+    file_path = report_dispatcher.save_report_locally(report_data, interactive=False)
+    report_dispatcher.dispatch_report(file_path)
+
+# ******************************************************************************************
 # Task Explanation Handler
 # ******************************************************************************************
 
 def explain_task(task, mood):
-    print("\n🧪 CHARLOTTE says:")
+    print("\n🥪 CHARLOTTE says:")
     if task == "binary_strings":
         if mood == "sassy":
             print("  Honey, entropy is just chaos — measured mathematically.\n  If it looks random and sus, it probably is. Let’s dig in.\n")
@@ -134,21 +145,21 @@ def explain_task(task, mood):
         print("  Exploit generation creates payloads based on vulnerability descriptions.\n")
 
 # ******************************************************************************************
-# Entry point logic - handle CLI startup and logging structure
+# Entry Point Logic
 # ******************************************************************************************
 
 def main():
     check_plugin_doc()
 
-    # Windows-safe fallback if __name__ not handled
     if __name__ != "__main__":
         return
 
-    # 🧠 CHARLOTTE runtime
-    parse_custom_flags()
-    launch_cli(explain_task, charlotte)
+    # Example test
+    result = run_amass_plugin(domain="example.com")
+    handle_report(result)
 
 if __name__ == "__main__":
     main()
 # ******************************************************************************************
-# This is the main entry point for the CHARLOTTE CLI.   
+# This is the main entry point for the CHARLOTTE CLI.
+# ******************************************************************************************
