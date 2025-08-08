@@ -121,6 +121,37 @@ def send_servicenow_ticket(file_path, short_description="CHARLOTTE Triage Report
 
     print("[+] Report attached to ServiceNow incident.")
 
+def show_report_summary(report_data):
+    print("\n--- Triage Report Summary ---")
+    print(f"Total Vulnerabilities: {len(report_data.get('vulnerabilities', []))}")
+    for vuln in report_data.get("vulnerabilities", []):
+        print(f"- {vuln.get('cve_id', 'Unknown CVE')}: {vuln.get('description', 'No description')}")
+    print("------------------------------")
+# ==========================================================================================
+# FUNCTION: save_report_locally()
+# Saves the report data to a local file
+# ==========================================================================================
+
+def save_report_locally(report_data, file_path=None, interactive=True):
+    if interactive:
+        save_report = input("Save report locally? (y/n): ").strip().lower() == 'y'
+        if not save_report:
+            print("[*] Report not saved locally.")
+            return None
+        file_name = input("Enter file name (default: triage_report.json): ").strip() or "triage_report.json"
+    else:
+        file_name = "triage_report.json"
+
+    if not file_name.endswith(".json"):
+        file_name += ".json"
+    file_path = file_path or os.path.join("data/reports", file_name)
+    os.makedirs("data/reports", exist_ok=True)
+    with open(file_path, "w", encoding="utf-8") as f:
+        json.dump(report_data, f, indent=4)
+    print(f"[+] Report saved locally to {file_path}")
+    show_report_summary(report_data)
+    return file_path
+
 # ==========================================================================================
 # FUNCTION: dispatch_report()
 # Master dispatcher that checks config and sends to destination
