@@ -29,7 +29,7 @@ PLUGIN_TASKS = {
     "🌐 Web Recon (Subdomains)": "web_recon",
     "📱 Nmap Network Scanner": "nmap_scan",
     "💉 SQL Injection Scan": "sql_injection",
-    " 🮺 XSS Scan": "xss_scan",
+    "🩺 XSS Scan": "xss_scan",
     "🚨 Exploit Generator": "exploit_generation",
     "🔎 OWASP Amass Subdomain Recon": "owasp_amass",
     "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent"
