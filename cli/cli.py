@@ -2,28 +2,73 @@
 # CHARLOTTE CLI - Interactive Interface for the Cybernetic Heuristic Assistant
 # Provides task selection, personality configuration, and scan execution via plugin engine.
 # ******************************************************************************************
+# ******************************************************************************************
+# CHARLOTTE CLI - Interactive Interface for the Cybernetic Heuristic Assistant
+# Provides task selection, personality configuration, and scan execution via plugin engine.
+# ******************************************************************************************
 
 import os
 import sys
+
+# 🛠️ PATCH SYS.PATH EARLY — this must be before any CHARLOTTE imports!
+CURRENT_FILE = os.path.abspath(__file__)
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(CURRENT_FILE), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+
+# 🧠 All other imports now work:
+
 import json
 import random
+import inspect
 import argparse
 from datetime import datetime
 from InquirerPy import inquirer
 from utils.logger import log_session
 from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
-from core import report_dispatcher # Handles report generation and dispatching 
+from core import report_dispatcher
 from core.charlotte_personality import CharlottePersonality
-from plugins.recon.amass.owasp_amass import run_plugin as run_amass_plugin  # Merged Amass plugin
-from plugins.recon.nmap.nmap_plugin import run_plugin as run_nmap_plugin     # Merged Nmap plugin
+from plugins.recon.amass.owasp_amass import run_plugin as run_amass_plugin
+from plugins.recon.nmap.nmap_plugin import run_plugin as run_nmap_plugin
+from plugins.recon.http_banner.http_banner import run_plugin as run_http_banner_plugin
 
+import inspect
 
-# Dynamically add CHARLOTTE project root to Python path
-ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
-if ROOT_DIR not in sys.path:
-    sys.path.insert(0, ROOT_DIR)
-    
+def safe_run_plugin(func, **params):
+    """
+    Calls plugin functions that may accept different signatures:
+    - single dict param (args/config/options)
+    - specific named kwargs
+    - positional-only parameters
+    Also maps common synonyms like domain->target when needed.
+    """
+    sig = inspect.signature(func)
+    param_names = list(sig.parameters.keys())
+
+    # Map common synonyms
+    mapped = dict(params)
+    if "domain" in params and "domain" not in sig.parameters and "target" in sig.parameters:
+        mapped["target"] = params["domain"]
+
+    # If the function takes exactly one param, it often expects a dict
+    if len(param_names) == 1:
+        try:
+            return func(mapped)
+        except TypeError:
+            # fall back: pass only what that single param is named (still a dict)
+            return func({k: v for k, v in mapped.items()})
+
+    # Otherwise try filtered kwargs first
+    filtered = {k: v for k, v in mapped.items() if k in sig.parameters}
+    try:
+        return func(**filtered)
+    except TypeError:
+        # Last resort: positional in declared order (only those we have)
+        ordered = [mapped[name] for name in param_names if name in mapped]
+        return func(*ordered)
+
 # ******************************************************************************************
 # Plugin Task + Argument Setup
 # Maps human-readable labels to internal plugin keys and defines required input arguments.
@@ -160,12 +205,13 @@ def main():
     if __name__ != "__main__":
         return
 
-    # Example test
-    result = run_amass_plugin(domain="www.c-h-a-r-l-o-t-t-e.org", interactive=False)
+    # Use the shim so we don't care how the plugin’s signature looks
+    result = safe_run_plugin(
+        run_amass_plugin,
+        domain="www.c-h-a-r-l-o-t-t-e.org",
+        interactive=False
+    )
     handle_report(result)
-
-if __name__ == "__main__":
-    main()
 # ******************************************************************************************
 # This is the main entry point for the CHARLOTTE CLI.
 # ******************************************************************************************
