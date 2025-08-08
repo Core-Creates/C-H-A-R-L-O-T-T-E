@@ -18,6 +18,12 @@ from core.charlotte_personality import CharlottePersonality
 from plugins.recon.amass.owasp_amass import run_plugin as run_amass_plugin  # Merged Amass plugin
 from plugins.recon.nmap.nmap_plugin import run_plugin as run_nmap_plugin     # Merged Nmap plugin
 
+
+# Dynamically add CHARLOTTE project root to Python path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+    
 # ******************************************************************************************
 # Plugin Task + Argument Setup
 # Maps human-readable labels to internal plugin keys and defines required input arguments.
@@ -155,7 +161,7 @@ def main():
         return
 
     # Example test
-    result = run_amass_plugin(domain="example.com")
+    result = run_amass_plugin(domain="www.c-h-a-r-l-o-t-t-e.org", interactive=False)
     handle_report(result)
 
 if __name__ == "__main__":
