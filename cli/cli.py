@@ -10,13 +10,13 @@ import random
 import argparse
 from datetime import datetime
 from InquirerPy import inquirer
-from core.logger import log_session
+from utils.logger import log_session
 from InquirerPy.separator import Separator
 from core.plugin_manager import run_plugin
-from core.roast_generator import get_summary_roast  # Adjust path based on your structure
+from core.report_dispatcher # Handles report generation and dispatching
 from core.charlotte_personality import CharlottePersonality
-from plugins.owasp_amass import run_plugin as run_amass_plugin  # Merged Amass plugin
-from plugins.nmap_scan import run_plugin as run_nmap_plugin     # Merged Nmap plugin
+from plugins.recon.amass.owasp_amass import run_plugin as run_amass_plugin  # Merged Amass plugin
+from plugins.recon.nmap.nmap_plugin import run_plugin as run_nmap_plugin     # Merged Nmap plugin
 
 # ******************************************************************************************
 # Plugin Task + Argument Setup
