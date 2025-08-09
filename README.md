@@ -19,6 +19,10 @@ CHARLOTTE is built for multi-phase defensive and offensive security tasks, enabl
 - **Reverse Engineering** – Binary dissection, deobfuscation, symbolic tracing
 
 ---
+website:
+## https://www.c-h-a-r-l-o-t-t-e.org/
+
+---
 
 ## 🧬 Dual Intelligence Modes
 
