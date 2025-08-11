@@ -60,6 +60,20 @@ def load_cfg():
 
     return url, token
 
+def _unwrap_call_result(res):
+    """Return a plain dict/string from CallToolResult; fallback to res."""
+    blocks = getattr(res, "content", []) or []
+    for b in blocks:
+        t = getattr(b, "type", None)
+        if t == "json" and hasattr(b, "json"):
+            return b.json
+        if t == "text" and hasattr(b, "text"):
+            try:
+                return json.loads(b.text)
+            except Exception:
+                return b.text
+    return res
+
 class HtbMcpClient:
     def __init__(self, url: str, token: str):
         self.url = url
@@ -84,7 +98,8 @@ class HtbMcpClient:
         return [(t.name, t.description) for t in tools]
 
     async def call(self, tool_name: str, args: dict):
-        return await self.session.call_tool(tool_name, args)
+        res = await self.session.call_tool(tool_name, args)
+        return _unwrap_call_result(res)
 
     # ---------------- Convenience wrappers ----------------
     async def my_teams(self):
