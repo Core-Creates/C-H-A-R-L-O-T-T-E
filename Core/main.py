@@ -1,35 +1,52 @@
 # ******************************************************************************************
 # main.py - Minimal Launcher for CHARLOTTE with Banner and Plugin Hook
+#
+# PURPOSE:
+#   CLI entry for CHARLOTTE. Displays a menu, dispatches tasks to plugins, and hosts
+#   special flows (e.g., CVE Intelligence). Nmap gets a dedicated direct call so users
+#   always see interactive prompts.
 # ******************************************************************************************
 
 import os
 import sys
-import json
-import yaml
-from datetime import datetime
-from InquirerPy import inquirer
-from InquirerPy.separator import Separator
 
-# Fix import resolution for project-local packages like agents/, core/, etc.
+# ──────────────────────────────────────────────────────────────────────────────
+# Third-party deps with friendly hints if missing
+# ──────────────────────────────────────────────────────────────────────────────
+try:
+    from InquirerPy import inquirer
+    from InquirerPy.separator import Separator
+except ModuleNotFoundError:
+    print("[!] Missing dependency: InquirerPy\n    pip install InquirerPy")
+    raise
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Ensure project-local imports work (agents/, core/, plugins/, etc.)
+# ──────────────────────────────────────────────────────────────────────────────
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from agents.triage_agent import run_triage_agent, load_findings, save_results
-from core.plugin_manager import run_plugin, load_plugins
-from core.charlotte_personality import CharlottePersonality
-import core.cve_lookup
-# ******************************************************************************************
+# ──────────────────────────────────────────────────────────────────────────────
+# CHARLOTTE internals
+# ──────────────────────────────────────────────────────────────────────────────
+try:
+    from agents.triage_agent import run_triage_agent, load_findings, save_results
+    from core.plugin_manager import run_plugin, load_plugins
+    from core.charlotte_personality import CharlottePersonality
+    import core.cve_lookup
+except ModuleNotFoundError as e:
+    print(f"[!] Missing CHARLOTTE module: {e.name}\n    Did you activate the venv and install requirements?")
+    raise
 
-# Initialize CHARLOTTE personality
+# ──────────────────────────────────────────────────────────────────────────────
+# Initialize personality (for future contextual use)
+# ──────────────────────────────────────────────────────────────────────────────
 charlotte = CharlottePersonality()
 
-#print(f"[debug] __name__={__name__}")
-
-# ******************************************************************************************
-# Banner Art
-# ******************************************************************************************
-
+# ──────────────────────────────────────────────────────────────────────────────
+# Banner (for ✨ vibes ✨)
+# ──────────────────────────────────────────────────────────────────────────────
 def print_banner():
     PURPLE = "\033[35m"
     RESET = "\033[0m"
@@ -48,10 +65,13 @@ def print_banner():
 {RESET}"""
     print(skull_banner)
 
-# ******************************************************************************************
-# Plugin Task Mapping
-# ******************************************************************************************
-
+# ──────────────────────────────────────────────────────────────────────────────
+# Menu label → plugin key mapping
+#
+# NOTE: The Nmap loader registers as "port_scan" in your plugin system. We keep
+#       that here, but will also directly import/call its module to guarantee
+#       interactive prompts.
+# ──────────────────────────────────────────────────────────────────────────────
 PLUGIN_TASKS = {
     "🧠 Reverse Engineer Binary (Symbolic Trace)": "reverse_engineering",
     "🔍 Binary Strings + Entropy Analysis": "binary_strings",
@@ -59,7 +79,7 @@ PLUGIN_TASKS = {
     "🕵️ CVE Lookup (CHARLOTTE)": "cve_lookup",
     "🚨 Exploit Generator": "exploit_generation",
     "🔗 Link Analysis": "link_analysis",
-    "📡 NMAP Scan": "nmap_plugin",
+    "📡 NMAP Scan": "port_scan",  # Nmap
     "🧨 Predict Exploitability": "exploit_predictor",
     "🔎 Search Exploit DB": "exploit_search",
     "💉 SQL Injection Scan": "sql_injection",
@@ -67,13 +87,12 @@ PLUGIN_TASKS = {
     "📊 Vulnerability Assessment": "vulnerability_assessment",
     "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
     "🌐 Web Recon (Subdomains)": "web_recon",
-    "🧼 XSS Scan": "xss_scan"
+    "🧼 XSS Scan": "xss_scan",
 }
 
-# ******************************************************************************************
-# CVE Lookup Menu Logic
-# ******************************************************************************************
-
+# ──────────────────────────────────────────────────────────────────────────────
+# CVE Lookup sub-menu
+# ──────────────────────────────────────────────────────────────────────────────
 def run_cve_lookup():
     print("\n=== CHARLOTTE CVE Intelligence Module ===")
 
@@ -83,14 +102,14 @@ def run_cve_lookup():
             "🔎 Lookup by CVE ID",
             "🗂️ Search by Keyword",
             "📅 List CVEs by Product and Year",
-            "❌ Back to Main Menu"
-        ]
+            "❌ Back to Main Menu",
+        ],
     ).execute()
 
     if option == "🔎 Lookup by CVE ID":
         cve_id = input("Enter CVE ID (e.g., CVE-2023-12345): ").strip().upper()
         if not cve_id.startswith("CVE-"):
-            print("Invalid CVE ID format.")
+            print("[!] Invalid CVE ID format.")
             return
         result = core.cve_lookup.fetch_and_cache(cve_id)
         core.cve_lookup.show_and_export(result)
@@ -106,14 +125,20 @@ def run_cve_lookup():
         results = core.cve_lookup.search_by_product_year(product, year)
         core.cve_lookup.show_and_export(results, multiple=True)
 
-# ******************************************************************************************
-# Main CLI Application Logic
-# ******************************************************************************************
-
+# ──────────────────────────────────────────────────────────────────────────────
+# Main CLI
+# ──────────────────────────────────────────────────────────────────────────────
 def main():
     print_banner()
-    load_plugins()
 
+    # Load plugins (note: many implementations do this via side-effects and return None)
+    try:
+        load_plugins()
+    except Exception as e:
+        print(f"[!] Failed to load plugins: {e}")
+        return
+
+    # Top-level menu
     task = inquirer.select(
         message="What would you like CHARLOTTE to do?",
         choices=[
@@ -142,20 +167,44 @@ def main():
 
     plugin_key = PLUGIN_TASKS.get(task)
 
+    # Special handling: Nmap must always prompt interactively from menu
+    if plugin_key == "port_scan":
+        try:
+            # Ensure interactive mode
+            os.environ.pop("CHARLOTTE_HEADLESS", None)
+
+            # Direct import so we bypass any plugin-manager quirks and guarantee prompts
+            from plugins.recon.nmap import nmap_plugin as _nmap
+            print("\n[ℹ︎] Launching Nmap in interactive mode…\n")
+            _nmap.run_plugin(args=None)  # ← This shows the menu + input() prompts
+            return
+        except Exception as e:
+            print(f"[!] Nmap plugin error: {e}")
+            print("    Falling back to plugin manager…")
+            # If direct call fails for any reason, try the standard dispatch:
+            try:
+                run_plugin(plugin_key, args=None)
+            except Exception as e2:
+                print(f"[!] Plugin manager also failed to run Nmap: {e2}")
+            return
+
+    # Built-in triage flow
     if plugin_key == "triage_agent":
         scan_path = inquirer.text(
             message="Enter path to scan file (press Enter for default: data/findings.json):"
         ).execute()
-        scan_path = scan_path.strip() or "data/findings.json"
+        scan_path = (scan_path or "").strip() or "data/findings.json"
         run_triage_agent(scan_file=scan_path)
+        return
 
-    elif plugin_key == "exploit_predictor":
+    # Exploit predictor flow
+    if plugin_key == "exploit_predictor":
         from core.logic_modules.exploit_predictor import batch_predict
 
         scan_path = inquirer.text(
             message="Enter path to scan file (press Enter for default: data/findings.json):"
         ).execute()
-        scan_path = scan_path.strip() or "data/findings.json"
+        scan_path = (scan_path or "").strip() or "data/findings.json"
 
         try:
             findings = load_findings(scan_path)
@@ -167,18 +216,22 @@ def main():
             print("Use '🧮 Vulnerability Triage' to further refine prioritization.\n")
         except Exception as e:
             print(f"[!] Error processing exploit prediction: {e}")
+        return
 
-    else:
-        run_plugin(plugin_key)
+    # All other plugins — use the manager and request interactive mode
+    try:
+        run_plugin(plugin_key, args=None)
         print(f"\n[✔] Running plugin: {plugin_key}...\n")
+    except TypeError as te:
+        print(f"[!] Plugin '{plugin_key}' raised a TypeError: {te}")
+        print("    Tip: Ensure its entrypoint is 'def run_plugin(args=None, ...):'")
+    except Exception as e:
+        print(f"[!] Error running plugin '{plugin_key}': {e}")
 
-# ******************************************************************************************
-# Entry Point
-# ******************************************************************************************
-
+# ──────────────────────────────────────────────────────────────────────────────
+# Entry point
+# ──────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
     main()
-    pass  # Keep this to avoid accidental execution in interactive mode
-
 # ******************************************************************************************
 # This is the main entry point for the CHARLOTTE CLI application.
