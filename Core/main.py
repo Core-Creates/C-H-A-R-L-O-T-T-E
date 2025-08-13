@@ -18,7 +18,7 @@ if PROJECT_ROOT not in sys.path:
 from agents.triage_agent import run_triage_agent, load_findings, save_results
 from core.plugin_manager import run_plugin, load_plugins
 from core.charlotte_personality import CharlottePersonality
-import cve_lookup
+import core.cve_lookup
 # ******************************************************************************************
 
 # Initialize CHARLOTTE personality
