@@ -20,6 +20,8 @@ except ModuleNotFoundError:
     print("[!] Missing dependency: InquirerPy\n    pip install InquirerPy")
     raise
 
+# Make internal helpers importable by other modules
+__all__ = ["run_plugin", "_call_plugin_entrypoint", "PLUGIN_REGISTRY", "ALIASES"]
 # ──────────────────────────────────────────────────────────────────────────────
 # Ensure project-local imports work (agents/, core/, plugins/, etc.)
 # ──────────────────────────────────────────────────────────────────────────────
