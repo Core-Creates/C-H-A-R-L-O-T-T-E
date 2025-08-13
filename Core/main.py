@@ -16,12 +16,15 @@ if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
 from agents.triage_agent import run_triage_agent, load_findings, save_results
-from plugin_manager import run_plugin, load_plugins
-from charlotte_personality import CharlottePersonality
+from core.plugin_manager import run_plugin, load_plugins
+from core.charlotte_personality import CharlottePersonality
 import cve_lookup
+# ******************************************************************************************
 
 # Initialize CHARLOTTE personality
 charlotte = CharlottePersonality()
+
+#print(f"[debug] __name__={__name__}")
 
 # ******************************************************************************************
 # Banner Art
@@ -72,7 +75,7 @@ PLUGIN_TASKS = {
 # ******************************************************************************************
 
 def run_cve_lookup():
-    print("\n=== HARLOTTE CVE Intelligence Module ===")
+    print("\n=== CHARLOTTE CVE Intelligence Module ===")
 
     option = inquirer.select(
         message="Choose your CVE query method:",
@@ -175,6 +178,7 @@ def main():
 
 if __name__ == "__main__":
     main()
+    pass  # Keep this to avoid accidental execution in interactive mode
 
 # ******************************************************************************************
 # This is the main entry point for the CHARLOTTE CLI application.
