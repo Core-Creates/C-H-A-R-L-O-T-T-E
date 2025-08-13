@@ -71,3 +71,5 @@ tqdm
 pymetasploit3
 
 torch
+
+reportlab
