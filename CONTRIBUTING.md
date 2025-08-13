@@ -52,9 +52,17 @@ CHARLOTTE is a modular AI assistant built to assist in:
 
 5. **Run CHARLOTTE Locally**
    ```bash
-   python charlotte.py
+   python charlotte
    ```
-   
+6. **Set Upstream Repo to main repo"
+   ```bash
+   git init
+   git add .
+   git commit -m "first commit"
+   git remote add origin https://github.com/Core-Creates/C-H-A-R-L-O-T-T-E.git
+   git push -u origin master
+   ```
+
    **Special Note if using Docker**
    ## 🐳 Running with Docker Compose
 
