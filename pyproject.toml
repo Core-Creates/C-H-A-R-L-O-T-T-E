@@ -1,0 +1,12 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "charlotte"
+version = "0.1.0"
+packages = ["core", "agents"]
+requires-python = ">=3.9"
+
+[project.scripts]
+charlotte = "core.main:main"
