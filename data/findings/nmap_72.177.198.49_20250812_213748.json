@@ -1,0 +1,19 @@
+{
+    "72.177.198.49": {
+        "state": "up",
+        "last_scanned": "20250812_213748",
+        "ports": {
+            "22": {
+                "state": "closed",
+                "name": "ssh",
+                "product": "",
+                "version": ""
+            }
+        },
+        "heuristics": {
+            "score": 3,
+            "rating": "\u2705 LOW",
+            "findings": []
+        }
+    }
+}
