@@ -92,19 +92,19 @@ def run_cve_lookup():
         if not cve_id.startswith("CVE-"):
             print("Invalid CVE ID format.")
             return
-        result = cve_lookup.fetch_and_cache(cve_id)
-        cve_lookup.show_and_export(result)
+        result = core.cve_lookup.fetch_and_cache(cve_id)
+        core.cve_lookup.show_and_export(result)
 
     elif option == "🗂️ Search by Keyword":
         keyword = input("Enter keyword (e.g., apache, buffer overflow): ").strip().lower()
-        results = cve_lookup.search_by_keyword(keyword)
-        cve_lookup.show_and_export(results, multiple=True)
+        results = core.cve_lookup.search_by_keyword(keyword)
+        core.cve_lookup.show_and_export(results, multiple=True)
 
     elif option == "📅 List CVEs by Product and Year":
         product = input("Enter product name (e.g., chrome, openssl): ").strip().lower()
         year = input("Enter year (e.g., 2022): ").strip()
-        results = cve_lookup.search_by_product_year(product, year)
-        cve_lookup.show_and_export(results, multiple=True)
+        results = core.cve_lookup.search_by_product_year(product, year)
+        core.cve_lookup.show_and_export(results, multiple=True)
 
 # ******************************************************************************************
 # Main CLI Application Logic
