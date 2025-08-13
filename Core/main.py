@@ -170,24 +170,56 @@ def main():
     # Special handling: Nmap must always prompt interactively from menu
     if plugin_key == "port_scan":
         try:
-            # Ensure interactive mode
-            os.environ.pop("CHARLOTTE_HEADLESS", None)
+            # Try to reuse the flexible shim from cli.py
+            try:
+                from cli import safe_run_plugin  # uses signature introspection and arg mapping
+            except Exception:
+                # Fallback: minimal local shim
+                import inspect
+                def safe_run_plugin(func, **params):
+                    sig = inspect.signature(func)
+                    param_names = list(sig.parameters.keys())
+                    mapped = dict(params)
+                    if "domain" in mapped and "domain" not in sig.parameters and "target" in sig.parameters:
+                        mapped["target"] = mapped["domain"]
+                    if len(param_names) == 1:
+                        try:
+                            return func(mapped)
+                        except TypeError:
+                            return func({k: v for k, v in mapped.items()})
+                    filtered = {k: v for k, v in mapped.items() if k in sig.parameters}
+                    try:
+                        return func(**filtered)
+                    except TypeError:
+                        ordered = [mapped[name] for name in param_names if name in mapped]
+                        return func(*ordered)
 
-            # Direct import so we bypass any plugin-manager quirks and guarantee prompts
-            from plugins.recon.nmap import nmap_plugin as _nmap
-            print("\n[ℹ︎] Launching Nmap in interactive mode…\n")
-            _nmap.run_plugin(args=None)  # ← This shows the menu + input() prompts
+            # Prompt for required args (mirrors cli.py behavior)
+            target = inquirer.text(message="Enter target IP or domain:").execute()
+            ports = inquirer.text(message="Enter ports (e.g., 80,443 or leave blank):").execute()
+
+            # Call the plugin with interactive=True; the shim adapts its signature
+            from plugins.recon.nmap.nmap_plugin import run_plugin as run_nmap_plugin
+            result = safe_run_plugin(run_nmap_plugin, target=target, ports=ports, interactive=True)
+
+            # Save/dispatch report like cli.py does
+            from core import report_dispatcher
+            if result:
+                file_path = report_dispatcher.save_report_locally(result, interactive=False)
+                report_dispatcher.dispatch_report(file_path)
+            else:
+                print("[!] No report data returned.")
             return
+
         except Exception as e:
             print(f"[!] Nmap plugin error: {e}")
-            print("    Falling back to plugin manager…")
-            # If direct call fails for any reason, try the standard dispatch:
+            # Optional: fall back to the plugin manager
             try:
                 run_plugin(plugin_key, args=None)
             except Exception as e2:
                 print(f"[!] Plugin manager also failed to run Nmap: {e2}")
             return
-
+    
     # Built-in triage flow
     if plugin_key == "triage_agent":
         scan_path = inquirer.text(

@@ -4,11 +4,14 @@
 # Supports static task routing and dynamic plugin.yaml-based discovery.
 # ******************************************************************************************
 
-import importlib
+
 import os
-import traceback
 import yaml
-from typing import Dict, List
+import inspect
+import importlib
+import traceback
+from pathlib import Path
+from typing import Dict, List, Optional
 
 # ******************************************************************************************
 # Static Plugin Registry
@@ -31,33 +34,83 @@ PLUGIN_REGISTRY = {
     "vulnscore": ("vulnscore", "vulnscore_plugin"),          # ⚖️ Combines severity + exploitability
 }
 
+# --- plugin_manager.py (PATCH) -----------------------------------------------
+
+ALIASES = {
+    # main.py menu → registry key
+    "triage_agent": "triage_vulnerabilities",
+    # keep adding if you later rename menu items:
+    # "vulnerability_assessment": "vulnscore",
+    # "exploit_predictor": "severity_predictor",
+}
+
+def _call_plugin_entrypoint(plugin_module, args: Optional[Dict]) -> str:
+    """
+    Prefer plugin.run(args) if available; otherwise try plugin.run_plugin(args=None).
+    Falls back gracefully based on function signatures.
+    """
+    # 1) Preferred: run(args)
+    if hasattr(plugin_module, "run"):
+        run_fn = getattr(plugin_module, "run")
+        sig = inspect.signature(run_fn)
+        if len(sig.parameters) == 0:
+            return run_fn()
+        # normalize args to dict for run(args)
+        return run_fn(args if args is not None else {})
+
+    # 2) Fallback: run_plugin(args=None)
+    if hasattr(plugin_module, "run_plugin"):
+        runp = getattr(plugin_module, "run_plugin")
+        sig = inspect.signature(runp)
+        if len(sig.parameters) == 0:
+            return runp()
+        # many plugins accept None for interactive mode
+        return runp(args if args is not None else None)
+
+    # Neither entrypoint found
+    return "[ERROR] Plugin has neither run(args) nor run_plugin(args)."
+
 # ******************************************************************************************
 # Static Plugin Executor
 # Dynamically loads and executes the requested plugin module from PLUGIN_REGISTRY
 # ******************************************************************************************
 
-def run_plugin(task: str, args: Dict) -> str:
+def run_plugin(task: str, args: Optional[Dict] = None) -> str:
     """
-    Loads and executes a statically registered plugin.
+    Loads and executes a statically registered plugin with:
+      • alias resolution (menu key → registry key)
+      • flexible entrypoint support (run(args) or run_plugin(args=None))
 
     Args:
-        task (str): Key from PLUGIN_REGISTRY
-        args (Dict): Arguments passed to plugin's `run(args)` function
+        task: Menu/registry key for the plugin
+        args: Arguments passed to the plugin (dict or None)
 
     Returns:
-        str: Plugin output or error message
+        Plugin output or error string.
     """
-    if task not in PLUGIN_REGISTRY:
+    # Resolve menu → registry alias, if any
+    resolved_task = ALIASES.get(task, task)
+
+    if resolved_task not in PLUGIN_REGISTRY:
         return f"[ERROR] No plugin registered for task '{task}'"
 
-    category, module_name = PLUGIN_REGISTRY[task]
+    category, module_name = PLUGIN_REGISTRY[resolved_task]
     module_path = f"plugins.{category}.{module_name}"
 
     try:
-        plugin = importlib.import_module(module_path)
-        if not hasattr(plugin, "run"):
-            return f"[ERROR] Plugin '{module_name}' has no 'run(args)' function."
-        return plugin.run(args)
+        plugin_module = importlib.import_module(module_path)
+
+        # If you want to enforce run(args) when present and only fallback otherwise:
+        if hasattr(plugin_module, "run"):
+            try:
+                return plugin_module.run(args if args is not None else {})
+            except TypeError:
+                # signature mismatch → try flexible dispatcher
+                pass
+
+        # Flexible dispatcher handles run() / run(args) / run_plugin() / run_plugin(args)
+        return _call_plugin_entrypoint(plugin_module, args)
+
     except Exception as e:
         return f"[PLUGIN ERROR]: {str(e)}\n{traceback.format_exc()}"
 
