@@ -11,7 +11,7 @@ import os
 import sys
 import json
 from datetime import datetime
-
+from plugins.intell.google_dorks.dorks import ghdb
 # Optional dependencies
 try:
     from tabulate import tabulate
