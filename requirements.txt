@@ -73,3 +73,5 @@ pymetasploit3
 torch
 
 reportlab
+
+bs4
