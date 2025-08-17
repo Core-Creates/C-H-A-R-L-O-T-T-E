@@ -4,7 +4,6 @@
 # Supports static task routing and dynamic plugin.yaml-based discovery.
 # ******************************************************************************************
 
-
 import os
 import yaml
 import inspect
@@ -12,6 +11,12 @@ import importlib
 import traceback
 from pathlib import Path
 from typing import Dict, List, Optional
+
+# ******************************************************************************************
+# Public API
+# Provides a unified interface for running plugins by task name or dynamic entry point.
+# ******************************************************************************************
+__all__ = ["run_plugin", "_call_plugin_entrypoint", "PLUGIN_REGISTRY", "ALIASES"]
 
 # ******************************************************************************************
 # Static Plugin Registry
@@ -28,20 +33,22 @@ PLUGIN_REGISTRY = {
     "exploit_generation": ("agents", "exploit_agent"),       # 🚨 LLM-generated exploit suggestions
     "triage_vulnerabilities": ("agents", "triage_agent"),    # 📊 Vulnerability triage and scoring
     "report_dispatcher": ("report", "report_dispatcher"),    # 📤 Report generation and dispatch
-    'Metasploit': ("exploitation", "metasploit_plugin"),     # 🦠 Metasploit RPC interface
+    "Metasploit": ("exploitation", "metasploit_plugin"),     # 🦠 Metasploit RPC interface
     "servicenow_setup": ("servicenow", "servicenow_setup"),  # 🛎️ Initial ServiceNow config wizard
     "severity_predictor": ("ml", "predict_severity"),        # 🤖 Predicts CVE severity using NN model
     "vulnscore": ("vulnscore", "vulnscore_plugin"),          # ⚖️ Combines severity + exploitability
 }
 
-# --- plugin_manager.py (PATCH) -----------------------------------------------
-
-ALIASES = {
-    # main.py menu → registry key
-    "triage_agent": "triage_vulnerabilities",
-    # keep adding if you later rename menu items:
-    # "vulnerability_assessment": "vulnscore",
-    # "exploit_predictor": "severity_predictor",
+# ******************************************************************************************
+# Aliases (menu labels -> registry keys)
+# Add entries whenever main.py’s PLUGIN_TASKS uses a label that differs from the registry key.
+# ******************************************************************************************
+ALIASES: Dict[str, str] = {
+    # From main.py menu
+    "triage_agent": "triage_vulnerabilities",   # 🧮 Vulnerability Triage
+    "vulnerability_assessment": "vulnscore",    # 📊 Vulnerability Assessment
+    "exploit_predictor": "severity_predictor",  # 🧨 Predict Exploitability
+    # Add more here as you expand PLUGIN_TASKS
 }
 
 def _call_plugin_entrypoint(plugin_module, args: Optional[Dict]) -> str:
@@ -55,7 +62,6 @@ def _call_plugin_entrypoint(plugin_module, args: Optional[Dict]) -> str:
         sig = inspect.signature(run_fn)
         if len(sig.parameters) == 0:
             return run_fn()
-        # normalize args to dict for run(args)
         return run_fn(args if args is not None else {})
 
     # 2) Fallback: run_plugin(args=None)
@@ -64,7 +70,6 @@ def _call_plugin_entrypoint(plugin_module, args: Optional[Dict]) -> str:
         sig = inspect.signature(runp)
         if len(sig.parameters) == 0:
             return runp()
-        # many plugins accept None for interactive mode
         return runp(args if args is not None else None)
 
     # Neither entrypoint found
@@ -100,15 +105,14 @@ def run_plugin(task: str, args: Optional[Dict] = None) -> str:
     try:
         plugin_module = importlib.import_module(module_path)
 
-        # If you want to enforce run(args) when present and only fallback otherwise:
+        # Prefer run(args) and gracefully fallback to flexible dispatcher on mismatch
         if hasattr(plugin_module, "run"):
             try:
                 return plugin_module.run(args if args is not None else {})
             except TypeError:
-                # signature mismatch → try flexible dispatcher
-                pass
+                pass  # signature mismatch → try flexible dispatcher
 
-        # Flexible dispatcher handles run() / run(args) / run_plugin() / run_plugin(args)
+        # Flexible dispatcher handles run/run_plugin variants
         return _call_plugin_entrypoint(plugin_module, args)
 
     except Exception as e:
@@ -196,3 +200,5 @@ if __name__ == "__main__":
     for item in list_plugins():
         print(f"  - {item}")
     print("\n✅ Plugin system initialized.")
+# ******************************************************************************************
+# End of plugin_manager.py

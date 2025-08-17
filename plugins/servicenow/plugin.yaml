@@ -21,11 +21,8 @@ permissions_required:
   - outbound_network: true
   - local_file_write: true
 
-tags:
-  - servicenow
-  - integration
-  - incident-response
-  - ticketing
+tags: [servicenow, integration, incident-response, ticketing, default]
+enabled: true
 
 author: CHARLOTTE Core Team
 version: 1.0.0

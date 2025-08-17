@@ -22,5 +22,6 @@ requirements:
   - amass
   - python (standard library)
   - InquirerPy
+tags: [amass, owasp, subdomain-enumeration, recon]
 notes: |
   Requires OWASP Amass to be installed and available in PATH. Results are saved in data/findings/.
