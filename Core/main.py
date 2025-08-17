@@ -41,6 +41,10 @@ except ModuleNotFoundError as e:
     print(f"[!] Missing CHARLOTTE module: {e.name}\n    Did you activate the venv and install requirements?")
     raise
 
+
+from utils.logger import start_session, append_session_event, end_session, log_error, log_plugin_event
+import uuid
+import os
 # ──────────────────────────────────────────────────────────────────────────────
 # Initialize personality (for future contextual use)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -112,7 +116,8 @@ def run_cve_lookup():
         cve_id = input("Enter CVE ID (e.g., CVE-2023-12345): ").strip().upper()
         if not cve_id.startswith("CVE-"):
             print("[!] Invalid CVE ID format.")
-            return
+            end_session(session_id, status="ok")
+        return
         result = core.cve_lookup.fetch_and_cache(cve_id)
         core.cve_lookup.show_and_export(result)
 
@@ -131,6 +136,8 @@ def run_cve_lookup():
 # Main CLI
 # ──────────────────────────────────────────────────────────────────────────────
 def main():
+    session_id = start_session({"version": "0.1.0", "stage": "cli_start"})
+    append_session_event(session_id, "BANNER_PRINT")
     print_banner()
 
     # Load plugins (note: many implementations do this via side-effects and return None)
@@ -138,6 +145,7 @@ def main():
         load_plugins()
     except Exception as e:
         print(f"[!] Failed to load plugins: {e}")
+        end_session(session_id, status="ok")
         return
 
     # Top-level menu
@@ -161,10 +169,12 @@ def main():
 
     if task == "❌ Exit":
         print("Goodbye, bestie 🖤")
+        end_session(session_id, status="ok")
         return
 
     if task == "🕵️ CVE Lookup (CHARLOTTE)":
         run_cve_lookup()
+        end_session(session_id, status="ok")
         return
 
     plugin_key = PLUGIN_TASKS.get(task)
@@ -172,55 +182,47 @@ def main():
     # Special handling: Nmap must always prompt interactively from menu
     if plugin_key == "port_scan":
         try:
-            # Try to reuse the flexible shim from cli.py
-            try:
-                from cli import safe_run_plugin  # uses signature introspection and arg mapping
-            except Exception:
-                # Fallback: minimal local shim
-                import inspect
-                def safe_run_plugin(func, **params):
-                    sig = inspect.signature(func)
-                    param_names = list(sig.parameters.keys())
-                    mapped = dict(params)
-                    if "domain" in mapped and "domain" not in sig.parameters and "target" in sig.parameters:
-                        mapped["target"] = mapped["domain"]
-                    if len(param_names) == 1:
-                        try:
-                            return func(mapped)
-                        except TypeError:
-                            return func({k: v for k, v in mapped.items()})
-                    filtered = {k: v for k, v in mapped.items() if k in sig.parameters}
-                    try:
-                        return func(**filtered)
-                    except TypeError:
-                        ordered = [mapped[name] for name in param_names if name in mapped]
-                        return func(*ordered)
+            # Use the shared entrypoint logic from plugin_manager so behavior is consistent everywhere
+            from core.plugin_manager import _call_plugin_entrypoint  # shared helper
+            import importlib
 
-            # Prompt for required args (mirrors cli.py behavior)
+            # Prompt for required args (same UX as before)
+            append_session_event(session_id, "PROMPT_SELECTION", {"selected": "port_scan"})
             target = inquirer.text(message="Enter target IP or domain:").execute()
             ports = inquirer.text(message="Enter ports (e.g., 80,443 or leave blank):").execute()
 
-            # Call the plugin with interactive=True; the shim adapts its signature
-            from plugins.recon.nmap.nmap_plugin import run_plugin as run_nmap_plugin
-            result = safe_run_plugin(run_nmap_plugin, target=target, ports=ports, interactive=True)
+            # Import the Nmap plugin module and invoke via the shared entrypoint helper
+            nmap_module = importlib.import_module("plugins.recon.nmap.nmap_plugin")
+            append_session_event(session_id, "ACTION_BEGIN", {"plugin": "port_scan"})
+            result = _call_plugin_entrypoint(
+                nmap_module,
+                {"target": target, "ports": ports, "interactive": True}
+            )
 
-            # Save/dispatch report like cli.py does
+            # Save/dispatch report (unchanged)
             from core import report_dispatcher
+            append_session_event(session_id, "ACTION_RESULT", {"plugin": "port_scan", "result_kind": type(result).__name__})
             if result:
                 file_path = report_dispatcher.save_report_locally(result, interactive=False)
+                append_session_event(session_id, "TRIAGE_DONE", {"report_path": display_path(file_path)})
                 report_dispatcher.dispatch_report(file_path)
             else:
                 print("[!] No report data returned.")
+            end_session(session_id, status="ok")
             return
-
+    
         except Exception as e:
             print(f"[!] Nmap plugin error: {e}")
-            # Optional: fall back to the plugin manager
+            log_error(f"Nmap error: {e}")
+            append_session_event(session_id, "ERROR", {"where": "nmap", "error": str(e)})
+            # Optional fallback: plugin manager dispatch
             try:
                 run_plugin(plugin_key, args=None)
             except Exception as e2:
                 print(f"[!] Plugin manager also failed to run Nmap: {e2}")
+            end_session(session_id, status="ok")
             return
+
     
     # Built-in triage flow
     if plugin_key == "triage_agent":
@@ -229,6 +231,7 @@ def main():
         ).execute()
         scan_path = (scan_path or "").strip() or "data/findings.json"
         run_triage_agent(scan_file=scan_path)
+        end_session(session_id, status="ok")
         return
 
     # Exploit predictor flow
@@ -250,6 +253,7 @@ def main():
             print("Use '🧮 Vulnerability Triage' to further refine prioritization.\n")
         except Exception as e:
             print(f"[!] Error processing exploit prediction: {e}")
+        end_session(session_id, status="ok")
         return
 
     # All other plugins — use the manager and request interactive mode
@@ -269,3 +273,11 @@ if __name__ == "__main__":
     main()
 # ******************************************************************************************
 # This is the main entry point for the CHARLOTTE CLI application.
+# ──────────────────────────────────────────────────────────────────────────────
+# Path display helper
+# ──────────────────────────────────────────────────────────────────────────────
+def display_path(p: str) -> str:
+    import os as _os
+    return _os.path.normpath(p)
+# ──────────────────────────────────────────────────────────────────────────────
+# End of main.py

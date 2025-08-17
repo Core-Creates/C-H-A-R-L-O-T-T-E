@@ -1,13 +1,13 @@
 {
-    "72.177.198.49": {
+    "192.168.88.140": {
         "state": "up",
-        "last_scanned": "20250812_213748",
+        "last_scanned": "20250817_090939",
         "ports": {
             "22": {
-                "state": "closed",
+                "state": "open",
                 "name": "ssh",
-                "product": "",
-                "version": ""
+                "product": "OpenSSH",
+                "version": "9.6p1 Ubuntu 3ubuntu13.11"
             }
         },
         "heuristics": {
