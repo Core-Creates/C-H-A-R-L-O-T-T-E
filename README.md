@@ -1,7 +1,7 @@
 # 🧠 C.H.A.R.L.O.T.T.E.
 
 **Cybernetic Heuristic Assistant for Recon, Logic, Offensive Tactics, Triage & Exploitation**  
-A modular, AI-augmented offensive security framework — designed for autonomy, adaptability, and advanced analysis.
+A modular, AI-augmented offensive and defensive security framework — designed for autonomy, adaptability, and advanced analysis.
 
 > **🛠️ 100% Open Source. Toggle between self-contained or LLM-augmented operation.**
 
