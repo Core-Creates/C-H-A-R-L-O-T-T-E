@@ -5,13 +5,27 @@
 # ******************************************************************************************
 
 import os
+import sys
 import json
 import smtplib
 import requests
 import mimetypes
-from email.message import EmailMessage
-from plugins.exploitation.metasploit.msf_mapper import find_exploit_for_cve
-from plugins.exploitation.metasploit.cve_autoscript import generate_exploit_script
+from pathlib import Path
+
+# Dynamically locate CHARLOTTE root and add to Python path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+# Ensure CHARLOTTE core and plugins are importable
+try:
+    from utils.paths import display_path  # preferred location
+    from email.message import EmailMessage
+    from plugins.exploitation.metasploit.msf_mapper import find_exploit_for_cve
+    from plugins.exploitation.metasploit.cve_autoscript import generate_exploit_script
+except ImportError as e:
+    print(f"[!] Import error: {e}")
+    raise
+
 # ==========================================================================================
 # CONSTANTS
 
