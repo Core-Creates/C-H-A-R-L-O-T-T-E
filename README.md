@@ -114,7 +114,8 @@ charlotte/
 │   |   └── (other recon plugins)
 |   |
 │   ├── vulnscan/           # XSS, SQLi detectors, etc.
-│       └─ web_scanner/
+│       ├── nessus_plugin.py
+│       ├──web_scanner/
 │           └─ burp_suite_plugin.py     # Pure Python scanner
 |
 |
