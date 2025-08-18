@@ -1,0 +1,7 @@
+{"ts": "2025-08-18T02-44-05Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
+{"ts": "2025-08-18T02-44-05Z", "event": "BANNER_PRINT", "payload": {}}
+{"ts": "2025-08-18T02-44-10Z", "event": "PROMPT_SELECTION", "payload": {"selected": "port_scan"}}
+{"ts": "2025-08-18T02-44-47Z", "event": "ACTION_BEGIN", "payload": {"plugin": "port_scan"}}
+{"ts": "2025-08-18T02-46-46Z", "event": "ACTION_RESULT", "payload": {"plugin": "port_scan", "result_kind": "dict"}}
+{"ts": "2025-08-18T02-46-46Z", "event": "ERROR", "payload": {"where": "nmap", "error": "name 'display_path' is not defined"}}
+{"ts": "2025-08-18T02-46-46Z", "event": "END", "payload": {"status": "ok"}}
