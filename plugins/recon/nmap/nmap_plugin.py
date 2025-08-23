@@ -25,7 +25,7 @@ try:
    from utils.paths import display_path        # preferred location+
 except Exception:
     try:
-        from paths import display_path          # fallback if paths.py is at repo root
+        from utils.paths import display_path          # fallback if paths.py is at repo root
     except Exception:
        # last-resort shim so nothing crashes
         def display_path(path: str, base: str | None = None) -> str:
