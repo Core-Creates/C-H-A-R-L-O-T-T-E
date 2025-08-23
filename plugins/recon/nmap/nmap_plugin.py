@@ -420,48 +420,48 @@ def run_plugin_full(args=None, output_dir="data/findings"):
     os.makedirs(output_dir, exist_ok=True)
 
     # Extract args
-    targets = None
+    targets = args.get("target")
     scan_flag = None
-    ports = None
+    ports = args.get("ports")
     ghdb_enabled = True
     ghdb_source = "dump"
     ghdb_limit = 15
     ghdb_grep = None
     ghdb_debug = False
 
-    if isinstance(args, dict):
-        targets = args.get("targets")
-        scan_flag = args.get("scan_type")  # e.g. "-sV"
-        ports = args.get("ports")
-        output_dir = args.get("output_dir", output_dir)
-        ghdb_enabled = bool(args.get("ghdb", True))
-        ghdb_source = args.get("ghdb_source", "dump")
-        ghdb_limit = int(args.get("ghdb_limit", 15))
-        ghdb_grep = args.get("ghdb_grep")
-        ghdb_debug = bool(args.get("debug", False))
+    # if isinstance(args, dict):
+    #     targets = args.get("targets")
+    #     scan_flag = args.get("scan_type")  # e.g. "-sV"
+    #     ports = args.get("ports")
+    #     output_dir = args.get("output_dir", output_dir)
+    #     ghdb_enabled = bool(args.get("ghdb", True))
+    #     ghdb_source = args.get("ghdb_source", "dump")
+    #     ghdb_limit = int(args.get("ghdb_limit", 15))
+    #     ghdb_grep = args.get("ghdb_grep")
+    #     ghdb_debug = bool(args.get("debug", False))
 
     output_paths: List[str] = []
 
-    if targets:
-        # Headless: default to -sV unless caller overrides
-        chosen = next((v for v in SCAN_TYPES.values() if v["arg"] == (scan_flag or "-sV")), None)
-        if not chosen:
-            chosen = SCAN_TYPES["4"]  # Service Version Detection
-        for host in targets:
-            path = run_nmap_scan(chosen, host, ports=ports, output_dir=output_dir)
-            if path:
-                output_paths.append(path)
-    else:
-        # Interactive mode
-        list_scan_options()
-        chosen = choose_scan()
-        target = input("\nEnter target IP or domain (comma-separated for multiple): ").strip()
-        ports = input("Enter port(s) to scan (e.g. 22,80 or 1-1000) [optional]: ").strip()
-        targets = [t.strip() for t in target.split(",") if t.strip()]
-        for host in targets:
-            path = run_nmap_scan(chosen, host, ports=ports or None, output_dir=output_dir)
-            if path:
-                output_paths.append(path)
+    
+    # Headless: default to -sV unless caller overrides
+    chosen = next((v for v in SCAN_TYPES.values() if v["arg"] == (scan_flag or "-sV")), None)
+    if not chosen:
+        chosen = SCAN_TYPES["4"]  # Service Version Detection
+    for host in targets:
+        path = run_nmap_scan(chosen, host, ports=ports, output_dir=output_dir)
+        if path:
+            output_paths.append(path)
+    # else:
+    #     # Interactive mode
+    #     list_scan_options()
+    #     chosen = choose_scan()
+    #     target = input("\nEnter target IP or domain (comma-separated for multiple): ").strip()
+    #     ports = input("Enter port(s) to scan (e.g. 22,80 or 1-1000) [optional]: ").strip()
+    #     targets = [t.strip() for t in target.split(",") if t.strip()]
+    #     for host in targets:
+    #         path = run_nmap_scan(chosen, host, ports=ports or None, output_dir=output_dir)
+    #         if path:
+    #             output_paths.append(path)
 
     # Build a unified scan_result (hosts/ports) from saved JSONs for downstream consumers
     scan_result = {"hosts": []}
