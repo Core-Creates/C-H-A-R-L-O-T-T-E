@@ -1,9 +1,10 @@
+label: OWASP Amass Subdomain Enum
 name: owasp_amass
 version: 1.0
 description: |
   OWASP Amass subdomain enumeration plugin for CHARLOTTE. Supports passive/active modes, outputs JSON, and can chain results to Nmap and HTTP banner plugins.
 author: CHARLOTTE (touched by shadows)
-entry_point: owasp_amass.py
+entry_point: plugins/recon/amass/owasp_amass.py
 function: run_plugin
 category: recon
 inputs:
@@ -25,3 +26,4 @@ requirements:
 tags: [amass, owasp, subdomain-enumeration, recon]
 notes: |
   Requires OWASP Amass to be installed and available in PATH. Results are saved in data/findings/.
+exposed: true
