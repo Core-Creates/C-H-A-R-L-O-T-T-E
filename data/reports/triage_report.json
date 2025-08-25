@@ -2,7 +2,7 @@
     "task": "port_scan",
     "status": "ok",
     "output_paths": [
-        "data/findings\\nmap_192.168.88.140_20250817_214509.json"
+        "data/findings\\nmap_192.168.88.140_20250825_144034.json"
     ],
     "results": {
         "hosts": [
