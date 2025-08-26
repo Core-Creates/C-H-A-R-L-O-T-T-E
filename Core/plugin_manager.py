@@ -5,6 +5,7 @@
 #   Dynamically load and execute CHARLOTTE's plugins with robust imports.
 #   Avoids name collisions with third-party 'plugins' packages by falling back
 #   to absolute file path imports. Handles static and dynamic plugin discovery.
+#   Also supports executing "dynamic" plugins described by plugin.yaml.
 # ******************************************************************************************
 
 import os
@@ -15,7 +16,7 @@ import importlib.util
 import traceback
 import inspect
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Tuple
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Repo root + plugin paths
@@ -30,7 +31,7 @@ PLUGIN_DIR = "plugins"
 # ──────────────────────────────────────────────────────────────────────────────
 # Static Plugin Registry
 # ──────────────────────────────────────────────────────────────────────────────
-PLUGIN_REGISTRY: Dict[str, tuple[str, str]] = {
+PLUGIN_REGISTRY: Dict[str, Tuple[str, str]] = {
     "reverse_engineering": ("re", "symbolic_trace"),
     "binary_strings": ("re", "bin_strings"),
     "web_recon": ("recon", "subdomain_enum"),
@@ -44,6 +45,8 @@ PLUGIN_REGISTRY: Dict[str, tuple[str, str]] = {
     "servicenow_setup": ("servicenow", "servicenow_setup"),
     "severity_predictor": ("ml", "predict_severity"),
     "vulnscore": ("vulnscore", "vulnscore_plugin"),
+    # Example static registration for Amass (optional if you rely on dynamic YAML):
+    # "owasp_amass": ("recon.amass", "owasp_amass"),
 }
 
 ALIASES: Dict[str, str] = {
@@ -57,6 +60,7 @@ ALIASES: Dict[str, str] = {
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _import_by_dotted(dotted: str):
+    """Try to import a module by dotted path, return None on failure."""
     try:
         return importlib.import_module(dotted)
     except Exception:
@@ -64,6 +68,7 @@ def _import_by_dotted(dotted: str):
 
 
 def _import_by_path(module_name: str, file_path: Path):
+    """Import a module directly from a file path under a stable module name."""
     spec = importlib.util.spec_from_file_location(module_name, str(file_path))
     if spec is None or spec.loader is None:
         raise ImportError(f"Cannot load spec for {module_name} from {file_path}")
@@ -74,7 +79,8 @@ def _import_by_path(module_name: str, file_path: Path):
 
 
 def _load_plugin_module(category: str, module: str):
-    """Load a plugin module, supporting nested categories like 'recon.nmap'.
+    """
+    Load a plugin module, supporting nested categories like 'recon.nmap'.
     Order: dotted import → file-path import.
     """
     # Try dotted import first (e.g., plugins.recon.nmap.nmap_plugin)
@@ -88,27 +94,28 @@ def _load_plugin_module(category: str, module: str):
     file_path = PLUGINS_DIR / category_path / f"{module}.py"
     if not file_path.exists():
         raise ModuleNotFoundError(f"Plugin file not found: {file_path}")
-    return _import_by_path(f"charlotte.plugins.{category}.{module}", file_path)
-
-    file_path = PLUGINS_DIR / category / f"{module}.py"
-    if not file_path.exists():
-        raise ModuleNotFoundError(f"Plugin file not found: {file_path}")
-    return _import_by_path(f"charlotte.plugins.{category}.{module}", file_path)
+    safe_name = f"charlotte.plugins.{category}.{module}"
+    return _import_by_path(safe_name, file_path)
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Entrypoint dispatcher
+# Entrypoint dispatcher (static & dynamic share this)
 # ──────────────────────────────────────────────────────────────────────────────
 
 def _call_plugin_entrypoint(plugin_module, args: Optional[Dict] = None) -> str:
+    """
+    Prefer plugin.run(args) → fallback to plugin.run_plugin(args or None).
+    """
     if hasattr(plugin_module, "run"):
         try:
             return plugin_module.run(args or {})
         except TypeError:
+            # signature mismatch; continue to try run_plugin
             pass
     if hasattr(plugin_module, "run_plugin"):
         try:
             return plugin_module.run_plugin(args)
         except TypeError:
+            # allow zero-arg run_plugin()
             return plugin_module.run_plugin()
     return "[ERROR] Plugin has neither run(args) nor run_plugin(args)."
 
@@ -128,17 +135,23 @@ def run_plugin(task: str, args: Optional[Dict] = None) -> str:
         return f"[PLUGIN ERROR]: {str(e)}\n{traceback.format_exc()}"
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Dynamic discovery
+# Dynamic discovery + execution
 # ──────────────────────────────────────────────────────────────────────────────
+
 _discovery_cache: Optional[List[Dict]] = None
 
 def discover_plugins() -> List[Dict]:
+    """
+    Scan plugin directories for plugin.yaml metadata files.
+    Returns a list of dicts with at least: label, description, (optional) tags,
+    and recommended fields such as: entry_point, function, exposed, path.
+    """
     global _discovery_cache
     if _discovery_cache is not None:
         return _discovery_cache
 
     plugins: List[Dict] = []
-    for root, dirs, files in os.walk(PLUGIN_DIR):
+    for root, _, files in os.walk(PLUGIN_DIR):
         if "plugin.yaml" in files:
             yaml_path = os.path.join(root, "plugin.yaml")
             try:
@@ -147,6 +160,8 @@ def discover_plugins() -> List[Dict]:
                     if not isinstance(metadata, dict):
                         continue
                     metadata["path"] = root
+
+                    # Normalize label
                     label = metadata.get("label") or metadata.get("name")
                     if not label:
                         desc = metadata.get("description")
@@ -155,11 +170,78 @@ def discover_plugins() -> List[Dict]:
                         else:
                             label = os.path.basename(root)
                     metadata["label"] = label
+
+                    # Normalize entry point/function keys (optional in YAML)
+                    # Support either dotted "plugins.recon.amass.owasp_amass"
+                    # or file path "plugins/recon/amass/owasp_amass.py"
+                    ep = metadata.get("entry_point") or metadata.get("entrypoint") or metadata.get("module")
+                    fn = metadata.get("function") or "run_plugin"
+                    if ep:
+                        metadata["entry_point"] = ep
+                        metadata["function"] = fn
+
                     plugins.append(metadata)
             except Exception as e:
                 print(f"[!] Failed to load plugin.yaml from {yaml_path}: {e}")
+
     _discovery_cache = plugins
     return plugins
+
+
+def _resolve_dynamic_entry(entry_point: str):
+    """
+    Resolve a dynamic entry point that may be dotted or a file path.
+    Returns a loaded module.
+    """
+    # If dotted (has dots and no path separators), try dotted import first
+    if ("/" not in entry_point) and ("\\" not in entry_point):
+        mod = _import_by_dotted(entry_point)
+        if mod:
+            return mod
+        # If it looked dotted but didn't import, try translating to a path
+        file_path = ROOT_DIR / (entry_point.replace(".", "/") + ".py")
+        if file_path.exists():
+            return _import_by_path(f"charlotte.dynamic.{file_path.stem}", file_path)
+        raise ModuleNotFoundError(f"Dynamic module '{entry_point}' not found.")
+
+    # Otherwise treat as a file path (allow relative paths under repo)
+    file_path = (ROOT_DIR / entry_point).resolve() if not entry_point.startswith(str(ROOT_DIR)) else Path(entry_point)
+    if not file_path.exists():
+        raise FileNotFoundError(f"Dynamic plugin file not found: {file_path}")
+    return _import_by_path(f"charlotte.dynamic.{file_path.stem}", file_path)
+
+
+def run_dynamic(entry_point: str, function: str = "run_plugin", args: Optional[Dict] = None):
+    """
+    Execute a dynamic plugin specified by entry_point + function.
+    `entry_point` may be dotted (e.g., "plugins.recon.amass.owasp_amass")
+    or a file path (e.g., "plugins/recon/amass/owasp_amass.py").
+    """
+    if args is None:
+        args = {}
+
+    mod = _resolve_dynamic_entry(entry_point)
+
+    if not hasattr(mod, function):
+        raise AttributeError(f"Dynamic entry '{entry_point}' missing callable '{function}()'")
+
+    fn = getattr(mod, function)
+    # Mirror static dispatcher behavior: try with args, then zero-arg fallback
+    try:
+        return fn(args)
+    except TypeError:
+        return fn()
+
+# Optional: convenience index for menus (key by label)
+def dynamic_index_by_label() -> Dict[str, Dict]:
+    """Return a dict mapping label -> plugin metadata for all discovered plugins."""
+    items = discover_plugins()
+    out: Dict[str, Dict] = {}
+    for meta in items:
+        label = meta.get("label") or meta.get("name")
+        if label:
+            out[str(label)] = meta
+    return out
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Loader / printing
@@ -167,6 +249,7 @@ def discover_plugins() -> List[Dict]:
 _plugins_loaded_banner_printed = False
 
 def load_plugins():
+    """Print static & dynamic plugin listings once per process (side-effect)."""
     global _plugins_loaded_banner_printed
     if _plugins_loaded_banner_printed:
         return

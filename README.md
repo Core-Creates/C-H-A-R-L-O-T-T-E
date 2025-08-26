@@ -180,6 +180,29 @@ charlotte/
 
 ---
 
+
+## Separation of Ownership
+```
+
+                 🎓 C-H-A-R-L-O-T-T-E (501(c)(3))
+   ─────────────────────────────────────────────────────────────
+   • Owns IP of CHARLOTTE OSS
+   • Distributes core under AGPLv3
+   • Manages community, grants, contributors
+   • Contributors sign CLA (allows relicensing)
+
+                     │
+                     │ Dual-License Authority
+                     ▼
+                 💼 C-H-A-R-L-O-T-T-E Corp (C-Corp)
+   ─────────────────────────────────────────────────────────────
+   • Sells proprietary enterprise licenses
+   • Provides commercial support, SLAs
+   • Can develop proprietary add-ons
+   • Revenues help sustain Foundation mission
+```
+---
+
 ## 🚀 Coming Soon
 - CVE matching from live scan data  
 - GUI dashboard  
