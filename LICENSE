@@ -1,21 +1,55 @@
-MIT License
+# C-H-A-R-L-O-T-T-E Dual License
 
-Copyright (c) 2025 Corrina (Core) Alcoser
+C-H-A-R-L-O-T-T-E is released under a **dual license model**:
 
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
+---
 
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
+## 1. Open Source License (Community Use)
 
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
+The **core C-H-A-R-L-O-T-T-E project** is licensed under the terms of the **GNU Affero General Public License v3.0 (AGPL-3.0)**.
+
+- You are free to use, modify, and redistribute C-H-A-R-L-O-T-T-E under the terms of the AGPL-3.0.
+- If you modify C-H-A-R-L-O-T-T-E and make it available to others **over a network** (for example, as a SaaS or hosted service), you must also release the source code of your modified version under the same license.
+- This ensures that C-H-A-R-L-O-T-T-E remains a community resource and that improvements are shared back with the public.
+
+For the full license text, see:  
+[GNU Affero General Public License v3.0](https://www.gnu.org/licenses/agpl-3.0.html)
+
+---
+
+## 2. Commercial License (Enterprise Use)
+
+If you are a company or organization that wants to:
+
+- Use C-H-A-R-L-O-T-T-E as part of a **proprietary product**,  
+- Offer C-H-A-R-L-O-T-T-E as a **hosted service (SaaS)** without releasing your modifications, or  
+- Obtain **enterprise support, SLAs, or proprietary add-ons**,  
+
+then you must purchase a **commercial license** from **C-H-A-R-L-O-T-T-E Corp**.
+
+Commercial licensing terms provide legal clarity and exemption from AGPL obligations, while helping sustain the nonprofit mission of the C-H-A-R-L-O-T-T-E Foundation.
+
+For inquiries about commercial licensing, please contact:  
+📧 **enterprise@c-h-a-r-l-o-t-t-e.org**
+
+---
+
+## 3. Contributor License Agreement (CLA)
+
+By contributing to C-H-A-R-L-O-T-T-E, you agree that:
+
+- Your contributions are licensed under the AGPL-3.0 for community use.  
+- You grant the C-H-A-R-L-O-T-T-E Foundation the right to relicense contributions for commercial purposes (dual licensing).  
+- This model ensures your work remains open-source while also supporting sustainable funding through enterprise licensing.
+
+---
+
+## 4. Summary
+
+- **Community users**: Free under AGPL-3.0.  
+- **Enterprise users**: Commercial license required.  
+- **Contributors**: Contributions remain free/open, while also powering C-H-A-R-L-O-T-T-E’s nonprofit mission.  
+
+---
+
+© C-H-A-R-L-O-T-T-E Foundation. All rights reserved.  
