@@ -1044,5 +1044,233 @@
       "cvss": 7.2,
       "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1089"
     }
+  ],
+  "KW:xss:12:2025-08-07T01:07:26.000Z:2025-08-27T01:07:26.000Z:0": [
+    {
+      "cve_id": "CVE-2025-55133",
+      "description": "In Agora Foundation Agora fall23-Alpha1 before b087490, there is XSS via topicName in client/agora/public/js/editorManager.js.",
+      "published": "2025-08-07T16:15:30.800",
+      "cvss": 6.4,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-55133"
+    },
+    {
+      "cve_id": "CVE-2025-55134",
+      "description": "In Agora Foundation Agora fall23-Alpha1 before b087490, there is XSS via tag in client/agora/public/js/editorManager.js.",
+      "published": "2025-08-07T16:15:30.973",
+      "cvss": 6.4,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-55134"
+    },
+    {
+      "cve_id": "CVE-2025-55135",
+      "description": "In Agora Foundation Agora fall23-Alpha1 before 690ce56, there is XSS via a profile picture to server/controller/userController.js. Formats other than PNG, JPEG, and WEBP are permitted by server/routes/userRoutes.js; this includes SVG.",
+      "published": "2025-08-07T16:15:31.143",
+      "cvss": 6.4,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-55135"
+    },
+    {
+      "cve_id": "CVE-2025-54392",
+      "description": "Netwrix Directory Manager (formerly Imanami GroupID) 11.0.0.0 before 11.1.25162.02 allows XSS for authentication error data, a different vulnerability than CVE-2025-47189.",
+      "published": "2025-08-07T17:15:29.343",
+      "cvss": 6.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-54392"
+    },
+    {
+      "cve_id": "CVE-2025-54395",
+      "description": "Netwrix Directory Manager (formerly Imanami GroupID) 11.0.0.0 before 11.1.25162.02 allows XSS for authentication configuration data.",
+      "published": "2025-08-07T17:15:29.750",
+      "cvss": 6.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-54395"
+    },
+    {
+      "cve_id": "CVE-2020-9322",
+      "description": "The /users endpoint in Statamic Core before 2.11.8 allows XSS to add an administrator user. This can be exploited via CSRF. Stored XSS can occur via a JavaScript payload in a username during account registration. Reflected XSS can occur via the /users PATH_INFO.",
+      "published": "2025-08-08T15:15:27.067",
+      "cvss": 8.8,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2020-9322"
+    },
+    {
+      "cve_id": "CVE-2025-32932",
+      "description": "An Improper neutralization of input during web page generation ('cross-site scripting') vulnerability [CWE-79] in FortiSOAR version 7.6.1 and below, version 7.5.1 and below, 7.4 all versions, 7.3 all versions, 7.2 all versions, 7.0 all versions, 6.4 all versions WEB UI may allow an authenticated remote attacker to perform an XSS attack via stored malicious service requests",
+      "published": "2025-08-12T19:15:29.260",
+      "cvss": 6.5,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-32932"
+    },
+    {
+      "cve_id": "CVE-2025-28975",
+      "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in redqteam Alike - WordPress Custom Post Comparison allows Reflected XSS. This issue affects Alike - WordPress Custom Post Comparison: from n/a through 3.0.1.",
+      "published": "2025-08-14T11:15:31.393",
+      "cvss": 7.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-28975"
+    },
+    {
+      "cve_id": "CVE-2025-28999",
+      "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in ZoomIt WooCommerce Shop Page Builder allows Reflected XSS. This issue affects WooCommerce Shop Page Builder: from n/a through 2.27.7.",
+      "published": "2025-08-14T11:15:31.990",
+      "cvss": 7.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-28999"
+    },
+    {
+      "cve_id": "CVE-2025-29014",
+      "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in ZoomIt FoodMenu allows Reflected XSS. This issue affects FoodMenu: from n/a through 1.20.",
+      "published": "2025-08-14T11:15:32.180",
+      "cvss": 7.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-29014"
+    },
+    {
+      "cve_id": "CVE-2025-30626",
+      "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in LambertGroup Multimedia Playlist Slider Addon for WPBakery Page Builder allows Reflected XSS. This issue affects Multimedia Playlist Slider Addon for WPBakery Page Builder: from n/a through 2.1.",
+      "published": "2025-08-14T11:15:32.367",
+      "cvss": 7.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-30626"
+    },
+    {
+      "cve_id": "CVE-2025-31007",
+      "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in Alvind Billplz Addon for Contact Form 7 allows Reflected XSS. This issue affects Billplz Addon for Contact Form 7: from n/a through 1.2.0.",
+      "published": "2025-08-14T11:15:33.367",
+      "cvss": 7.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-31007"
+    }
+  ],
+  "KW:ssh:20:None:None:0": [
+    {
+      "cve_id": "CVE-1999-0013",
+      "description": "Stolen credentials from SSH clients via ssh-agent program, allowing other local users to access remote accounts belonging to the ssh-agent user.",
+      "published": "1998-01-22T05:00:00.000",
+      "cvss": 8.4,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0013"
+    },
+    {
+      "cve_id": "CVE-1999-1085",
+      "description": "SSH 1.2.25, 1.2.23, and other versions, when used in in CBC (Cipher Block Chaining) or CFB (Cipher Feedback 64 bits) modes, allows remote attackers to insert arbitrary data into an existing stream between an SSH client and server by using a known plaintext attack and computing a valid CRC-32 checksum for the packet, aka the \"SSH insertion attack.\"",
+      "published": "1998-06-12T04:00:00.000",
+      "cvss": 5.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1085"
+    },
+    {
+      "cve_id": "CVE-1999-0310",
+      "description": "SSH 1.2.25 on HP-UX allows access to new user accounts.",
+      "published": "1998-09-01T04:00:00.000",
+      "cvss": 7.5,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0310"
+    },
+    {
+      "cve_id": "CVE-1999-1321",
+      "description": "Buffer overflow in ssh 1.2.26 client with Kerberos V enabled could allow remote attackers to cause a denial of service or execute arbitrary commands via a long DNS hostname that is not properly handled during TGT ticket passing.",
+      "published": "1998-11-05T05:00:00.000",
+      "cvss": 7.5,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1321"
+    },
+    {
+      "cve_id": "CVE-1999-1159",
+      "description": "SSH 2.0.11 and earlier allows local users to request remote forwarding from privileged ports without being root.",
+      "published": "1998-12-29T05:00:00.000",
+      "cvss": 4.6,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1159"
+    },
+    {
+      "cve_id": "CVE-1999-0248",
+      "description": "A race condition in the authentication agent mechanism of sshd 1.2.17 allows an attacker to steal another user's credentials.",
+      "published": "1999-01-01T05:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0248"
+    },
+    {
+      "cve_id": "CVE-1999-0398",
+      "description": "In some instances of SSH 1.2.27 and 2.0.11 on Linux systems, SSH will allow users with expired accounts to login.",
+      "published": "1999-01-01T05:00:00.000",
+      "cvss": 4.6,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0398"
+    },
+    {
+      "cve_id": "CVE-1999-0547",
+      "description": "An SSH server allows authentication through the .rhosts file.",
+      "published": "1999-01-01T05:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0547"
+    },
+    {
+      "cve_id": "CVE-1999-0634",
+      "description": "Rejected reason: DO NOT USE THIS CANDIDATE NUMBER.  ConsultIDs: None.  Reason: this candidate is solely about a configuration that does not directly introduce security vulnerabilities, so it is more appropriate to cover under the Common Configuration Enumeration (CCE).  Notes: the former description is: \"The SSH service is running.",
+      "published": "1999-01-01T05:00:00.000",
+      "cvss": null,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0634"
+    },
+    {
+      "cve_id": "CVE-1999-1029",
+      "description": "SSH server (sshd2) before 2.0.12 does not properly record login attempts if the connection is closed before the maximum number of tries, allowing a remote attacker to guess the password without showing up in the audit logs.",
+      "published": "1999-05-13T04:00:00.000",
+      "cvss": 7.5,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1029"
+    },
+    {
+      "cve_id": "CVE-1999-1231",
+      "description": "ssh 2.0.12, and possibly other versions, allows valid user names to attempt to enter the correct password multiple times, but only prompts an invalid user name for a password once, which allows remote attackers to determine user account names on the server.",
+      "published": "1999-06-09T04:00:00.000",
+      "cvss": 5.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1231"
+    },
+    {
+      "cve_id": "CVE-1999-0787",
+      "description": "The SSH authentication agent follows symlinks via a UNIX domain socket.",
+      "published": "1999-09-17T04:00:00.000",
+      "cvss": 2.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0787"
+    },
+    {
+      "cve_id": "CVE-1999-1010",
+      "description": "An SSH 1.2.27 server allows a client to use the \"none\" cipher, even if it is not allowed by the server policy.",
+      "published": "1999-12-14T05:00:00.000",
+      "cvss": 2.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1010"
+    },
+    {
+      "cve_id": "CVE-2000-0143",
+      "description": "The SSH protocol server sshd allows local users without shell access to redirect a TCP connection through a service that uses the standard system password database for authentication, such as POP or FTP.",
+      "published": "2000-02-11T05:00:00.000",
+      "cvss": 4.6,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0143"
+    },
+    {
+      "cve_id": "CVE-2000-0217",
+      "description": "The default configuration of SSH allows X forwarding, which could allow a remote attacker to control a client's X sessions via a malicious xauth program.",
+      "published": "2000-02-24T05:00:00.000",
+      "cvss": 5.1,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0217"
+    },
+    {
+      "cve_id": "CVE-2000-0532",
+      "description": "A FreeBSD patch for SSH on 2000-01-14 configures ssh to listen on port 722 as well as port 22, which might allow remote attackers to access SSH through port 722 even if port 22 is otherwise filtered.",
+      "published": "2000-06-07T04:00:00.000",
+      "cvss": 7.5,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0532"
+    },
+    {
+      "cve_id": "CVE-2000-0525",
+      "description": "OpenSSH does not properly drop privileges when the UseLogin option is enabled, which allows local users to execute arbitrary commands by providing the command to the ssh daemon.",
+      "published": "2000-06-08T04:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0525"
+    },
+    {
+      "cve_id": "CVE-2000-0575",
+      "description": "SSH 1.2.27 with Kerberos authentication support stores Kerberos tickets in a file which is created in the current directory of the user who is logging in, which could allow remote attackers to sniff the ticket cache if the home directory is installed on NFS.",
+      "published": "2000-07-05T04:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0575"
+    },
+    {
+      "cve_id": "CVE-2000-0784",
+      "description": "sshd program in the Rapidstream 2.1 Beta VPN appliance has a hard-coded \"rsadmin\" account with a null password, which allows remote attackers to execute arbitrary commands via ssh.",
+      "published": "2000-10-20T04:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0784"
+    },
+    {
+      "cve_id": "CVE-2000-0999",
+      "description": "Format string vulnerabilities in OpenBSD ssh program (and possibly other BSD-based operating systems) allow attackers to gain root privileges.",
+      "published": "2000-12-11T05:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0999"
+    }
   ]
 }

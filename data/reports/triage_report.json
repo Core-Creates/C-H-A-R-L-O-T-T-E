@@ -1,5 +1,1 @@
-{
-    "task": "port_scan",
-    "status": "error",
-    "error": "No targets provided."
-}
+"[ERROR] No plugin registered for task 'OWASP Amass Subdomain Enum'"

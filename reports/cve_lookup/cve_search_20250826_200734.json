@@ -1,0 +1,98 @@
+[
+  {
+    "cve_id": "CVE-2025-55133",
+    "published": "2025-08-07T16:15:30.800",
+    "cvss": 6.4,
+    "description": "In Agora Foundation Agora fall23-Alpha1 before b087490, there is XSS via topicName in client/agora/public/js/editorManager.js.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-55133",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-55134",
+    "published": "2025-08-07T16:15:30.973",
+    "cvss": 6.4,
+    "description": "In Agora Foundation Agora fall23-Alpha1 before b087490, there is XSS via tag in client/agora/public/js/editorManager.js.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-55134",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-55135",
+    "published": "2025-08-07T16:15:31.143",
+    "cvss": 6.4,
+    "description": "In Agora Foundation Agora fall23-Alpha1 before 690ce56, there is XSS via a profile picture to server/controller/userController.js. Formats other than PNG, JPEG, and WEBP are permitted by server/routes/userRoutes.js; this includes SVG.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-55135",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-54392",
+    "published": "2025-08-07T17:15:29.343",
+    "cvss": 6.1,
+    "description": "Netwrix Directory Manager (formerly Imanami GroupID) 11.0.0.0 before 11.1.25162.02 allows XSS for authentication error data, a different vulnerability than CVE-2025-47189.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-54392",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-54395",
+    "published": "2025-08-07T17:15:29.750",
+    "cvss": 6.1,
+    "description": "Netwrix Directory Manager (formerly Imanami GroupID) 11.0.0.0 before 11.1.25162.02 allows XSS for authentication configuration data.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-54395",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2020-9322",
+    "published": "2025-08-08T15:15:27.067",
+    "cvss": 8.8,
+    "description": "The /users endpoint in Statamic Core before 2.11.8 allows XSS to add an administrator user. This can be exploited via CSRF. Stored XSS can occur via a JavaScript payload in a username during account registration. Reflected XSS can occur via the /users PATH_INFO.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2020-9322",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-32932",
+    "published": "2025-08-12T19:15:29.260",
+    "cvss": 6.5,
+    "description": "An Improper neutralization of input during web page generation ('cross-site scripting') vulnerability [CWE-79] in FortiSOAR version 7.6.1 and below, version 7.5.1 and below, 7.4 all versions, 7.3 all versions, 7.2 all versions, 7.0 all versions, 6.4 all versions WEB UI may allow an authenticated remote attacker to perform an XSS attack via stored malicious service requests",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-32932",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-28975",
+    "published": "2025-08-14T11:15:31.393",
+    "cvss": 7.1,
+    "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in redqteam Alike - WordPress Custom Post Comparison allows Reflected XSS. This issue affects Alike - WordPress Custom Post Comparison: from n/a through 3.0.1.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-28975",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-28999",
+    "published": "2025-08-14T11:15:31.990",
+    "cvss": 7.1,
+    "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in ZoomIt WooCommerce Shop Page Builder allows Reflected XSS. This issue affects WooCommerce Shop Page Builder: from n/a through 2.27.7.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-28999",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-29014",
+    "published": "2025-08-14T11:15:32.180",
+    "cvss": 7.1,
+    "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in ZoomIt FoodMenu allows Reflected XSS. This issue affects FoodMenu: from n/a through 1.20.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-29014",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-30626",
+    "published": "2025-08-14T11:15:32.367",
+    "cvss": 7.1,
+    "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in LambertGroup Multimedia Playlist Slider Addon for WPBakery Page Builder allows Reflected XSS. This issue affects Multimedia Playlist Slider Addon for WPBakery Page Builder: from n/a through 2.1.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-30626",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2025-31007",
+    "published": "2025-08-14T11:15:33.367",
+    "cvss": 7.1,
+    "description": "Improper Neutralization of Input During Web Page Generation ('Cross-site Scripting') vulnerability in Alvind Billplz Addon for Contact Form 7 allows Reflected XSS. This issue affects Billplz Addon for Contact Form 7: from n/a through 1.2.0.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2025-31007",
+    "source": "keyword"
+  }
+]
