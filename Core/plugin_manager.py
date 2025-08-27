@@ -37,6 +37,7 @@ PLUGIN_REGISTRY = {
     "servicenow_setup": ("servicenow", "servicenow_setup"),  # 🛎️ Initial ServiceNow config wizard
     "severity_predictor": ("ml", "predict_severity"),        # 🤖 Predicts CVE severity using NN model
     "vulnscore": ("vulnscore", "vulnscore_plugin"),          # ⚖️ Combines severity + exploitability
+    "owasp_zap": ("exploitation.owasp_zap", "zap_plugin")  # OWASP ZAP integration
 }
 
 # ******************************************************************************************
