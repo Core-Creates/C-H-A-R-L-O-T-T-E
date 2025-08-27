@@ -1,0 +1,162 @@
+[
+  {
+    "cve_id": "CVE-1999-1471",
+    "published": "1989-01-01T05:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow in passwd in BSD based operating systems 4.3 and earlier allows local users to gain root privileges by specifying a long shell or GECOS field.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1471",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2000-0388",
+    "published": "1990-05-09T04:00:00.000",
+    "cvss": 7.5,
+    "description": "Buffer overflow in FreeBSD libmytinfo library allows local users to execute commands via a long TERMCAP environmental variable.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0388",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0232",
+    "published": "1995-02-01T05:00:00.000",
+    "cvss": 10.0,
+    "description": "Buffer overflow in NCSA WebServer (version 1.5c) gives remote access.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0232",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0235",
+    "published": "1995-02-17T05:00:00.000",
+    "cvss": 10.0,
+    "description": "Buffer overflow in NCSA WebServer (1.4.1 and below) gives remote access.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0235",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0099",
+    "published": "1995-10-19T04:00:00.000",
+    "cvss": 10.0,
+    "description": "Buffer overflow in syslog utility allows local or remote attackers to gain root privileges.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0099",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0316",
+    "published": "1995-12-01T05:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow in Linux splitvt command gives root access to local users.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0316",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0022",
+    "published": "1996-07-03T04:00:00.000",
+    "cvss": 7.8,
+    "description": "Local user gains root privileges via buffer overflow in rdist, via expstr() function.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0022",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0137",
+    "published": "1996-07-09T04:00:00.000",
+    "cvss": 7.2,
+    "description": "The dip program on many Linux systems allows local users to gain root access via a buffer overflow.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0137",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0023",
+    "published": "1996-07-24T04:00:00.000",
+    "cvss": 7.2,
+    "description": "Local user gains root privileges via buffer overflow in rdist, via lookup() function.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0023",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0085",
+    "published": "1996-08-21T04:00:00.000",
+    "cvss": 7.5,
+    "description": "Buffer overflow in rwhod on AIX and other operating systems allows remote attackers to execute arbitrary code via a UDP packet with a long hostname.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0085",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0131",
+    "published": "1996-09-11T04:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow and denial of service in Sendmail 8.7.5 and earlier through GECOS field gives root access to local users.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0131",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0206",
+    "published": "1996-10-01T04:00:00.000",
+    "cvss": 10.0,
+    "description": "MIME buffer overflow in Sendmail 8.8.0 and 8.8.1 gives root access.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0206",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0319",
+    "published": "1996-10-01T04:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow in xmcd 2.1 allows local users to gain access through a user resource setting.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0319",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0032",
+    "published": "1996-10-25T04:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow in lpr, as used in BSD-based systems including Linux, allows local users to execute arbitrary code as root via a long -C (classification) command line option.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0032",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0336",
+    "published": "1996-11-01T05:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow in mstm in HP-UX allows local users to gain root access.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0336",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-1240",
+    "published": "1996-11-26T05:00:00.000",
+    "cvss": 7.5,
+    "description": "Buffer overflow in cddbd CD database server allows remote attackers to execute arbitrary commands via a long log message.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1240",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0050",
+    "published": "1996-12-01T05:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow in HP-UX newgrp program.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0050",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0101",
+    "published": "1996-12-10T05:00:00.000",
+    "cvss": 10.0,
+    "description": "Buffer overflow in AIX and Solaris \"gethostbyname\" library call allows root access through corrupt DNS host names.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0101",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0297",
+    "published": "1996-12-12T05:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow in Vixie Cron library up to version 3.0 allows local users to obtain root access via a long environmental variable.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0297",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-1089",
+    "published": "1996-12-13T05:00:00.000",
+    "cvss": 7.2,
+    "description": "Buffer overflow in chfn command in HP-UX 9.X through 10.20 allows local users to gain privileges via a long command line argument.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1089",
+    "source": "keyword"
+  }
+]
