@@ -760,5 +760,289 @@
         }
       ]
     }
-  }
+  },
+  "KW:xss:20:None:None:0": [
+    {
+      "cve_id": "CVE-2002-1315",
+      "description": "Cross-site scripting (XSS) vulnerability in the Admin Server for iPlanet WebServer 4.x, up to SP11, allows remote attackers to execute web script or HTML as the iPlanet administrator by injecting the desired script into error logs, and possibly escalating privileges by using the XSS vulnerability in conjunction with another issue (CVE-2002-1316).",
+      "published": "2002-11-29T05:00:00.000",
+      "cvss": 6.8,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2002-1315"
+    },
+    {
+      "cve_id": "CVE-2002-1316",
+      "description": "importInfo in the Admin Server for iPlanet WebServer 4.x, up to SP11, allows the web administrator to execute arbitrary commands via shell metacharacters in the dir parameter, and possibly allows remote attackers to exploit this vulnerability via a separate XSS issue (CVE-2002-1315).",
+      "published": "2002-11-29T05:00:00.000",
+      "cvss": 6.8,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2002-1316"
+    },
+    {
+      "cve_id": "CVE-2003-0292",
+      "description": "Cross-site scripting (XSS) vulnerability in Inktomi Traffic-Server 5.5.1 allows remote attackers to insert arbitrary web script or HTML into an error page that appears to come from the domain that the client is visiting, aka \"Man-in-the-Middle\" XSS.",
+      "published": "2003-06-16T04:00:00.000",
+      "cvss": 6.8,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2003-0292"
+    },
+    {
+      "cve_id": "CVE-2003-1184",
+      "description": "Multiple cross-site scripting (XSS) vulnerabilities in ThWboard Beta 2.8 and 2.81 allow remote attackers to inject arbitrary web script or HTML via (1) time in board.php, (2) the profile Homepage-Feld, (3) pictures, and (4) other \"Diverse XSS Bugs.\"",
+      "published": "2003-11-03T05:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2003-1184"
+    },
+    {
+      "cve_id": "CVE-2004-2294",
+      "description": "Canonicalize-before-filter error in the send_review function in the Reviews module for PHP-Nuke 6.0 to 7.3 allows remote attackers to inject arbitrary web script or HTML via hex-encoded XSS sequences in the text parameter, which is checked for dangerous sequences before it is canonicalized, leading to a cross-site scripting (XSS) vulnerability.",
+      "published": "2004-12-31T05:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2004-2294"
+    },
+    {
+      "cve_id": "CVE-2004-2749",
+      "description": "Directory traversal vulnerability in wra/public/wralogin in 2Wire Gateway, possibly as used in HomePortal and other product lines, allows remote attackers to read arbitrary files via a .. (dot dot) in the return parameter.  NOTE: this issue was reported as XSS, but this might be a terminology error.",
+      "published": "2004-12-31T05:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2004-2749"
+    },
+    {
+      "cve_id": "CVE-2005-2088",
+      "description": "The Apache HTTP server before 1.3.34, and 2.0.x before 2.0.55, when acting as an HTTP proxy, allows remote attackers to poison the web cache, bypass web application firewall protection, and conduct XSS attacks via an HTTP request with both a \"Transfer-Encoding: chunked\" header and a Content-Length header, which causes Apache to incorrectly handle and forward the body of the request in a way that causes the receiving server to process it as a separate HTTP request, aka \"HTTP Request Smuggling.\"",
+      "published": "2005-07-05T04:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-2088"
+    },
+    {
+      "cve_id": "CVE-2005-2089",
+      "description": "Microsoft IIS 5.0 and 6.0 allows remote attackers to poison the web cache, bypass web application firewall protection, and conduct XSS attacks via an HTTP request with both a \"Transfer-Encoding: chunked\" header and a Content-Length header, which causes IIS to incorrectly handle and forward the body of the request in a way that causes the receiving server to process it as a separate HTTP request, aka \"HTTP Request Smuggling.\"",
+      "published": "2005-07-05T04:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-2089"
+    },
+    {
+      "cve_id": "CVE-2005-2090",
+      "description": "Jakarta Tomcat 5.0.19 (Coyote/1.1) and Tomcat 4.1.24 (Coyote/1.0) allows remote attackers to poison the web cache, bypass web application firewall protection, and conduct XSS attacks via an HTTP request with both a \"Transfer-Encoding: chunked\" header and a Content-Length header, which causes Tomcat to incorrectly handle and forward the body of the request in a way that causes the receiving server to process it as a separate HTTP request, aka \"HTTP Request Smuggling.\"",
+      "published": "2005-07-05T04:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-2090"
+    },
+    {
+      "cve_id": "CVE-2005-2091",
+      "description": "IBM WebSphere 5.1 and WebSphere 5.0 allows remote attackers to poison the web cache, bypass web application firewall protection, and conduct XSS attacks via an HTTP request with both a \"Transfer-Encoding: chunked\" header and a Content-Length header, which causes WebSphere to incorrectly handle and forward the body of the request in a way that causes the receiving server to process it as a separate HTTP request, aka \"HTTP Request Smuggling.\"",
+      "published": "2005-07-05T04:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-2091"
+    },
+    {
+      "cve_id": "CVE-2005-2092",
+      "description": "BEA Systems WebLogic 8.1 SP1 allows remote attackers to poison the web cache, bypass web application firewall protection, and conduct XSS attacks via an HTTP request with both a \"Transfer-Encoding: chunked\" header and a Content-Length header, which causes WebLogic to incorrectly handle and forward the body of the request in a way that causes the receiving server to process it as a separate HTTP request, aka \"HTTP Request Smuggling.\"",
+      "published": "2005-07-05T04:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-2092"
+    },
+    {
+      "cve_id": "CVE-2005-2093",
+      "description": "Oracle 9i Application Server (Oracle9iAS) 9.0.2 allows remote attackers to poison the web cache, bypass web application firewall protection, and conduct XSS attacks via an HTTP request with both a \"Transfer-Encoding: chunked\" header and a Content-Length header, which causes Application Server to incorrectly handle and forward the body of the request in a way that causes the receiving server to process it as a separate HTTP request, aka \"HTTP Request Smuggling.\"",
+      "published": "2005-07-05T04:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-2093"
+    },
+    {
+      "cve_id": "CVE-2005-2094",
+      "description": "Sun SunONE web server 6.1 SP1 allows remote attackers to poison the web cache, bypass web application firewall protection, and conduct XSS attacks via an HTTP request with both a \"Transfer-Encoding: chunked\" header and a Content-Length header, which causes SunONE to incorrectly handle and forward the body of the request in a way that causes the receiving server to process it as a separate HTTP request, aka \"HTTP Request Smuggling.\"",
+      "published": "2005-07-05T04:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-2094"
+    },
+    {
+      "cve_id": "CVE-2005-2095",
+      "description": "options_identities.php in SquirrelMail 1.4.4 and earlier uses the extract function to process the $_POST variable, which allows remote attackers to modify or read the preferences of other users, conduct cross-site scripting XSS) attacks, and write arbitrary files.",
+      "published": "2005-07-13T04:00:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-2095"
+    },
+    {
+      "cve_id": "CVE-2005-3156",
+      "description": "Directory traversal vulnerability in printfaq.php in EasyGuppy (Guppy for Windows) 4.5.4 and 4.5.5 allows remote attackers to read arbitrary files via \"..\" sequences in the pg parameter, which is cleansed for XSS but not directory traversal.",
+      "published": "2005-10-05T23:02:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-3156"
+    },
+    {
+      "cve_id": "CVE-2005-3165",
+      "description": "Multiple cross-site scripting (XSS) vulnerabilities in MediaWiki before 1.4.9 allow remote attackers to inject arbitrary web script or HTML via (1) <math> tags or (2) Extension or <nowiki> sections that \"bypass HTML style attribute restrictions\" that are intended to protect against XSS vulnerabilities in Internet Explorer clients.",
+      "published": "2005-10-06T10:02:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-3165"
+    },
+    {
+      "cve_id": "CVE-2005-3208",
+      "description": "Multiple SQL injection vulnerabilities in (1) aeNovo, (2) aeNovoShop and (3) aeNovoWYSI allow remote attackers to execute arbitrary SQL code via (a) the password parameter in control.asp, and (b) the strSQL parameter in search.asp, which can enable XSS attacks in resulting error messages.",
+      "published": "2005-10-14T10:02:00.000",
+      "cvss": 6.8,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-3208"
+    },
+    {
+      "cve_id": "CVE-2005-3236",
+      "description": "Multiple SQL injection vulnerabilities in Cyphor 0.19 allow remote attackers to execute arbitrary SQL and obtain administrative access via (1) the fid parameter of newmsg.php, which can enable XSS attacks when the SQL syntax is invalid or (2) the nick parameter of lostpwd.php.",
+      "published": "2005-10-14T10:02:00.000",
+      "cvss": 6.8,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-3236"
+    },
+    {
+      "cve_id": "CVE-2005-3306",
+      "description": "Cross-site scripting (XSS) vulnerability in index.php for FlatNuke 2.5.6 allows remote attackers to inject arbitrary web script or HTML via the user parameter in a profile operation, a different vulnerability than CVE-2005-2814.  NOTE: it is possible that this XSS is a resultant vulnerability of CVE-2005-3307.",
+      "published": "2005-10-26T01:02:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-3306"
+    },
+    {
+      "cve_id": "CVE-2005-3751",
+      "description": "HTTP request smuggling vulnerability in Pound before 1.9.4 allows remote attackers to poison web caches, bypass web application firewall protection, and conduct XSS attacks via an HTTP request with conflicting Content-length and Transfer-encoding headers.",
+      "published": "2005-11-22T20:03:00.000",
+      "cvss": 4.3,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2005-3751"
+    }
+  ],
+  "KW:buffer overflow:20:None:None:0": [
+    {
+      "cve_id": "CVE-1999-1471",
+      "description": "Buffer overflow in passwd in BSD based operating systems 4.3 and earlier allows local users to gain root privileges by specifying a long shell or GECOS field.",
+      "published": "1989-01-01T05:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1471"
+    },
+    {
+      "cve_id": "CVE-2000-0388",
+      "description": "Buffer overflow in FreeBSD libmytinfo library allows local users to execute commands via a long TERMCAP environmental variable.",
+      "published": "1990-05-09T04:00:00.000",
+      "cvss": 7.5,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0388"
+    },
+    {
+      "cve_id": "CVE-1999-0232",
+      "description": "Buffer overflow in NCSA WebServer (version 1.5c) gives remote access.",
+      "published": "1995-02-01T05:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0232"
+    },
+    {
+      "cve_id": "CVE-1999-0235",
+      "description": "Buffer overflow in NCSA WebServer (1.4.1 and below) gives remote access.",
+      "published": "1995-02-17T05:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0235"
+    },
+    {
+      "cve_id": "CVE-1999-0099",
+      "description": "Buffer overflow in syslog utility allows local or remote attackers to gain root privileges.",
+      "published": "1995-10-19T04:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0099"
+    },
+    {
+      "cve_id": "CVE-1999-0316",
+      "description": "Buffer overflow in Linux splitvt command gives root access to local users.",
+      "published": "1995-12-01T05:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0316"
+    },
+    {
+      "cve_id": "CVE-1999-0022",
+      "description": "Local user gains root privileges via buffer overflow in rdist, via expstr() function.",
+      "published": "1996-07-03T04:00:00.000",
+      "cvss": 7.8,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0022"
+    },
+    {
+      "cve_id": "CVE-1999-0137",
+      "description": "The dip program on many Linux systems allows local users to gain root access via a buffer overflow.",
+      "published": "1996-07-09T04:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0137"
+    },
+    {
+      "cve_id": "CVE-1999-0023",
+      "description": "Local user gains root privileges via buffer overflow in rdist, via lookup() function.",
+      "published": "1996-07-24T04:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0023"
+    },
+    {
+      "cve_id": "CVE-1999-0085",
+      "description": "Buffer overflow in rwhod on AIX and other operating systems allows remote attackers to execute arbitrary code via a UDP packet with a long hostname.",
+      "published": "1996-08-21T04:00:00.000",
+      "cvss": 7.5,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0085"
+    },
+    {
+      "cve_id": "CVE-1999-0131",
+      "description": "Buffer overflow and denial of service in Sendmail 8.7.5 and earlier through GECOS field gives root access to local users.",
+      "published": "1996-09-11T04:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0131"
+    },
+    {
+      "cve_id": "CVE-1999-0206",
+      "description": "MIME buffer overflow in Sendmail 8.8.0 and 8.8.1 gives root access.",
+      "published": "1996-10-01T04:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0206"
+    },
+    {
+      "cve_id": "CVE-1999-0319",
+      "description": "Buffer overflow in xmcd 2.1 allows local users to gain access through a user resource setting.",
+      "published": "1996-10-01T04:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0319"
+    },
+    {
+      "cve_id": "CVE-1999-0032",
+      "description": "Buffer overflow in lpr, as used in BSD-based systems including Linux, allows local users to execute arbitrary code as root via a long -C (classification) command line option.",
+      "published": "1996-10-25T04:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0032"
+    },
+    {
+      "cve_id": "CVE-1999-0336",
+      "description": "Buffer overflow in mstm in HP-UX allows local users to gain root access.",
+      "published": "1996-11-01T05:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0336"
+    },
+    {
+      "cve_id": "CVE-1999-1240",
+      "description": "Buffer overflow in cddbd CD database server allows remote attackers to execute arbitrary commands via a long log message.",
+      "published": "1996-11-26T05:00:00.000",
+      "cvss": 7.5,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1240"
+    },
+    {
+      "cve_id": "CVE-1999-0050",
+      "description": "Buffer overflow in HP-UX newgrp program.",
+      "published": "1996-12-01T05:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0050"
+    },
+    {
+      "cve_id": "CVE-1999-0101",
+      "description": "Buffer overflow in AIX and Solaris \"gethostbyname\" library call allows root access through corrupt DNS host names.",
+      "published": "1996-12-10T05:00:00.000",
+      "cvss": 10.0,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0101"
+    },
+    {
+      "cve_id": "CVE-1999-0297",
+      "description": "Buffer overflow in Vixie Cron library up to version 3.0 allows local users to obtain root access via a long environmental variable.",
+      "published": "1996-12-12T05:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0297"
+    },
+    {
+      "cve_id": "CVE-1999-1089",
+      "description": "Buffer overflow in chfn command in HP-UX 9.X through 10.20 allows local users to gain privileges via a long command line argument.",
+      "published": "1996-12-13T05:00:00.000",
+      "cvss": 7.2,
+      "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1089"
+    }
+  ]
 }

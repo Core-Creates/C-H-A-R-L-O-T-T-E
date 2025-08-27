@@ -1,13 +1,5 @@
 {
     "task": "port_scan",
-    "status": "ok",
-    "output_paths": [
-        "data/findings\\nmap_192.168.88.140_20250826_110822.json"
-    ],
-    "results": {
-        "hosts": []
-    },
-    "intel": {
-        "ghdb": {}
-    }
+    "status": "error",
+    "error": "No targets provided."
 }
