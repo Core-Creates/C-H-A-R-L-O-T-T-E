@@ -1,0 +1,162 @@
+[
+  {
+    "cve_id": "CVE-1999-0013",
+    "published": "1998-01-22T05:00:00.000",
+    "cvss": 8.4,
+    "description": "Stolen credentials from SSH clients via ssh-agent program, allowing other local users to access remote accounts belonging to the ssh-agent user.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0013",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-1085",
+    "published": "1998-06-12T04:00:00.000",
+    "cvss": 5.0,
+    "description": "SSH 1.2.25, 1.2.23, and other versions, when used in in CBC (Cipher Block Chaining) or CFB (Cipher Feedback 64 bits) modes, allows remote attackers to insert arbitrary data into an existing stream between an SSH client and server by using a known plaintext attack and computing a valid CRC-32 checksum for the packet, aka the \"SSH insertion attack.\"",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1085",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0310",
+    "published": "1998-09-01T04:00:00.000",
+    "cvss": 7.5,
+    "description": "SSH 1.2.25 on HP-UX allows access to new user accounts.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0310",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-1321",
+    "published": "1998-11-05T05:00:00.000",
+    "cvss": 7.5,
+    "description": "Buffer overflow in ssh 1.2.26 client with Kerberos V enabled could allow remote attackers to cause a denial of service or execute arbitrary commands via a long DNS hostname that is not properly handled during TGT ticket passing.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1321",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-1159",
+    "published": "1998-12-29T05:00:00.000",
+    "cvss": 4.6,
+    "description": "SSH 2.0.11 and earlier allows local users to request remote forwarding from privileged ports without being root.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1159",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0248",
+    "published": "1999-01-01T05:00:00.000",
+    "cvss": 10.0,
+    "description": "A race condition in the authentication agent mechanism of sshd 1.2.17 allows an attacker to steal another user's credentials.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0248",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0398",
+    "published": "1999-01-01T05:00:00.000",
+    "cvss": 4.6,
+    "description": "In some instances of SSH 1.2.27 and 2.0.11 on Linux systems, SSH will allow users with expired accounts to login.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0398",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0547",
+    "published": "1999-01-01T05:00:00.000",
+    "cvss": 10.0,
+    "description": "An SSH server allows authentication through the .rhosts file.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0547",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0634",
+    "published": "1999-01-01T05:00:00.000",
+    "cvss": null,
+    "description": "Rejected reason: DO NOT USE THIS CANDIDATE NUMBER.  ConsultIDs: None.  Reason: this candidate is solely about a configuration that does not directly introduce security vulnerabilities, so it is more appropriate to cover under the Common Configuration Enumeration (CCE).  Notes: the former description is: \"The SSH service is running.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0634",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-1029",
+    "published": "1999-05-13T04:00:00.000",
+    "cvss": 7.5,
+    "description": "SSH server (sshd2) before 2.0.12 does not properly record login attempts if the connection is closed before the maximum number of tries, allowing a remote attacker to guess the password without showing up in the audit logs.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1029",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-1231",
+    "published": "1999-06-09T04:00:00.000",
+    "cvss": 5.0,
+    "description": "ssh 2.0.12, and possibly other versions, allows valid user names to attempt to enter the correct password multiple times, but only prompts an invalid user name for a password once, which allows remote attackers to determine user account names on the server.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1231",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-0787",
+    "published": "1999-09-17T04:00:00.000",
+    "cvss": 2.1,
+    "description": "The SSH authentication agent follows symlinks via a UNIX domain socket.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-0787",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-1999-1010",
+    "published": "1999-12-14T05:00:00.000",
+    "cvss": 2.1,
+    "description": "An SSH 1.2.27 server allows a client to use the \"none\" cipher, even if it is not allowed by the server policy.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-1999-1010",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2000-0143",
+    "published": "2000-02-11T05:00:00.000",
+    "cvss": 4.6,
+    "description": "The SSH protocol server sshd allows local users without shell access to redirect a TCP connection through a service that uses the standard system password database for authentication, such as POP or FTP.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0143",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2000-0217",
+    "published": "2000-02-24T05:00:00.000",
+    "cvss": 5.1,
+    "description": "The default configuration of SSH allows X forwarding, which could allow a remote attacker to control a client's X sessions via a malicious xauth program.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0217",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2000-0532",
+    "published": "2000-06-07T04:00:00.000",
+    "cvss": 7.5,
+    "description": "A FreeBSD patch for SSH on 2000-01-14 configures ssh to listen on port 722 as well as port 22, which might allow remote attackers to access SSH through port 722 even if port 22 is otherwise filtered.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0532",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2000-0525",
+    "published": "2000-06-08T04:00:00.000",
+    "cvss": 10.0,
+    "description": "OpenSSH does not properly drop privileges when the UseLogin option is enabled, which allows local users to execute arbitrary commands by providing the command to the ssh daemon.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0525",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2000-0575",
+    "published": "2000-07-05T04:00:00.000",
+    "cvss": 7.2,
+    "description": "SSH 1.2.27 with Kerberos authentication support stores Kerberos tickets in a file which is created in the current directory of the user who is logging in, which could allow remote attackers to sniff the ticket cache if the home directory is installed on NFS.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0575",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2000-0784",
+    "published": "2000-10-20T04:00:00.000",
+    "cvss": 10.0,
+    "description": "sshd program in the Rapidstream 2.1 Beta VPN appliance has a hard-coded \"rsadmin\" account with a null password, which allows remote attackers to execute arbitrary commands via ssh.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0784",
+    "source": "keyword"
+  },
+  {
+    "cve_id": "CVE-2000-0999",
+    "published": "2000-12-11T05:00:00.000",
+    "cvss": 10.0,
+    "description": "Format string vulnerabilities in OpenBSD ssh program (and possibly other BSD-based operating systems) allow attackers to gain root privileges.",
+    "url": "https://nvd.nist.gov/vuln/detail/CVE-2000-0999",
+    "source": "keyword"
+  }
+]

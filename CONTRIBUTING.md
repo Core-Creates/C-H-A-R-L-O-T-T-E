@@ -63,6 +63,14 @@ CHARLOTTE is a modular AI assistant built to assist in:
    git push -u origin master
    ```
 
+# Developer Certificate of Origin (DCO)
+
+To contribute to **C-H-A-R-L-O-T-T-E**, you must agree to the Developer Certificate of Origin (DCO).  
+This is a simple statement that you, the contributor, have the legal right to submit your work.
+
+When you commit your changes, you must add a **Signed-off-by** line to your commit message, certifying the below:
+
+
    **Special Note if using Docker**
    ## 🐳 Running with Docker Compose
 

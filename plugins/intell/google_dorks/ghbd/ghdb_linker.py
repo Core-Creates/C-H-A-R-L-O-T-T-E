@@ -14,7 +14,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 # Ensure CHARLOTTE core and plugins are importable
-from plugins.intell.google_dorks.dorks import ghdb  # exposes ghdb.query(...)
+from plugins.intell.google_dorks.dorks.dorks import ghdb  # exposes ghdb.query(...)
 
 # Prefer the real location
 try:
