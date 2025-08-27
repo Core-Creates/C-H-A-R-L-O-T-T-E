@@ -1,0 +1,6 @@
+{"ts": "2025-08-25T19-06-24Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
+{"ts": "2025-08-25T19-06-24Z", "event": "BANNER_PRINT", "payload": {}}
+{"ts": "2025-08-25T19-06-33Z", "event": "PROMPT_SELECTION", "payload": {"selected": "port_scan"}}
+{"ts": "2025-08-25T19-07-21Z", "event": "ACTION_RESULT", "payload": {"plugin": "port_scan", "result_kind": "dict"}}
+{"ts": "2025-08-25T19-07-21Z", "event": "TRIAGE_DONE", "payload": {"report_path": "data/reports/triage_report.json"}}
+{"ts": "2025-08-25T19-07-58Z", "event": "END", "payload": {"status": "ok"}}

@@ -1,5 +1,5 @@
 # ******************************************************************************************
-# plugins/recon/owasp_amass.py
+# plugins/recon/amass/owasp_amass.py
 # CHARLOTTE plugin for OWASP Amass - Subdomain Enumeration
 # Supports passive and active modes, multiple output formats, and CHARLOTTE JSON parsing.
 # Author: CHARLOTTE (touched by shadows)
@@ -148,19 +148,34 @@ def run_plugin(chain_followups=True):
 # ******************************************************************************************
 # Optional: standalone CLI usage
 # ******************************************************************************************
+
 if __name__ == "__main__":
     import argparse
+    import sys
+
     parser = argparse.ArgumentParser(description="Run OWASP Amass Plugin")
     parser.add_argument("domain", help="Target domain (e.g. example.com)")
     parser.add_argument("--active", action="store_true", help="Use active mode (default is passive)")
     args = parser.parse_args()
 
-    output = run_amass_enum(args.domain, passive=not args.active, output_format="json")
-    if output:
-        parsed = parse_amass_json(output)
+    json_output, folder = run_amass_enum(
+        args.domain,
+        passive=not args.active,
+        output_format="json",
+    )
+
+    if json_output:
+        parsed = parse_amass_json(json_output)
         print_summary(parsed)
-        print(f"[✓] Results saved to: {output}")
+
+        summary_path = os.path.join(
+            folder,
+            f"charlotte_subdomains_{args.domain}_{'active' if args.active else 'passive'}.json"
+        )
+        with open(summary_path, "w", encoding="utf-8") as f:
+            json.dump(parsed, f, indent=2)
+
+        print(f"[✓] Results saved to: {summary_path}")
     else:
         print("[!] Amass execution failed or produced no output.")
-# ******************************************************************************************
-# This plugin provides a CHARLOTTE-compatible interface for OWASP Amass,
+        sys.exit(1)
