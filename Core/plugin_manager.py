@@ -41,21 +41,18 @@ DYNAMIC_PLUGINS: Dict[str, Dict] = {}
 # Static Plugin Registry
 # ──────────────────────────────────────────────────────────────────────────────
 PLUGIN_REGISTRY: Dict[str, Tuple[str, str]] = {
-    "reverse_engineering": ("re", "symbolic_trace"),
-    "binary_strings": ("re", "bin_strings"),
-    "web_recon": ("recon", "subdomain_enum"),
-    "port_scan": ("recon.nmap", "nmap_plugin"),
-    "xss_scan": ("vulnscan", "xss_detector"),
-    "sql_injection": ("vulnscan", "sql_injection"),
-    "exploit_generation": ("agents", "exploit_agent"),
-    "triage_vulnerabilities": ("agents", "triage_agent"),
-    "report_dispatcher": ("report", "report_dispatcher"),
-    "Metasploit": ("exploitation", "metasploit_plugin"),
-    "servicenow_setup": ("servicenow", "servicenow_setup"),
-    "severity_predictor": ("ml", "predict_severity"),
-    "vulnscore": ("vulnscore", "vulnscore_plugin"),
-    # Optional static fallback for Amass (not required if using dynamic YAML):
-    # "owasp_amass": ("recon.amass", "owasp_amass"),
+    "reverse_engineering": ("re", "symbolic_trace"),         # 🧠 Binary symbolic tracer
+    "binary_strings": ("re", "bin_strings"),                 # 🔍 Strings & entropy scan
+    "web_recon": ("recon", "subdomain_enum"),                # 🌐 Subdomain discovery
+    "port_scan": ("recon.nmap", "nmap_plugin"),              # 📡 Basic port scan
+    "xss_scan": ("vulnscan", "xss_detector"),                # 🧼 Cross-site scripting test
+    "exploit_generation": ("agents", "exploit_agent"),       # 🚨 LLM-generated exploit suggestions
+    "triage_vulnerabilities": ("agents", "triage_agent"),    # 📊 Vulnerability triage and scoring
+    "report_dispatcher": ("report", "report_dispatcher"),    # 📤 Report generation and dispatch
+    "servicenow_setup": ("servicenow", "servicenow_setup"),  # 🛎️ Initial ServiceNow config wizard
+    "severity_predictor": ("ml", "predict_severity"),        # 🤖 Predicts CVE severity using NN model
+    "vulnscore": ("vulnscore", "vulnscore_plugin"),           # ⚖️ Combines severity + exploitability
+
 }
 
 ALIASES: Dict[str, str] = {
