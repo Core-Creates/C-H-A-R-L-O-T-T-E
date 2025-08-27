@@ -6,6 +6,12 @@
 #   Avoids name collisions with third-party 'plugins' packages by falling back
 #   to absolute file path imports. Handles static and dynamic plugin discovery.
 #   Also supports executing "dynamic" plugins described by plugin.yaml.
+#
+# NOTE (what changed):
+#   • Added DYNAMIC_PLUGINS global (label -> metadata) so main.py can build a menu.
+#   • load_plugins() now computes & publishes that index.
+#   • Added run_dynamic_by_label(label, ...) convenience wrapper.
+#   • dynamic_index_by_label() now respects 'exposed: false' in plugin.yaml.
 # ******************************************************************************************
 
 import os
@@ -26,7 +32,10 @@ if str(ROOT_DIR) not in sys.path:
     sys.path.insert(0, str(ROOT_DIR))
 
 PLUGINS_DIR = ROOT_DIR / "plugins"
-PLUGIN_DIR = "plugins"
+PLUGIN_DIR = "plugins"  # used by os.walk()
+
+# Exposed dynamic registry (label -> metadata). Populated by load_plugins().
+DYNAMIC_PLUGINS: Dict[str, Dict] = {}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Static Plugin Registry
@@ -45,7 +54,7 @@ PLUGIN_REGISTRY: Dict[str, Tuple[str, str]] = {
     "servicenow_setup": ("servicenow", "servicenow_setup"),
     "severity_predictor": ("ml", "predict_severity"),
     "vulnscore": ("vulnscore", "vulnscore_plugin"),
-    # Example static registration for Amass (optional if you rely on dynamic YAML):
+    # Optional static fallback for Amass (not required if using dynamic YAML):
     # "owasp_amass": ("recon.amass", "owasp_amass"),
 }
 
@@ -232,12 +241,35 @@ def run_dynamic(entry_point: str, function: str = "run_plugin", args: Optional[D
     except TypeError:
         return fn()
 
+
+def run_dynamic_by_label(label: str, args: Optional[Dict] = None):
+    """
+    Convenience wrapper: execute a dynamic plugin by its menu label.
+    Looks up entry_point/function in DYNAMIC_PLUGINS and delegates to run_dynamic().
+    """
+    meta = DYNAMIC_PLUGINS.get(label)
+    if not meta:
+        raise KeyError(f"Dynamic plugin with label '{label}' not found.")
+    ep = meta.get("entry_point")
+    fn = meta.get("function", "run_plugin")
+    if not ep:
+        raise RuntimeError(f"Dynamic plugin '{label}' is missing 'entry_point' in plugin.yaml.")
+    return run_dynamic(ep, function=fn, args=args)
+
+
 # Optional: convenience index for menus (key by label)
 def dynamic_index_by_label() -> Dict[str, Dict]:
-    """Return a dict mapping label -> plugin metadata for all discovered plugins."""
+    """
+    Return a dict mapping label -> plugin metadata for all discovered plugins.
+    Respects 'exposed: false' if present in plugin.yaml.
+    """
     items = discover_plugins()
     out: Dict[str, Dict] = {}
     for meta in items:
+        if not isinstance(meta, dict):
+            continue
+        if meta.get("exposed", True) is False:
+            continue
         label = meta.get("label") or meta.get("name")
         if label:
             out[str(label)] = meta
@@ -249,8 +281,11 @@ def dynamic_index_by_label() -> Dict[str, Dict]:
 _plugins_loaded_banner_printed = False
 
 def load_plugins():
-    """Print static & dynamic plugin listings once per process (side-effect)."""
-    global _plugins_loaded_banner_printed
+    """
+    Print static & dynamic plugin listings once per process (side-effect)
+    and PUBLISH the dynamic label->metadata map for menu consumption.
+    """
+    global _plugins_loaded_banner_printed, DYNAMIC_PLUGINS
     if _plugins_loaded_banner_printed:
         return
 
@@ -260,15 +295,18 @@ def load_plugins():
         cat_path = "/".join(category.split("."))
         print(f"  • {key:20s} → plugins/{cat_path}/{module_name}.py")
 
+    # Discover dynamic plugins & print banner
     dynamic_plugins = discover_plugins()
     if dynamic_plugins:
         print("\n🧩 Dynamic Plugins:")
-        for plugin in dynamic_plugins:
-            label = plugin.get("label", "Unnamed Plugin")
-            description = plugin.get("description", "No description provided")
+        # Build an index now and publish it
+        DYNAMIC_PLUGINS = dynamic_index_by_label()
+        for label, meta in DYNAMIC_PLUGINS.items():
+            description = meta.get("description", "No description provided")
             print(f"  • {label:30s} :: {description}")
     else:
-        print("⚠️  No dynamic plugins found.")
+        print("\n🧩 Dynamic Plugins: none discovered")
+        DYNAMIC_PLUGINS = {}
 
     print("✅ Plugin system ready.\n")
     _plugins_loaded_banner_printed = True
@@ -284,5 +322,11 @@ if __name__ == "__main__":
     print("\n🧩 Discovered Plugins:")
     for item in discover_plugins():
         print(f"  - {item.get('label')} :: {item.get('description')}")
+
+    # Also show the published dynamic index for sanity
+    DYNAMIC_PLUGINS = dynamic_index_by_label()
+    print("\n🧭 Dynamic Index:")
+    for k in DYNAMIC_PLUGINS:
+        print(f"  - {k}")
 
     print("\n✅ Plugin system initialized.")
