@@ -57,24 +57,27 @@ def _call_plugin_entrypoint(plugin_module, args: Optional[Dict]) -> str:
     Prefer plugin.run(args) if available; otherwise try plugin.run_plugin(args=None).
     Falls back gracefully based on function signatures.
     """
-    # 1) Preferred: run(args)
-    if hasattr(plugin_module, "run"):
-        run_fn = getattr(plugin_module, "run")
-        sig = inspect.signature(run_fn)
-        if len(sig.parameters) == 0:
-            return run_fn()
-        return run_fn(args if args is not None else {})
+    try:
+        # 1) Preferred: run(args)
+        if hasattr(plugin_module, "run"):
+            run_fn = getattr(plugin_module, "run")
+            sig = inspect.signature(run_fn)
+            if len(sig.parameters) == 0:
+                return run_fn()
+            return run_fn(args if args is not None else {})
 
-    # 2) Fallback: run_plugin(args=None)
-    if hasattr(plugin_module, "run_plugin"):
-        runp = getattr(plugin_module, "run_plugin")
-        sig = inspect.signature(runp)
-        if len(sig.parameters) == 0:
-            return runp()
-        return runp(args if args is not None else None)
+        # 2) Fallback: run_plugin(args=None)
+        if hasattr(plugin_module, "run_plugin"):
+            runp = getattr(plugin_module, "run_plugin")
+            sig = inspect.signature(runp)
+            if len(sig.parameters) == 0:
+                return runp()
+            return runp(args if args is not None else None)
 
-    # Neither entrypoint found
-    return "[ERROR] Plugin has neither run(args) nor run_plugin(args)."
+        # Neither entrypoint found
+        return "[ERROR] Plugin has neither run(args) nor run_plugin(args)."
+    except Exception as e:
+        return f"[PLUGIN EXECUTION ERROR] Failed to execute plugin entrypoint: {str(e)}\n\nFull error details:\n{traceback.format_exc()}"
 
 # ******************************************************************************************
 # Static Plugin Executor
@@ -116,8 +119,10 @@ def run_plugin(task: str, args: Optional[Dict] = None) -> str:
         # Flexible dispatcher handles run/run_plugin variants
         return _call_plugin_entrypoint(plugin_module, args)
 
+    except ImportError as e:
+        return f"[PLUGIN ERROR] Failed to import module '{module_path}': {str(e)}\n\nThis usually means:\n- The plugin file doesn't exist\n- There's a syntax error in the plugin\n- Missing dependencies\n\nFull error: {traceback.format_exc()}"
     except Exception as e:
-        return f"[PLUGIN ERROR]: {str(e)}\n{traceback.format_exc()}"
+        return f"[PLUGIN ERROR]: {str(e)}\n\nFull error details:\n{traceback.format_exc()}"
 
 # ******************************************************************************************
 # Unified Plugin Loader (Populates internal registry from both static and dynamic sources)

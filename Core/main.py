@@ -259,13 +259,26 @@ def main():
 
     # All other plugins — use the manager and request interactive mode
     try:
-        run_plugin(plugin_key, args=None)
         print(f"\n[✔] Running plugin: {plugin_key}...\n")
+        result = run_plugin(plugin_key, args=None)
+        
+        # Display the plugin result
+        if result:
+            print(result)
+        else:
+            print(f"[!] Plugin '{plugin_key}' returned no output")
+            
     except TypeError as te:
         print(f"[!] Plugin '{plugin_key}' raised a TypeError: {te}")
         print("    Tip: Ensure its entrypoint is 'def run_plugin(args=None, ...):'")
+    except ImportError as ie:
+        print(f"[!] Plugin '{plugin_key}' failed to import: {ie}")
+        print("    Tip: Check if the plugin module exists and has no syntax errors")
     except Exception as e:
         print(f"[!] Error running plugin '{plugin_key}': {e}")
+        import traceback
+        print(f"[!] Full error details:")
+        traceback.print_exc()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Entry point
