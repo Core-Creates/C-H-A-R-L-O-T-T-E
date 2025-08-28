@@ -18,3 +18,11 @@ services:
     working_dir: /app
     stdin_open: true
     tty: true
+  zap:
+    image: ghcr.io/zaproxy/zaproxy:stable
+    command: zap.sh -daemon -host 0.0.0.0 -port 8090
+    ports:
+      - "8090:8090"
+    volumes:
+      - ./zap-data:/home/zap/.ZAP
+    restart: unless-stopped
