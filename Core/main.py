@@ -94,7 +94,7 @@ PLUGIN_TASKS = {
     "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
     "🌐 Web Recon (Subdomains)": "web_recon",
     "🧼 XSS Scan": "xss_scan",
-    " OWASP ZAP Exploitability": "owasp_zap"
+    "🐝 OWASP ZAP Exploitability": "owasp_zap"
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
