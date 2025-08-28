@@ -180,6 +180,53 @@ charlotte/
 
 ---
 
+## 🧩 Plugin System
+
+CHARLOTTE uses a flexible plugin system supporting both statically registered and dynamically discovered plugins for easy extension and modularity.
+
+### Plugin Flow
+
+1. **Static Plugins**
+   - Registered in `core/plugin_manager.py` via the `PLUGIN_REGISTRY` dictionary.
+   - Each entry maps a logical task name to a plugin module (e.g., `("re", "symbolic_trace")`).
+   - Aliases in `ALIASES` allow menu labels to map to registry keys.
+   - The `run_plugin(task, args)` function loads and executes the plugin, preferring a `run(args)` entrypoint, with fallbacks.
+
+2. **Dynamic Plugins**
+   - Discovered by scanning subdirectories in the `plugins/` folder for a `plugin.yaml` file.
+   - Metadata (label, description, entry_point) is loaded from `plugin.yaml`.
+   - The `run_dynamic_plugin(entry_point)` function loads and runs the specified function (e.g., `module.submodule:function`).
+
+3. **Unified Loader**
+   - `load_plugins()` prints all available static and dynamic plugins for visibility.
+
+### File Structure
+
+- `core/plugin_manager.py`: Main logic for plugin registration, loading, and execution.
+- `plugins/`: Directory containing plugin subfolders.
+  - Each static plugin is a Python module (e.g., `plugins/re/symbolic_trace.py`).
+  - Each dynamic plugin has a `plugin.yaml` and its code.
+
+### Creating a New Plugin
+
+#### Static Plugin
+
+1. Add your plugin module under the appropriate subdirectory in `plugins/`.
+2. Implement a `run(args)` or `run_plugin(args=None)` function.
+3. Register your plugin in `PLUGIN_REGISTRY` in `core/plugin_manager.py`.
+4. (Optional) Add an alias in `ALIASES` if needed.
+
+#### Dynamic Plugin
+
+1. Create a new subdirectory in `plugins/`.
+2. Add your plugin code and a `plugin.yaml` with metadata:
+   ```yaml
+   label: My Plugin
+   description: Does something useful
+   entry_point: plugins.my_plugin.module:function
+   ```
+   
+---
 
 ## Separation of Ownership
 ```
@@ -201,6 +248,7 @@ charlotte/
    • Can develop proprietary add-ons
    • Revenues help sustain Foundation mission
 ```
+
 ---
 
 ## 🚀 Coming Soon
