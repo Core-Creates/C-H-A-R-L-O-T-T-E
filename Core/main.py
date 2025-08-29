@@ -534,6 +534,20 @@ def run_owasp_zap_interface(session_id: str | None = None):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Helper function to handle graceful exit with session logging
+# Centralizes the repeated pattern of goodbye message + session cleanup
+# ──────────────────────────────────────────────────────────────────────────────
+def graceful_exit(session_id: str | None = None):
+    """
+    Handles graceful exit with goodbye message and session cleanup.
+    Centralizes the repeated pattern used throughout the main loop.
+    """
+    print("Goodbye, bestie 🖤")
+    if session_id:
+        end_session(session_id, status="ok")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Main CLI
 # Orchestrates:
 #   • Session lifecycle logging (start/end, events)
@@ -620,8 +634,7 @@ def main():
 
         # Graceful exit path with session end logging.
         if task == "❌ Exit":
-            print("Goodbye, bestie 🖤")
-            end_session(session_id, status="ok")
+            graceful_exit(session_id)
             break
 
         # Special route: CVE Intelligence flow (own sub-menu + exports)
@@ -648,8 +661,7 @@ def main():
             # Offer to run another task before we loop back.
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
                 break
             continue
 
@@ -693,8 +705,7 @@ def main():
             # Offer to run another task after Nmap completes.
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
                 break
             continue
 
@@ -707,8 +718,7 @@ def main():
             run_triage_agent(scan_file=scan_path)
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
                 break
             continue
 
@@ -730,8 +740,7 @@ def main():
                 print(f"[!] Error processing exploit prediction: {e}")
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
                 break
             continue
 
@@ -741,8 +750,7 @@ def main():
             # Offer to run another task after OWASP ZAP completes.
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
                 break
             continue
 
@@ -761,8 +769,7 @@ def main():
         # Post-run: ask if the user wants to continue; end session if not.
         again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
         if not again:
-            print("Goodbye, bestie 🖤")
-            end_session(session_id, status="ok")
+            graceful_exit(session_id)
             break
 
 # ******************************************************************************************
