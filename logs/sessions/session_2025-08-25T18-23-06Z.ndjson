@@ -1,0 +1,5 @@
+{"ts": "2025-08-25T18-23-06Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
+{"ts": "2025-08-25T18-23-06Z", "event": "BANNER_PRINT", "payload": {}}
+{"ts": "2025-08-25T18-23-22Z", "event": "PROMPT_SELECTION", "payload": {"selected": "port_scan"}}
+{"ts": "2025-08-25T18-23-35Z", "event": "ERROR", "payload": {"where": "nmap", "error": "No module named 'plugins.recon.nmap_plugin'"}}
+{"ts": "2025-08-25T18-29-58Z", "event": "END", "payload": {"status": "ok"}}

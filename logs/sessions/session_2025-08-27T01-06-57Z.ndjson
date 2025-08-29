@@ -1,0 +1,3 @@
+{"ts": "2025-08-27T01-06-57Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
+{"ts": "2025-08-27T01-06-57Z", "event": "BANNER_PRINT", "payload": {}}
+{"ts": "2025-08-27T01-07-48Z", "event": "END", "payload": {"status": "ok"}}
