@@ -424,6 +424,116 @@ def _is_amass_like(task_key: str, pretty: str, desc: str, tags: list[str]) -> bo
     return ("amass" in name_lc) or ("amass" in desc_lc) or ("amass" in key_lc)
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Special handling: OWASP ZAP with comprehensive parameter input
+# Provides a user-friendly interface for configuring ZAP scans with validation
+# ──────────────────────────────────────────────────────────────────────────────
+def run_owasp_zap_interface(session_id: str | None = None):
+    """
+    Interactive interface for OWASP ZAP vulnerability scanning.
+    Prompts user for target URL, ZAP server settings, and scan parameters.
+    """
+    print("\n=== 🐝 OWASP ZAP Vulnerability Scanner ===")
+    print("Configure your ZAP scan parameters below:\n")
+    
+    try:
+        # Target URL input with validation
+        target = inquirer.text(
+            message="Enter target URL to scan:",
+            default="https://public-firing-range.appspot.com",
+            validate=lambda x: x.startswith(("http://", "https://")) if x else True
+        ).execute()
+        
+        if not target:
+            target = "https://public-firing-range.appspot.com"
+            print(f"[ℹ️] Using default target: {target}")
+        
+        # ZAP server configuration
+        zap_host = inquirer.text(
+            message="ZAP server host (press Enter for default):",
+            default="127.0.0.1"
+        ).execute()
+        
+        zap_port = inquirer.text(
+            message="ZAP server port (press Enter for default):",
+            default="8080"
+        ).execute()
+        
+        # Scan configuration
+        scan_timeout = inquirer.text(
+            message="Scan timeout in seconds (press Enter for default):",
+            default="900"
+        ).execute()
+        
+        # API key (optional)
+        api_key = inquirer.text(
+            message="ZAP API key (press Enter if not required):",
+            default=""
+        ).execute()
+        
+        # HTTP timeout
+        http_timeout = inquirer.text(
+            message="HTTP timeout in seconds (press Enter for default):",
+            default="5.0"
+        ).execute()
+        
+        # Build arguments dictionary
+        args = {
+            "target": target,
+            "zap_host": zap_host or "127.0.0.1",
+            "zap_port": int(zap_port or "8080"),
+            "scan_timeout": int(scan_timeout or "900"),
+            "http_timeout": float(http_timeout or "5.0")
+        }
+        
+        # Add API key if provided
+        if api_key:
+            args["api_key"] = api_key
+        
+        print(f"\n[🔧] Configuration:")
+        print(f"  Target: {args['target']}")
+        print(f"  ZAP Server: {args['zap_host']}:{args['zap_port']}")
+        print(f"  Scan Timeout: {args['scan_timeout']}s")
+        print(f"  HTTP Timeout: {args['http_timeout']}s")
+        if api_key:
+            print(f"  API Key: {'*' * min(len(api_key), 8)}...")
+        
+        # Confirm before proceeding
+        proceed = inquirer.confirm(
+            message="Proceed with scan?",
+            default=True
+        ).execute()
+        
+        if not proceed:
+            print("[❌] Scan cancelled by user.")
+            return
+        
+        print(f"\n[🚀] Starting OWASP ZAP scan of {target}...")
+        
+        # Log the action
+        if session_id:
+            append_session_event(session_id, "ACTION_BEGIN", {"plugin": "owasp_zap", "target": target})
+        
+        # Execute the scan
+        result = run_plugin("owasp_zap", args)
+        
+        # Log the result
+        if session_id:
+            append_session_event(session_id, "ACTION_RESULT", {"plugin": "owasp_zap", "result": result})
+        
+        print(f"\n[✅] OWASP ZAP scan completed!")
+        print(f"\n{result}")
+        
+    except KeyboardInterrupt:
+        print("\n[❌] Scan cancelled by user.")
+    except Exception as e:
+        error_msg = f"OWASP ZAP interface error: {e}"
+        print(f"\n[!] {error_msg}")
+        if session_id:
+            log_error(session_id, error_msg)
+        raise
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Main CLI
 # Orchestrates:
 #   • Session lifecycle logging (start/end, events)
@@ -618,6 +728,17 @@ def main():
                 print("Use '🧮 Vulnerability Triage' to further refine prioritization.\n")
             except Exception as e:
                 print(f"[!] Error processing exploit prediction: {e}")
+            again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
+            if not again:
+                print("Goodbye, bestie 🖤")
+                end_session(session_id, status="ok")
+                break
+            continue
+
+        # ── Special handling: OWASP ZAP (interactive interface)
+        if plugin_key == "owasp_zap":
+            run_owasp_zap_interface(session_id)
+            # Offer to run another task after OWASP ZAP completes.
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
                 print("Goodbye, bestie 🖤")
