@@ -458,7 +458,7 @@ def run_owasp_zap_interface(session_id: str | None = None):
             print(f"[ℹ️] Using default target: {target}")
         
         # Scan type selection
-        scan_type = inquirer.select(
+        scan_type_tuple = inquirer.select(
             message="Select scan type:",
             choices=[
                 ("Passive Scan (Spider + Analysis)", "passive"),
@@ -466,6 +466,9 @@ def run_owasp_zap_interface(session_id: str | None = None):
             ],
             default="passive"
         ).execute()
+        
+        # Extract the actual value from the tuple
+        scan_type = scan_type_tuple[1] if isinstance(scan_type_tuple, tuple) else scan_type_tuple
         
         # ZAP server configuration
         zap_host = inquirer.text(
