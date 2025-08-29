@@ -20,31 +20,16 @@ ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
 if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
-# Path helper (robust import)
-try:
-   from utils.paths import display_path        # preferred location+
-except Exception:
-    try:
-        from paths import display_path          # fallback if paths.py is at repo root
-    except Exception:
-       # last-resort shim so nothing crashes
-        def display_path(path: str, base: str | None = None) -> str:
-            return str(path).replace("\\", "/")
-# GHDB provider
-from plugins.intell.google_dorks.dorks import ghdb
 
-# Optional: path utilities
-# Prefer the real location
+# Robust display_path import (single block)
 try:
     from utils.paths import display_path
 except Exception:
-    # Optional fallback if you ever relocate it in the future
-    try:
-        from utils.paths import display_path  # legacy
-    except Exception:
-        # Final safety: minimal inline shim so nothing crashes
-        def display_path(path: str, base: str | None = None) -> str:
-            return str(path).replace("\\", "/")
+    def display_path(path: str, base: str | None = None) -> str:
+        return str(path).replace("\\", "/")
+
+# GHDB provider
+from plugins.intell.google_dorks.dorks.dorks import ghdb
 
 # Optional: rich table
 try:
@@ -60,7 +45,7 @@ except Exception:  # pragma: no cover
 
 # Optional linker (preferred if available)
 try:
-    from plugins.intell.google_dorks.ghdb_linker import suggest_from_nmap as _suggest_from_nmap
+    from plugins.intell.google_dorks.ghbd.ghdb_linker import suggest_from_nmap as _suggest_from_nmap
 except Exception:  # pragma: no cover
     _suggest_from_nmap = None
 
@@ -86,9 +71,24 @@ SCAN_TYPES = {
 DEVICE_SETTINGS_PATH = "data/device_settings.json"
 
 def load_device_settings():
+    """
+    Robust loader for device_settings.json.
+    Treats missing/empty/invalid files as empty dict rather than crashing.
+    """
     if os.path.exists(DEVICE_SETTINGS_PATH):
-        with open(DEVICE_SETTINGS_PATH, "r", encoding="utf-8") as f:
-            return json.load(f)
+        try:
+            with open(DEVICE_SETTINGS_PATH, "r", encoding="utf-8") as f:
+                txt = f.read().strip()
+                if not txt:
+                    # empty file, treat as fresh
+                    return {}
+                return json.loads(txt)
+        except json.JSONDecodeError:
+            print("[!] device_settings.json is invalid JSON. Resetting it to an empty object.")
+            return {}
+        except Exception as e:
+            print(f"[!] Could not read device settings ({e}). Continuing with defaults.")
+            return {}
     return {}
 
 def save_device_settings(settings):
@@ -406,7 +406,7 @@ def run_plugin_full(args=None, output_dir="data/findings"):
           args = {"targets": ["10.0.0.5", "10.0.0.6"], "scan_type": "-sV", "ports": "1-1024",
                   "ghdb": True, "ghdb_limit": 15, "ghdb_grep": "wordpress|joomla", "ghdb_source": "dump"}
       - Interactive:
-          no args or no 'targets' -> show menu + prompt user
+          no args or no 'targets' -> (disabled here; see commented section if you want prompts)
 
     Returns (extended):
       {
@@ -418,52 +418,43 @@ def run_plugin_full(args=None, output_dir="data/findings"):
       }
     """
     os.makedirs(output_dir, exist_ok=True)
+    args = args or {}
 
-    # Extract args
-    targets = None
-    scan_flag = None
-    ports = None
-    ghdb_enabled = True
-    ghdb_source = "dump"
-    ghdb_limit = 15
-    ghdb_grep = None
-    ghdb_debug = False
+    # -------- Normalize/Extract args -------- #
+    # Accept either 'targets' (list) or 'target' (string/comma-separated)
+    targets = args.get("targets") or args.get("target")
+    if isinstance(targets, str):
+        targets = [t.strip() for t in targets.split(",") if t.strip()]
 
-    if isinstance(args, dict):
-        targets = args.get("targets")
-        scan_flag = args.get("scan_type")  # e.g. "-sV"
-        ports = args.get("ports")
-        output_dir = args.get("output_dir", output_dir)
-        ghdb_enabled = bool(args.get("ghdb", True))
-        ghdb_source = args.get("ghdb_source", "dump")
-        ghdb_limit = int(args.get("ghdb_limit", 15))
-        ghdb_grep = args.get("ghdb_grep")
-        ghdb_debug = bool(args.get("debug", False))
+    scan_flag = args.get("scan_type")  # e.g., "-sV"
+    ports = args.get("ports")
+    output_dir = args.get("output_dir", output_dir)
 
+    # GHDB enrichment options (with safe defaults)
+    ghdb_enabled = bool(args.get("ghdb", True))
+    ghdb_source = args.get("ghdb_source", "dump")
+    ghdb_limit = int(args.get("ghdb_limit", 15))
+    ghdb_grep = args.get("ghdb_grep")
+    ghdb_debug = bool(args.get("debug", False))
+
+    if not targets:
+        # If you prefer interactive prompts, re-enable the block below.
+        return {"task": "port_scan", "status": "error", "error": "No targets provided."}
+
+    # -------- Perform scans (headless) -------- #
     output_paths: List[str] = []
 
-    if targets:
-        # Headless: default to -sV unless caller overrides
-        chosen = next((v for v in SCAN_TYPES.values() if v["arg"] == (scan_flag or "-sV")), None)
-        if not chosen:
-            chosen = SCAN_TYPES["4"]  # Service Version Detection
-        for host in targets:
-            path = run_nmap_scan(chosen, host, ports=ports, output_dir=output_dir)
-            if path:
-                output_paths.append(path)
-    else:
-        # Interactive mode
-        list_scan_options()
-        chosen = choose_scan()
-        target = input("\nEnter target IP or domain (comma-separated for multiple): ").strip()
-        ports = input("Enter port(s) to scan (e.g. 22,80 or 1-1000) [optional]: ").strip()
-        targets = [t.strip() for t in target.split(",") if t.strip()]
-        for host in targets:
-            path = run_nmap_scan(chosen, host, ports=ports or None, output_dir=output_dir)
-            if path:
-                output_paths.append(path)
+    # default to Service Version Detection (-sV)
+    chosen = next((v for v in SCAN_TYPES.values() if v["arg"] == (scan_flag or "-sV")), None)
+    if not chosen:
+        chosen = SCAN_TYPES["4"]  # Service Version Detection
 
-    # Build a unified scan_result (hosts/ports) from saved JSONs for downstream consumers
+    for host in targets:
+        path = run_nmap_scan(chosen, host, ports=ports, output_dir=output_dir)
+        if path:
+            output_paths.append(path)
+
+    # -------- Build unified results (hosts/ports) -------- #
     scan_result = {"hosts": []}
     for path in output_paths:
         try:
@@ -488,11 +479,12 @@ def run_plugin_full(args=None, output_dir="data/findings"):
                 })
             scan_result["hosts"].append(host_entry)
 
-    # Optionally enrich with GHDB intel
+    # -------- Optional GHDB enrichment -------- #
     ghdb_suggestions = {}
     if ghdb_enabled and scan_result["hosts"]:
         try:
-            if _suggest_from_nmap:
+            # call _suggest_from_nmap if present; else fallback
+            if "_suggest_from_nmap" in globals() and callable(globals()["_suggest_from_nmap"]):
                 ghdb_suggestions = _suggest_from_nmap(
                     scan_results=scan_result,
                     source=ghdb_source,
@@ -520,23 +512,26 @@ def run_plugin_full(args=None, output_dir="data/findings"):
             for r in entries[:min(10, ghdb_limit)]:
                 t = r.get("title") or "(no title)"
                 u = r.get("url") or ""
-                d = (r.get("dork") or "")[:80]
-                print(f"  - {t} -> {u} | dork: {d}{'…' if len(r.get('dork') or '') > 80 else ''}")
+                dork = (r.get("dork") or "")
+                d = dork[:80]
+                print(f"  - {t} -> {u} | dork: {d}{'…' if len(dork) > 80 else ''}")
 
-    # Final summary (optional)
+    # -------- Device priority summary -------- #
     device_settings = load_device_settings()
     summary_rows = [
         (host, data.get("priority", "?"), data.get("heuristic_score", 0))
         for host, data in device_settings.items()
     ]
+
     print("\n[🔍 CHARLOTTE Device Priority Summary]")
-    if tabulate:
-        print(tabulate(sorted(summary_rows, key=lambda x: x[2], reverse=True), headers=["Host", "Priority", "Score"]))
+    if "tabulate" in globals() and callable(globals().get("tabulate")):
+        print(tabulate(sorted(summary_rows, key=lambda x: x[2], reverse=True),
+                       headers=["Host", "Priority", "Score"]))
     else:
         for row in sorted(summary_rows, key=lambda x: x[2], reverse=True):
             print(f"  {row[0]:<20} {row[1]:<6} {row[2]}")
 
-    # Return extended structure (backward compatible: includes output_paths)
+    # -------- Return extended structure -------- #
     return {
         "task": "port_scan",
         "status": "ok",
@@ -546,6 +541,18 @@ def run_plugin_full(args=None, output_dir="data/findings"):
             "ghdb": ghdb_suggestions
         },
     }
+
+    # -------- Optional interactive block (disabled) -------- #
+    # list_scan_options()
+    # chosen = choose_scan()
+    # target = input("\nEnter target IP or domain (comma-separated for multiple): ").strip()
+    # ports = input("Enter port(s) to scan (e.g. 22,80 or 1-1000) [optional]: ").strip()
+    # targets = [t.strip() for t in target.split(",") if t.strip()]
+    # for host in targets:
+    #     path = run_nmap_scan(chosen, host, ports=ports or None, output_dir=output_dir)
+    #     if path:
+    #         output_paths.append(path)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Plugin entry point (manager-compatible)
