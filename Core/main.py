@@ -431,8 +431,18 @@ def run_owasp_zap_interface(session_id: str | None = None):
     """
     Interactive interface for OWASP ZAP vulnerability scanning.
     Prompts user for target URL, ZAP server settings, and scan parameters.
+    
+    ⚠️  IMPORTANT DISCLAIMER:
+    - Passive scan: Only analyzes responses without modifying target pages
+    - Spider crawler: Actively requests pages by following links (may generate server logs)
+    - Active scan: Sends malicious payloads to test for vulnerabilities (REQUIRES EXPLICIT PERMISSION)
+    
+    Testing websites or applications without proper authorization may violate laws in many 
+    countries and regions. Always ensure you have written permission from the target 
+    owner before conducting any security assessments.
     """
     print("\n=== 🐝 OWASP ZAP Vulnerability Scanner ===")
+    print("⚠️  IMPORTANT: Only scan targets you have permission to test!")
     print("Configure your ZAP scan parameters below:\n")
     
     try:
@@ -446,6 +456,16 @@ def run_owasp_zap_interface(session_id: str | None = None):
         if not target:
             target = "https://public-firing-range.appspot.com"
             print(f"[ℹ️] Using default target: {target}")
+        
+        # Scan type selection
+        scan_type = inquirer.select(
+            message="Select scan type:",
+            choices=[
+                ("Passive Scan (Spider + Analysis)", "passive"),
+                ("Active Scan (Spider + Active Testing)", "active")
+            ],
+            default="passive"
+        ).execute()
         
         # ZAP server configuration
         zap_host = inquirer.text(
@@ -489,19 +509,36 @@ def run_owasp_zap_interface(session_id: str | None = None):
         if api_key:
             args["api_key"] = api_key
         
+        # Add scan type to args
+        args["scan_type"] = scan_type
+        
         print(f"\n[🔧] Configuration:")
         print(f"  Target: {args['target']}")
+        print(f"  Scan Type: {scan_type.upper()}")
         print(f"  ZAP Server: {args['zap_host']}:{args['zap_port']}")
         print(f"  Scan Timeout: {args['scan_timeout']}s")
         print(f"  HTTP Timeout: {args['http_timeout']}s")
         if api_key:
             print(f"  API Key: {'*' * min(len(api_key), 8)}...")
         
-        # Confirm before proceeding
-        proceed = inquirer.confirm(
-            message="Proceed with scan?",
-            default=True
-        ).execute()
+        # Special warning for active scans
+        if scan_type == "active":
+            print(f"\n🚨  ACTIVE SCAN WARNING 🚨")
+            print(f"Active scanning will send malicious payloads to {target}")
+            print(f"This may trigger security alerts and could be illegal without permission!")
+            print(f"By proceeding, you confirm you have explicit permission to test this target.")
+            
+            # Require explicit confirmation for active scans
+            proceed = inquirer.confirm(
+                message="⚠️  I understand the risks and have permission to perform active scanning. Proceed?",
+                default=False
+            ).execute()
+        else:
+            # Confirm before proceeding for passive scans
+            proceed = inquirer.confirm(
+                message="Proceed with scan?",
+                default=True
+            ).execute()
         
         if not proceed:
             print("[❌] Scan cancelled by user.")
