@@ -94,8 +94,14 @@ def _to_severity(x: str) -> Severity:
 # ──────────────────────────────────────────────────────────────────────────────
 # Policy helpers (action resolution & policy-tunable modifiers)
 # ──────────────────────────────────────────────────────────────────────────────
+
+def _lc_set(values) -> Optional[set]:
+    if not values:
+        return None
+    return {str(v).strip().lower() for v in values}
+
 def _norm_key(s: str) -> str:
-    return s.replace("-", "_").replace(" ", "_").upper()
+    return str(s).strip().replace("-", "_").replace(" ", "_").upper()
 
 def _resolve_action_from_policy(pol, key_or_text: str) -> str:
     if not pol:
@@ -260,10 +266,24 @@ def _ensure_policy(policy_path: Optional[str], policy_obj: Optional["LoadedPolic
 # ──────────────────────────────────────────────────────────────────────────────
 _URGENCY_ORDER = {"P1": 0, "P2": 1, "P3": 2, "P4": 3}
 
+def _split_action_labels(action_text: str) -> List[str]:
+    """
+    Split a composite action string into normalized labels.
+    e.g., "Kill Process + Open Incident Ticket (High Priority) + Temporary Network Quarantine"
+    → ["kill process", "open incident ticket (high priority)", "temporary network quarantine"]
+    """
+    parts = action_text.replace("→", "+").split("+")
+    return [p.strip().lower() for p in parts if p and p.strip()]
+
 def _action_matches(decision_action: str, policy_action_key: str, pol) -> bool:
-    """Check if the decision's action includes the resolved action label for the key."""
-    resolved = _resolve_action_from_policy(pol, policy_action_key)
-    return resolved in decision_action
+    """
+    True if the decision's action contains the policy action (by label).
+    First try exact token equality against split labels, then fall back to substring.
+    """
+    resolved = _resolve_action_from_policy(pol, policy_action_key).lower()
+    tokens = _split_action_labels(decision_action)
+    return any(resolved == t for t in tokens) or (resolved in decision_action.lower())
+
 
 def _enforce_cooldowns(
     pol,
@@ -278,46 +298,76 @@ def _enforce_cooldowns(
     rules = getattr(pol, "cooldowns", []) if pol else []
     if not rules:
         return decision
-    for rule in rules:
-        match = rule.get("match", {})
-        scope = match.get("scope", "target")
-        stages = set(match.get("stages", [])) or None
-        severities = set(match.get("severities", [])) or None
-        actions = set(match.get("actions", [])) or set()
 
-        # Narrowing checks
+    for rule in rules:
+        match = rule.get("match", {}) or {}
+        scope = match.get("scope", "target")
+        stages = _lc_set(match.get("stages", []))
+        severities = _lc_set(match.get("severities", []))
+        actions = list(match.get("actions", []) or [])
+
+        # Stage / severity narrowing
         if stages and stg.value not in stages:
             continue
         if severities and sev.value not in severities:
             continue
-        if actions and not any(_action_matches(decision.action, a, pol) for a in actions):
-            continue
 
-        # Only enforce if scope == target and we have a target_id
+        # Scope support (target only for now)
         if scope == "target":
             if not ctx.target_id or not recent_action_lookup:
                 continue
-            # Choose first matching action key for lookup
-            for akey in (actions or {"OPEN_TICKET"}):
-                if actions and not _action_matches(decision.action, akey, pol):
+        else:
+            continue
+
+        window = int(rule.get("window_seconds", 0))
+        on_v = str(rule.get("on_violation", "require_approval")).lower()
+        reason = rule.get("reason", "Cooldown triggered")
+
+        candidates: List[Tuple[str, str]] = []  # (akey_for_reason, label_for_lookup)
+
+        if actions:
+            matched_any_action = False
+            for akey in actions:
+                if not _action_matches(decision.action, akey, pol):
                     continue
-                last_ts = recent_action_lookup(ctx.target_id, _resolve_action_from_policy(pol, akey))
-                if last_ts is None:
-                    continue
-                if now_ts - last_ts < int(rule.get("window_seconds", 0)):
-                    # Violation
-                    on_v = rule.get("on_violation", "require_approval")
-                    reason = rule.get("reason", "Cooldown triggered")
-                    decision.rationale.append(f"Cooldown violation: {reason}")
-                    decision.notify += list(rule.get("notify", []))
-                    if on_v == "defer_to_ticket":
-                        decision.action = pol.actions.get("OPEN_TICKET", OPEN_TICKET) if pol else OPEN_TICKET
-                    else:  # require_approval
-                        decision.requires_approval = True
-                        decision.approval_reason = reason
-                    break
+                matched_any_action = True
+                candidates.append((akey, _resolve_action_from_policy(pol, akey)))
+
+            if not matched_any_action:
+                # 🔧 Fallback: apply rule to current composite action tokens
+                decision.rationale.append(
+                    f"Cooldown rule actions {actions} did not explicitly match; "
+                    "falling back to current action tokens"
+                )
+                for token in _split_action_labels(decision.action):
+                    candidates.append(("current_action", token))
+        else:
+            # No actions specified → apply to current action tokens
+            for token in _split_action_labels(decision.action):
+                candidates.append(("current_action", token))
+
+        # Evaluate window; first violating candidate wins
+        for akey, label in candidates:
+            last_ts = recent_action_lookup(ctx.target_id, label)
+            if last_ts is None:
+                continue
+            delta = now_ts - float(last_ts)
+            if delta < window:
+                decision.rationale.append(
+                    f"Cooldown violation ({akey}): {reason} (Δ={delta:.1f}s < window={window}s)"
+                )
+                decision.notify += list(rule.get("notify", []))
+                if on_v == "defer_to_ticket":
+                    decision.action = pol.actions.get("OPEN_TICKET", OPEN_TICKET) if pol else OPEN_TICKET
+                else:
+                    decision.requires_approval = True
+                    decision.approval_reason = reason
+                break
+
     decision.notify = sorted(set(decision.notify))
     return decision
+
+
 
 def _enforce_approvals(pol, decision: Decision, stg: Stage, sev: Severity, ctx: Context) -> Decision:
     rules = (getattr(pol, "approvals", {}) or {}).get("rules", []) if pol else []
@@ -325,13 +375,13 @@ def _enforce_approvals(pol, decision: Decision, stg: Stage, sev: Severity, ctx: 
         return decision
 
     for rule in rules:
-        when = rule.get("when", {})
+        when = rule.get("when", {}) or {}
         min_urg = when.get("urgency_at_least")
-        envs = set(when.get("environments", [])) or None
-        assets = set(when.get("asset_criticality_in", [])) or None
-        actions = set(when.get("actions", [])) or None
-        stages = set(when.get("stages", [])) or None
-        severities = set(when.get("severities", [])) or None
+        envs = _lc_set(when.get("environments", []))            # ← normalize
+        assets = _lc_set(when.get("asset_criticality_in", []))  # ← normalize
+        actions = _lc_set(when.get("actions", []))              # ← normalize keys safely
+        stages = _lc_set(when.get("stages", []))                # ← normalize
+        severities = _lc_set(when.get("severities", []))        # ← normalize
 
         if min_urg and _URGENCY_ORDER.get(decision.urgency, 99) > _URGENCY_ORDER.get(min_urg, 99):
             continue
@@ -346,7 +396,7 @@ def _enforce_approvals(pol, decision: Decision, stg: Stage, sev: Severity, ctx: 
         if actions and not any(_action_matches(decision.action, a, pol) for a in actions):
             continue
 
-        req = rule.get("require", {})
+        req = rule.get("require", {}) or {}
         group = req.get("approver_group", "Security-Approvers")
         reason = req.get("reason", "Approval required by policy")
         decision.requires_approval = True

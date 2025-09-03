@@ -6,10 +6,12 @@ import textwrap
 import types
 import pytest
 from pathlib import Path
-
-# Import the module under test
-# Adjust if your tree is different
 import importlib.util
+
+# Ensure the repo root is in sys.path for imports
+ROOT = Path(__file__).resolve().parents[1]
+if str(ROOT) not in sys.path:
+    sys.path.insert(0, str(ROOT))
 
 @pytest.fixture(scope="session")
 def patch_planner():

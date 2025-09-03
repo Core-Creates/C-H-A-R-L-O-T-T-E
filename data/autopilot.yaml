@@ -64,5 +64,3 @@ autopilot:
     #   hosts: ["192.168.0.10", "192.168.0.20"]
     #   ports: [22, 80, 443, 445, 3389, 5900]
     #   timeout_seconds: 0.3
-    #   max_probes_per_run: 1000
-    #   approval_gate: true
