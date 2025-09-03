@@ -99,3 +99,30 @@ fallbacks:
   unknown_stage: exploit_attempt
   low_confidence_urgency: P3
   low_confidence_action: OPEN_TICKET
+
+cooldowns:
+  # Avoid flapping: don’t isolate the same target repeatedly within 30 minutes
+  - name: isolate-host-cooldown
+    match:
+      actions: ["ISOLATE"]     # action keys from "actions" map; case/spacing/hyphens tolerated
+      scope: target            # "target" (per Context.target_id) or "stage" (global per stage)
+      stages: ["data_exfil", "exploit_attempt", "persistence"]  # optional narrowing
+      severities: ["medium", "high", "critical"]               # optional
+    window_seconds: 1800
+    on_violation: require_approval   # "require_approval" | "defer_to_ticket"
+    notify: ["SOC", "ServiceOwner"]  # appended to decision.notify on violation
+    reason: "Cooldown: repeated isolation within 30m"
+
+approvals:
+  rules:
+    - name: p1_on_prod_requires_ir_manager
+      when:
+        urgency_at_least: "P1"                    # P1/P2/P3/P4
+        environments: ["prod", "production"]      # matches Context.environment
+        asset_criticality_in: ["crown_jewel"]     # matches Context.asset_criticality
+        actions: ["ISOLATE"]                      # optional; action keys
+        stages: ["data_exfil", "persistence"]     # optional
+      require:
+        approver_group: "IR-Managers"
+        reason: "High-risk change in production on crown-jewel asset"
+        notify: ["IncidentResponse"]              # appended to decision.notify

@@ -5,7 +5,8 @@
 from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
-from typing import Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
+import time
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Enums & constants
@@ -45,6 +46,8 @@ class Context:
     repeat_attempts: int = 0            # prior similar events in lookback
     has_mfa_bypass_indicators: bool = False
     has_dlp_hit: bool = False           # for exfil scenarios
+    environment: str = "prod"           # NEW: for approval gates (e.g., prod/stage/dev)
+    target_id: Optional[str] = None     # NEW: entity for cooldown scope ("target")
     notes: Optional[str] = None         # freeform
 
 @dataclass
@@ -54,6 +57,8 @@ class Decision:
     rationale: List[str]
     notify: List[str]
     followups: List[str]
+    requires_approval: bool = False        # NEW
+    approval_reason: Optional[str] = None  # NEW
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Hardcoded baseline (used only when no policy is provided)
@@ -72,13 +77,12 @@ BASE_POLICY: Dict[Tuple[Stage, Severity], str] = {
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Helper: normalize inputs safely
+# Helpers: normalization
 # ──────────────────────────────────────────────────────────────────────────────
 def _to_stage(x: str) -> Stage:
     try:
         return Stage(x.lower().strip())
     except Exception:
-        # Unknown stage → treat as exploit attempt but low confidence
         return Stage.EXPLOIT_ATTEMPT
 
 def _to_severity(x: str) -> Severity:
@@ -88,17 +92,12 @@ def _to_severity(x: str) -> Severity:
         return Severity.MEDIUM
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Policy helpers (action resolution & policy-driven modifiers)
+# Policy helpers (action resolution & policy-tunable modifiers)
 # ──────────────────────────────────────────────────────────────────────────────
 def _norm_key(s: str) -> str:
-    """Normalize policy action keys (tolerate spaces, hyphens, case)."""
     return s.replace("-", "_").replace(" ", "_").upper()
 
 def _resolve_action_from_policy(pol, key_or_text: str) -> str:
-    """
-    If key_or_text matches a key in policy.actions, return its display label.
-    Otherwise, return the text as-is. Supports simple 'A + B' combos.
-    """
     if not pol:
         return key_or_text
     if "+" in key_or_text:
@@ -109,10 +108,6 @@ def _resolve_action_from_policy(pol, key_or_text: str) -> str:
 def _apply_modifiers_with_policy(
     stage: Stage, severity: Severity, ctx: Context, decision: Decision, pol
 ) -> Decision:
-    """
-    Policy-driven modifiers. Mirrors the YAML structure.
-    Keys are optional; disabled or missing blocks are skipped.
-    """
     mods = pol.modifiers if pol else {}
 
     # 1) Asset criticality escalation
@@ -156,7 +151,7 @@ def _apply_modifiers_with_policy(
             decision.rationale.append("Remote origin → network quarantine applied")
             decision.notify += list(m.get("notify", []))
 
-    # 4) Repeat attempts escalation (use safe normalizer for min_severity)
+    # 4) Repeat attempts escalation (safe min_severity parse)
     m = mods.get("repeat_attempts", {})
     if m.get("enabled", False):
         threshold = int(m.get("threshold", 3))
@@ -179,18 +174,12 @@ def _apply_modifiers_with_policy(
             decision.notify += list(m.get("notify", []))
             decision.rationale.append("MFA bypass indicators present")
 
-    # De-dup and sort
     decision.notify = sorted(set(decision.notify))
     decision.followups = sorted(set(decision.followups))
     return decision
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Modifiers: (hardcoded fallback) context-aware adjustments to the base decision
-# ──────────────────────────────────────────────────────────────────────────────
-def _apply_modifiers(
-    stage: Stage, severity: Severity, ctx: Context, decision: Decision
-) -> Decision:
-    # 1) Asset criticality escalation
+# (hardcoded fallback) modifiers
+def _apply_modifiers(stage: Stage, severity: Severity, ctx: Context, decision: Decision) -> Decision:
     if ctx.asset_criticality in ("high", "crown_jewel"):
         decision.rationale.append(f"Asset criticality={ctx.asset_criticality}")
         if stage in (Stage.DATA_EXFIL, Stage.PERSISTENCE) or severity in (Severity.HIGH, Severity.CRITICAL):
@@ -199,45 +188,32 @@ def _apply_modifiers(
                 decision.action = f"{decision.action} → {ISOLATE}"
                 decision.rationale.append("Escalated to isolation due to asset importance")
         decision.notify.extend(["IncidentResponse", "ServiceOwner"])
-
-    # 2) Data classification & DLP hits
     if ctx.data_classification in ("confidential", "regulated") or ctx.has_dlp_hit:
-        decision.rationale.append(
-            f"Sensitive data (class={ctx.data_classification}, dlp_hit={ctx.has_dlp_hit})"
-        )
+        decision.rationale.append(f"Sensitive data (class={ctx.data_classification}, dlp_hit={ctx.has_dlp_hit})")
         if stage == Stage.DATA_EXFIL and decision.action != ISOLATE:
             decision.action = ISOLATE
             decision.urgency = "P1"
-
-    # 3) Remote origin makes containment stronger on execution attempts
     if ctx.is_remote and stage == Stage.EXPLOIT_ATTEMPT and severity != Severity.LOW:
         if KILL_PROC in decision.action or BLOCK_IP_MONITOR in decision.action:
             decision.rationale.append("Remote origin → block network egress/ingress")
             decision.action = f"{decision.action} + Temporary Network Quarantine"
             decision.notify.append("NetworkOps")
-
-    # 4) Repeated attempts within lookback → increase urgency
     if ctx.repeat_attempts >= 3 and severity in (Severity.MEDIUM, Severity.HIGH, Severity.CRITICAL):
         decision.rationale.append(f"Repeat attempts={ctx.repeat_attempts}")
         if decision.urgency not in ("P1",):
             decision.urgency = "P2"
         decision.notify.append("ThreatHunting")
-
-    # 5) MFA bypass indicators → immediate isolation if privilege-risky
     if ctx.has_mfa_bypass_indicators and stage in (Stage.PERSISTENCE, Stage.EXPLOIT_ATTEMPT):
         decision.rationale.append("MFA bypass indicators present")
         decision.action = ISOLATE
         decision.urgency = "P1"
         decision.notify.append("IdentitySec")
-
-    # Deduplicate notify & followups
     decision.notify = sorted(set(decision.notify))
     decision.followups = sorted(set(decision.followups))
     return decision
 
 # ──────────────────────────────────────────────────────────────────────────────
-# ML blending: optional probability dicts to modulate severity/stage/confidence
-# Pass in: stage_probs={'exploit_attempt':0.7,...}, severity_probs={'high':0.55,...}
+# ML blending
 # ──────────────────────────────────────────────────────────────────────────────
 def _blend_with_ml(
     stage: Stage,
@@ -267,7 +243,6 @@ def _blend_with_ml(
 # Policy support (optional)
 # ──────────────────────────────────────────────────────────────────────────────
 try:
-    # These imports are optional; only used when policy is supplied
     from models.policy_loader import load_policy, LoadedPolicy
 except Exception:  # pragma: no cover
     load_policy = None
@@ -281,6 +256,111 @@ def _ensure_policy(policy_path: Optional[str], policy_obj: Optional["LoadedPolic
     return None
 
 # ──────────────────────────────────────────────────────────────────────────────
+# ENFORCEMENT: cooldowns & approvals
+# ──────────────────────────────────────────────────────────────────────────────
+_URGENCY_ORDER = {"P1": 0, "P2": 1, "P3": 2, "P4": 3}
+
+def _action_matches(decision_action: str, policy_action_key: str, pol) -> bool:
+    """Check if the decision's action includes the resolved action label for the key."""
+    resolved = _resolve_action_from_policy(pol, policy_action_key)
+    return resolved in decision_action
+
+def _enforce_cooldowns(
+    pol,
+    decision: Decision,
+    stg: Stage,
+    sev: Severity,
+    ctx: Context,
+    *,
+    recent_action_lookup: Optional[Callable[[str, str], Optional[float]]],
+    now_ts: float,
+) -> Decision:
+    rules = getattr(pol, "cooldowns", []) if pol else []
+    if not rules:
+        return decision
+    for rule in rules:
+        match = rule.get("match", {})
+        scope = match.get("scope", "target")
+        stages = set(match.get("stages", [])) or None
+        severities = set(match.get("severities", [])) or None
+        actions = set(match.get("actions", [])) or set()
+
+        # Narrowing checks
+        if stages and stg.value not in stages:
+            continue
+        if severities and sev.value not in severities:
+            continue
+        if actions and not any(_action_matches(decision.action, a, pol) for a in actions):
+            continue
+
+        # Only enforce if scope == target and we have a target_id (or if future scopes are supported)
+        if scope == "target":
+            if not ctx.target_id or not recent_action_lookup:
+                continue
+            # Choose the first matching action key for lookup
+            for akey in (actions or {"OPEN_TICKET"}):
+                if actions and not _action_matches(decision.action, akey, pol):
+                    continue
+                last_ts = recent_action_lookup(ctx.target_id, _resolve_action_from_policy(pol, akey))
+                if last_ts is None:
+                    continue
+                if now_ts - last_ts < int(rule.get("window_seconds", 0)):
+                    # Violation
+                    on_v = rule.get("on_violation", "require_approval")
+                    reason = rule.get("reason", "Cooldown triggered")
+                    decision.rationale.append(f"Cooldown violation: {reason}")
+                    decision.notify += list(rule.get("notify", []))
+                    if on_v == "defer_to_ticket":
+                        decision.action = pol.actions.get("OPEN_TICKET", OPEN_TICKET) if pol else OPEN_TICKET
+                        # do not change urgency unless you want to; keep existing to preserve triage priority
+                    else:  # require_approval
+                        decision.requires_approval = True
+                        decision.approval_reason = reason
+                    break
+    decision.notify = sorted(set(decision.notify))
+    return decision
+
+def _enforce_approvals(pol, decision: Decision, stg: Stage, sev: Severity, ctx: Context) -> Decision:
+    rules = (getattr(pol, "approvals", {}) or {}).get("rules", []) if pol else []
+    if not rules:
+        return decision
+
+    for rule in rules:
+      # Conditions
+        when = rule.get("when", {})
+        min_urg = when.get("urgency_at_least")
+        envs = set(when.get("environments", [])) or None
+        assets = set(when.get("asset_criticality_in", [])) or None
+        actions = set(when.get("actions", [])) or None
+        stages = set(when.get("stages", [])) or None
+        severities = set(when.get("severities", [])) or None
+
+        if min_urg and _URGENCY_ORDER.get(decision.urgency, 99) > _URGENCY_ORDER.get(min_urg, 99):
+            continue
+        if envs and (ctx.environment not in envs):
+            continue
+        if assets and (ctx.asset_criticality not in assets):
+            continue
+        if stages and (stg.value not in stages):
+            continue
+        if severities and (sev.value not in severities):
+            continue
+        if actions and not any(_action_matches(decision.action, a, pol) for a in actions):
+            continue
+
+        # Requirement
+        req = rule.get("require", {})
+        group = req.get("approver_group", "Security-Approvers")
+        reason = req.get("reason", "Approval required by policy")
+        decision.requires_approval = True
+        decision.approval_reason = reason
+        decision.rationale.append(f"Approval required: {reason} (group={group})")
+        decision.notify += list(req.get("notify", []))
+
+    decision.notify = sorted(set(decision.notify))
+    return decision
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Public API
 # ──────────────────────────────────────────────────────────────────────────────
 def recommend_action(
@@ -291,13 +371,12 @@ def recommend_action(
     context: Optional[Context] = None,
     stage_probs: Optional[Dict[str, float]] = None,
     severity_probs: Optional[Dict[str, float]] = None,
-    policy_path: Optional[str] = None,                 # path to YAML/JSON policy
-    policy: Optional["LoadedPolicy"] = None,           # preloaded policy object
+    policy_path: Optional[str] = None,
+    policy: Optional["LoadedPolicy"] = None,
+    # NEW: hooks for enforcement
+    recent_action_lookup: Optional[Callable[[str, str], Optional[float]]] = None,
+    now_ts: Optional[float] = None,
 ) -> str:
-    """
-    Backward-compatible single-string action for quick uses.
-    Prefer `recommend_decision` if you want rationale & metadata.
-    """
     dec = recommend_decision(
         stage,
         severity,
@@ -307,6 +386,8 @@ def recommend_action(
         severity_probs=severity_probs,
         policy_path=policy_path,
         policy=policy,
+        recent_action_lookup=recent_action_lookup,
+        now_ts=now_ts,
     )
     return dec.action
 
@@ -320,11 +401,16 @@ def recommend_decision(
     severity_probs: Optional[Dict[str, float]] = None,
     policy_path: Optional[str] = None,
     policy: Optional["LoadedPolicy"] = None,
+    # NEW: hooks for enforcement
+    recent_action_lookup: Optional[Callable[[str, str], Optional[float]]] = None,
+    now_ts: Optional[float] = None,
 ) -> Decision:
     """
-    Rich decision including urgency, rationale, notify targets, and follow-ups.
-    Uses policy-driven tables when `policy` or `policy_path` is provided; otherwise
-    falls back to built-in defaults.
+    Rich decision including urgency, rationale, notify targets, follow-ups,
+    plus policy-driven cooldowns and approval gates when a policy is provided.
+
+    recent_action_lookup(target_id, action_label) -> last_epoch_seconds or None
+    now_ts: override time.time() for testing.
     """
     # Normalize inputs
     stg = _to_stage(stage)
@@ -332,14 +418,13 @@ def recommend_decision(
     ctx = context or Context(is_remote=is_remote)
     ctx.is_remote = is_remote if context is None else ctx.is_remote
 
-    # Resolve policy (if any)
     pol = _ensure_policy(policy_path, policy)
 
-    # ML blending (optional)
+    # ML blending
     ml_notes: List[str] = []
     stg, sev, ctx, ml_notes = _blend_with_ml(stg, sev, ctx, stage_probs, severity_probs)
 
-    # Low-confidence safeguard (policy-aware) — guarded if policy omits OPEN_TICKET
+    # Low-confidence safeguard
     if ctx.detection_confidence < 0.4:
         if pol:
             lc_key = pol.fallbacks.get("low_confidence_action", "OPEN_TICKET")
@@ -355,36 +440,25 @@ def recommend_decision(
             followups=["Collect additional telemetry", "Run targeted hunt query"],
         )
 
-    # Base action (policy-driven first, otherwise hardcoded)
-    if pol:
-        action = pol.base_matrix.get((stg, sev))
-    else:
-        action = BASE_POLICY.get((stg, sev))
-
+    # Base action
+    action = pol.base_matrix.get((stg, sev)) if pol else BASE_POLICY.get((stg, sev))
     rationale = [f"Base policy match: stage={stg.value}, severity={sev.value}"]
     notify = ["SOC"]
     followups: List[str] = []
 
     if action is None:
-        # Fallback defaults (policy-aware)
-        if stg == Stage.BENIGN:
-            action = NO_ACTION
-        else:
-            action = (pol.actions.get("OPEN_TICKET", OPEN_TICKET) if pol else OPEN_TICKET)
+        action = NO_ACTION if stg == Stage.BENIGN else (pol.actions.get("OPEN_TICKET", OPEN_TICKET) if pol else OPEN_TICKET)
         rationale.append("No explicit matrix entry → fallback")
 
-    # Urgency mapping (policy-driven if available)
-    if pol:
-        urgency = pol.urgency_by_severity.get(sev, "P3")
-    else:
-        urgency = {
-            Severity.CRITICAL: "P1",
-            Severity.HIGH: "P2",
-            Severity.MEDIUM: "P3",
-            Severity.LOW: "P4",
-        }[sev]
+    # Urgency
+    urgency = (pol.urgency_by_severity.get(sev, "P3") if pol else {
+        Severity.CRITICAL: "P1",
+        Severity.HIGH: "P2",
+        Severity.MEDIUM: "P3",
+        Severity.LOW: "P4",
+    }[sev])
 
-    # Follow-ups (policy-driven if available)
+    # Follow-ups
     if pol and stg in pol.followups_by_stage:
         followups.extend(pol.followups_by_stage[stg])
     else:
@@ -403,11 +477,17 @@ def recommend_decision(
         followups=followups,
     )
 
-    # Apply modifiers (policy-driven when available; otherwise hardcoded)
+    # Modifiers (policy-aware)
     if pol is not None:
         decision = _apply_modifiers_with_policy(stg, sev, ctx, decision, pol)
     else:
         decision = _apply_modifiers(stg, sev, ctx, decision)
+
+    # ENFORCEMENT: cooldowns & approvals (policy must be present)
+    if pol is not None:
+        now = now_ts if now_ts is not None else time.time()
+        decision = _enforce_cooldowns(pol, decision, stg, sev, ctx, recent_action_lookup=recent_action_lookup, now_ts=now)
+        decision = _enforce_approvals(pol, decision, stg, sev, ctx)
 
     return decision
 
@@ -419,11 +499,10 @@ def batch_recommend_actions(
     contexts: Optional[List[Context]] = None,
     policy_path: Optional[str] = None,
     policy: Optional["LoadedPolicy"] = None,
+    # NEW: enforcement hooks
+    recent_action_lookup: Optional[Callable[[str, str], Optional[float]]] = None,
+    now_ts: Optional[float] = None,
 ) -> List[str]:
-    """
-    Backward-compatible vectorized interface returning string actions.
-    For richer outputs, map `recommend_decision` instead.
-    """
     if is_remote_flags is None:
         is_remote_flags = [True] * len(stages)
     results: List[str] = []
@@ -431,27 +510,35 @@ def batch_recommend_actions(
         ctx = (contexts[i] if contexts and i < len(contexts) else None)
         results.append(
             recommend_action(
-                stg, sev, rem, context=ctx, policy_path=policy_path, policy=policy
+                stg, sev, rem,
+                context=ctx,
+                policy_path=policy_path,
+                policy=policy,
+                recent_action_lookup=recent_action_lookup,
+                now_ts=now_ts,
             )
         )
     return results
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Optional: audit/export helper for logging decisions
+# Optional: audit/export helper
 # ──────────────────────────────────────────────────────────────────────────────
 def decision_as_dict(dec: Decision, stage: str, severity: str, ctx: Context) -> Dict[str, str]:
-    """Flatten a Decision + inputs to a dict suitable for JSON/CSV audit logs."""
     return {
         "stage": stage,
         "severity": severity,
         "action": dec.action,
         "urgency": dec.urgency,
+        "requires_approval": str(dec.requires_approval),
+        "approval_reason": dec.approval_reason or "",
         "rationale": " | ".join(dec.rationale),
         "notify": ",".join(dec.notify),
         "followups": ",".join(dec.followups),
         "remote": str(ctx.is_remote),
         "asset_criticality": ctx.asset_criticality,
         "data_classification": ctx.data_classification,
+        "environment": ctx.environment,
+        "target_id": ctx.target_id or "",
         "confidence": f"{ctx.detection_confidence:.2f}",
         "repeat_attempts": str(ctx.repeat_attempts),
         "mfa_bypass": str(ctx.has_mfa_bypass_indicators),
@@ -459,5 +546,4 @@ def decision_as_dict(dec: Decision, stage: str, severity: str, ctx: Context) -> 
         "notes": ctx.notes or "",
     }
 # ******************************************************************************************
-# End of models/action_recommender.py
-# ******************************************************************************************
+# End of File
