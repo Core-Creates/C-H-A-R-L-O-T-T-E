@@ -115,8 +115,88 @@ PLUGIN_TASKS = {
     "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
     "🌐 Web Recon (Subdomains)": "web_recon",
     "🧼 XSS Scan": "xss_scan",
-    " OWASP ZAP Exploitability": "owasp_zap"
+    "🐝 OWASP ZAP Exploitability": "owasp_zap"
 }
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Helpers for special flows (CVE date filter parsing)
+# These helpers live here (UI/orchestration layer) rather than in cve_lookup.py,
+# keeping cve_lookup clean as a data-access layer that only expects ISO timestamps.
+# ──────────────────────────────────────────────────────────────────────────────
+
+def _iso_z(dt: datetime) -> str:
+    """NVD wants ISO8601 with milliseconds and Z suffix: YYYY-MM-DDTHH:MM:SS.000Z"""
+    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
+def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
+    """
+    Translates a human-friendly filter string into NVD pubStartDate/pubEndDate.
+
+    Returns:
+      (pubStartDateISO, pubEndDateISO) or (None, None) if filter is empty/invalid.
+
+    Supported patterns:
+      • 'last 30 days' / 'last 2 weeks' / 'last 3 months' (months≈30 days)
+      • 'since 2025-07-01'
+      • 'between 2025-07-01 and 2025-07-31'
+      • '2025-07-01..2025-07-31'  (shorthand)
+
+    Rationale:
+      We keep date interpretation here in the UI layer so cve_lookup.py remains
+      reusable in other contexts (e.g., headless or API).
+    """
+    if not filter_str:
+        return None, None
+
+    s = filter_str.strip().lower()
+    now = datetime.now(timezone.utc)
+
+    # Pattern: last N units
+    m = re.match(r"^last\s+(\d+)\s*(days?|d|weeks?|w|months?|m)\s*$", s)
+    if m:
+        n = int(m.group(1))
+        unit = m.group(2)
+        if unit.startswith("day") or unit == "d":
+            delta = timedelta(days=n)
+        elif unit.startswith("week") or unit == "w":
+            delta = timedelta(weeks=n)
+        else:  # months (approximate as 30 days each)
+            delta = timedelta(days=30 * n)
+        start = now - delta
+        return _iso_z(start), _iso_z(now)
+
+    # Pattern: since YYYY-MM-DD
+    m = re.match(r"^since\s+(\d{4}-\d{2}-\d{2})\s*$", s)
+    if m:
+        try:
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            return _iso_z(start), _iso_z(now)
+        except Exception:
+            return None, None
+
+    # Pattern: between YYYY-MM-DD and YYYY-MM-DD
+    m = re.match(r"^between\s+(\d{4}-\d{2}-\d{2})\s+and\s+(\d{4}-\d{2}-\d{2})\s*$", s)
+    if m:
+        try:
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            # End-of-day inclusive: add a day then subtract 1 ms
+            end = datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1) - timedelta(milliseconds=1)
+            return _iso_z(start), _iso_z(end)
+        except Exception:
+            return None, None
+
+    # Pattern: YYYY-MM-DD..YYYY-MM-DD shorthand
+    m = re.match(r"^(\d{4}-\d{2}-\d{2})\s*\.\.\s*(\d{4}-\d{2}-\d{2})$", s)
+    if m:
+        try:
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            end = datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1) - timedelta(milliseconds=1)
+            return _iso_z(start), _iso_z(end)
+        except Exception:
+            return None, None
+
+    # Fallback: unrecognized expression
+    return None, None
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers for special flows (CVE date filter parsing)
@@ -344,6 +424,170 @@ def _is_amass_like(task_key: str, pretty: str, desc: str, tags: list[str]) -> bo
     return ("amass" in name_lc) or ("amass" in desc_lc) or ("amass" in key_lc)
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Special handling: OWASP ZAP with comprehensive parameter input
+# Provides a user-friendly interface for configuring ZAP scans with validation
+# ──────────────────────────────────────────────────────────────────────────────
+def run_owasp_zap_interface(session_id: str | None = None):
+    """
+    Interactive interface for OWASP ZAP vulnerability scanning.
+    Prompts user for target URL, ZAP server settings, and scan parameters.
+    
+    ⚠️  IMPORTANT DISCLAIMER:
+    - Passive scan: Only analyzes responses without modifying target pages
+    - Spider crawler: Actively requests pages by following links (may generate server logs)
+    - Active scan: Sends malicious payloads to test for vulnerabilities (REQUIRES EXPLICIT PERMISSION)
+    
+    Testing websites or applications without proper authorization may violate laws in many 
+    countries and regions. Always ensure you have written permission from the target 
+    owner before conducting any security assessments.
+    """
+    print("\n=== 🐝 OWASP ZAP Vulnerability Scanner ===")
+    print("⚠️  IMPORTANT: Only scan targets you have permission to test!")
+    print("Configure your ZAP scan parameters below:\n")
+    
+    try:
+        # Target URL input with validation
+        target = inquirer.text(
+            message="Enter target URL to scan:",
+            default="https://public-firing-range.appspot.com",
+            validate=lambda x: x.startswith(("http://", "https://")) if x else True
+        ).execute()
+        
+        if not target:
+            target = "https://public-firing-range.appspot.com"
+            print(f"[ℹ️] Using default target: {target}")
+        
+        # Scan type selection
+        scan_type_tuple = inquirer.select(
+            message="Select scan type:",
+            choices=[
+                ("Passive Scan (Spider + Analysis)", "passive"),
+                ("Active Scan (Spider + Active Testing)", "active")
+            ],
+            default="passive"
+        ).execute()
+        
+        # Extract the actual value from the tuple
+        scan_type = scan_type_tuple[1] if isinstance(scan_type_tuple, tuple) else scan_type_tuple
+        
+        # ZAP server configuration
+        zap_host = inquirer.text(
+            message="ZAP server host (press Enter for default):",
+            default="127.0.0.1"
+        ).execute()
+        
+        zap_port = inquirer.text(
+            message="ZAP server port (press Enter for default):",
+            default="8080"
+        ).execute()
+        
+        # Scan configuration
+        scan_timeout = inquirer.text(
+            message="Scan timeout in seconds (press Enter for default):",
+            default="900"
+        ).execute()
+        
+        # API key (optional)
+        api_key = inquirer.text(
+            message="ZAP API key (press Enter if not required):",
+            default=""
+        ).execute()
+        
+        # HTTP timeout
+        http_timeout = inquirer.text(
+            message="HTTP timeout in seconds (press Enter for default):",
+            default="5.0"
+        ).execute()
+        
+        # Build arguments dictionary
+        args = {
+            "target": target,
+            "zap_host": zap_host or "127.0.0.1",
+            "zap_port": int(zap_port or "8080"),
+            "scan_timeout": int(scan_timeout or "900"),
+            "http_timeout": float(http_timeout or "5.0")
+        }
+        
+        # Add API key if provided
+        if api_key:
+            args["api_key"] = api_key
+        
+        # Add scan type to args
+        args["scan_type"] = scan_type
+        
+        print(f"\n[🔧] Configuration:")
+        print(f"  Target: {args['target']}")
+        print(f"  Scan Type: {scan_type.upper()}")
+        print(f"  ZAP Server: {args['zap_host']}:{args['zap_port']}")
+        print(f"  Scan Timeout: {args['scan_timeout']}s")
+        print(f"  HTTP Timeout: {args['http_timeout']}s")
+        if api_key:
+            print(f"  API Key: {'*' * min(len(api_key), 8)}...")
+        
+        # Special warning for active scans
+        if scan_type == "active":
+            print(f"\n🚨  ACTIVE SCAN WARNING 🚨")
+            print(f"Active scanning will send malicious payloads to {target}")
+            print(f"This may trigger security alerts and could be illegal without permission!")
+            print(f"By proceeding, you confirm you have explicit permission to test this target.")
+            
+            # Require explicit confirmation for active scans
+            proceed = inquirer.confirm(
+                message="⚠️  I understand the risks and have permission to perform active scanning. Proceed?",
+                default=False
+            ).execute()
+        else:
+            # Confirm before proceeding for passive scans
+            proceed = inquirer.confirm(
+                message="Proceed with scan?",
+                default=True
+            ).execute()
+        
+        if not proceed:
+            print("[❌] Scan cancelled by user.")
+            return
+        
+        print(f"\n[🚀] Starting OWASP ZAP scan of {target}...")
+        
+        # Log the action
+        if session_id:
+            append_session_event(session_id, "ACTION_BEGIN", {"plugin": "owasp_zap", "target": target})
+        
+        # Execute the scan
+        result = run_plugin("owasp_zap", args)
+        
+        # Log the result
+        if session_id:
+            append_session_event(session_id, "ACTION_RESULT", {"plugin": "owasp_zap", "result": result})
+        
+        print(f"\n[✅] OWASP ZAP scan completed!")
+        print(f"\n{result}")
+        
+    except KeyboardInterrupt:
+        print("\n[❌] Scan cancelled by user.")
+    except Exception as e:
+        error_msg = f"OWASP ZAP interface error: {e}"
+        print(f"\n[!] {error_msg}")
+        if session_id:
+            log_error(session_id, error_msg)
+        raise
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Helper function to handle graceful exit with session logging
+# Centralizes the repeated pattern of goodbye message + session cleanup
+# ──────────────────────────────────────────────────────────────────────────────
+def graceful_exit(session_id: str | None = None):
+    """
+    Handles graceful exit with goodbye message and session cleanup.
+    Centralizes the repeated pattern used throughout the main loop.
+    """
+    print("Goodbye, bestie 🖤")
+    if session_id:
+        end_session(session_id, status="ok")
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Main CLI
 # Orchestrates:
 #   • Session lifecycle logging (start/end, events)
@@ -430,8 +674,7 @@ def main():
 
         # Graceful exit path with session end logging.
         if task == "❌ Exit":
-            print("Goodbye, bestie 🖤")
-            end_session(session_id, status="ok")
+            graceful_exit(session_id)
             break
 
         # Special route: CVE Intelligence flow (own sub-menu + exports)
@@ -458,8 +701,7 @@ def main():
             # Offer to run another task before we loop back.
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
                 break
             continue
 
@@ -503,8 +745,7 @@ def main():
             # Offer to run another task after Nmap completes.
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
                 break
             continue
 
@@ -517,8 +758,7 @@ def main():
             run_triage_agent(scan_file=scan_path)
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
                 break
             continue
 
@@ -540,8 +780,17 @@ def main():
                 print(f"[!] Error processing exploit prediction: {e}")
             again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
             if not again:
-                print("Goodbye, bestie 🖤")
-                end_session(session_id, status="ok")
+                graceful_exit(session_id)
+                break
+            continue
+
+        # ── Special handling: OWASP ZAP (interactive interface)
+        if plugin_key == "owasp_zap":
+            run_owasp_zap_interface(session_id)
+            # Offer to run another task after OWASP ZAP completes.
+            again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
+            if not again:
+                graceful_exit(session_id)
                 break
             continue
 
@@ -560,8 +809,7 @@ def main():
         # Post-run: ask if the user wants to continue; end session if not.
         again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
         if not again:
-            print("Goodbye, bestie 🖤")
-            end_session(session_id, status="ok")
+            graceful_exit(session_id)
             break
 
 # ******************************************************************************************

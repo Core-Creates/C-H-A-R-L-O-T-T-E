@@ -51,8 +51,8 @@ PLUGIN_REGISTRY: Dict[str, Tuple[str, str]] = {
     "report_dispatcher": ("report", "report_dispatcher"),    # 📤 Report generation and dispatch
     "servicenow_setup": ("servicenow", "servicenow_setup"),  # 🛎️ Initial ServiceNow config wizard
     "severity_predictor": ("ml", "predict_severity"),        # 🤖 Predicts CVE severity using NN model
-    "vulnscore": ("vulnscore", "vulnscore_plugin"),           # ⚖️ Combines severity + exploitability
-
+    "vulnscore": ("vulnscore", "vulnscore_plugin"),          # ⚖️ Combines severity + exploitability
+    "owasp_zap": ("exploitation.owasp_zap", "zap_plugin")    # 🐝 OWASP ZAP integration
 }
 
 ALIASES: Dict[str, str] = {
@@ -111,19 +111,27 @@ def _call_plugin_entrypoint(plugin_module, args: Optional[Dict] = None) -> str:
     """
     Prefer plugin.run(args) → fallback to plugin.run_plugin(args or None).
     """
-    if hasattr(plugin_module, "run"):
-        try:
-            return plugin_module.run(args or {})
-        except TypeError:
-            # signature mismatch; continue to try run_plugin
-            pass
-    if hasattr(plugin_module, "run_plugin"):
-        try:
-            return plugin_module.run_plugin(args)
-        except TypeError:
-            # allow zero-arg run_plugin()
-            return plugin_module.run_plugin()
-    return "[ERROR] Plugin has neither run(args) nor run_plugin(args)."
+    try:
+        # 1) Preferred: run(args)
+        if hasattr(plugin_module, "run"):
+            run_fn = getattr(plugin_module, "run")
+            sig = inspect.signature(run_fn)
+            if len(sig.parameters) == 0:
+                return run_fn()
+            return run_fn(args if args is not None else {})
+
+        # 2) Fallback: run_plugin(args=None)
+        if hasattr(plugin_module, "run_plugin"):
+            runp = getattr(plugin_module, "run_plugin")
+            sig = inspect.signature(runp)
+            if len(sig.parameters) == 0:
+                return runp()
+            return runp(args if args is not None else None)
+
+        # Neither entrypoint found
+        return "[ERROR] Plugin has neither run(args) nor run_plugin(args)."
+    except Exception as e:
+        return f"[PLUGIN EXECUTION ERROR] Failed to execute plugin entrypoint: {str(e)}\n\nFull error details:\n{traceback.format_exc()}"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Static plugin runner
@@ -138,7 +146,7 @@ def run_plugin(task: str, args: Optional[Dict] = None) -> str:
         plugin_module = _load_plugin_module(category, module_name)
         return _call_plugin_entrypoint(plugin_module, args)
     except Exception as e:
-        return f"[PLUGIN ERROR]: {str(e)}\n{traceback.format_exc()}"
+        return f"[PLUGIN ERROR]: {str(e)}\n\nFull error details:\n{traceback.format_exc()}"
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Dynamic discovery + execution
