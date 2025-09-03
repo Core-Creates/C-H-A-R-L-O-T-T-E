@@ -1,0 +1,50 @@
+# ******************************************************************************************
+# data/autopilot.yaml — Autopilot policy (schedules, bandwidth, approvals)
+# ******************************************************************************************
+autopilot:
+enabled: true
+# Token used by REST control endpoints (X-CHARLOTTE-Token). Set via env for prod.
+# If omitted here, MUST be provided by env CHARLOTTE_TOKEN.
+approval_token: "change-me"
+
+
+# Interface policy
+interfaces:
+- name: auto # "auto" picks the busiest non‑loopback interface
+net_utilization_max: 0.35 # fraction of link we’ll allow AUTOPILOT to consume
+min_idle_bps: 1000000 # require at least 1 Mbps headroom for heavy jobs
+
+
+scheduler:
+tick_seconds: 5
+max_concurrent_detectors: 2
+
+
+# Global backoff when the system is hot (CPU or bandwidth). Scales intervals.
+adaptive_backoff:
+cpu_hot_percent: 85
+net_hot_utilization: 0.70
+scale_factor: 2.0 # doubles effective intervals under hot conditions
+
+
+detectors:
+port_exposure:
+enabled: true
+interval: 15m
+cooldown: 10m
+approval_gate: false
+target_cidr: "192.168.0.0/24"
+scan_top_n: 100
+intensity: slow # slow | normal | fast (maps to nmap -T2/-T3/-T4)
+
+
+log_anomaly:
+enabled: true
+interval: 5m
+cooldown: 2m
+approval_gate: false
+files:
+- "C:\\ProgramData\\CHARLOTTE\\logs\\agent.log"
+- "/var/log/syslog"
+window_lines: 1000
+error_threshold: 10
