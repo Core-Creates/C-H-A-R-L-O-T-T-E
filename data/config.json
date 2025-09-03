@@ -1,0 +1,4 @@
+{
+  "log_level": "INFO",
+  "daemon": { "heartbeat_seconds": 300 }
+}
