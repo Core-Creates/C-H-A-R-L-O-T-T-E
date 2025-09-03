@@ -17,13 +17,15 @@ class LoadedPolicy:
     followups_by_stage: Dict[Stage, List[str]]
     modifiers: dict
     fallbacks: dict
+    cooldowns: List[dict]           # NEW
+    approvals: dict                 # NEW
     version: int
 
 def _enum_stage(s: str) -> Stage:
     try:
         return Stage(s.strip().lower())
     except Exception:
-        return Stage.EXPLOIT_ATTEMPT  # fallback; also exposed via fallbacks
+        return Stage.EXPLOIT_ATTEMPT  # fallback
 
 def _enum_sev(s: str) -> Severity:
     try:
@@ -47,27 +49,31 @@ def _resolve_action_expr(expr: str, actions_map: Dict[str, str]) -> str:
 def load_policy(path: str | Path) -> LoadedPolicy:
     path = Path(path)
     with path.open("r", encoding="utf-8") as f:
-        raw = yaml.safe_load(f)
+        raw = yaml.safe_load(f) or {}
 
     version = int(raw.get("version", 1))
-    actions_map: Dict[str, str] = {k.upper(): str(v) for k, v in raw.get("actions", {}).items()}
+    actions_map: Dict[str, str] = {k.upper(): str(v) for k, v in (raw.get("actions", {}) or {}).items()}
 
     # Base matrix
     base_matrix: Dict[Tuple[Stage, Severity], str] = {}
-    for row in raw.get("base_matrix", []):
-        stg = _enum_stage(row["stage"])
-        sev = _enum_sev(row["severity"])
-        action_expr = str(row["action"])
+    for row in (raw.get("base_matrix", []) or []):
+        stg = _enum_stage(row.get("stage", "exploit_attempt"))
+        sev = _enum_sev(row.get("severity", "medium"))
+        action_expr = str(row.get("action", "OPEN_TICKET"))
         base_matrix[(stg, sev)] = _resolve_action_expr(action_expr, actions_map)
 
     # Urgency map
-    urgency_by_sev = { _enum_sev(k): v for k, v in raw.get("urgency_by_severity", {}).items() }
+    urgency_by_sev = { _enum_sev(k): str(v) for k, v in (raw.get("urgency_by_severity", {}) or {}).items() }
 
     # Follow-ups
-    followups_by_stage = { _enum_stage(k): list(v or []) for k, v in raw.get("followups_by_stage", {}).items() }
+    followups_by_stage = { _enum_stage(k): list(v or []) for k, v in (raw.get("followups_by_stage", {}) or {}).items() }
 
-    modifiers = raw.get("modifiers", {})
-    fallbacks = raw.get("fallbacks", {})
+    modifiers = raw.get("modifiers", {}) or {}
+    fallbacks = raw.get("fallbacks", {}) or {}
+
+    # NEW: cooldowns & approvals (optional)
+    cooldowns = list(raw.get("cooldowns", []) or [])
+    approvals = dict(raw.get("approvals", {}) or {})
 
     return LoadedPolicy(
         actions=actions_map,
@@ -76,6 +82,9 @@ def load_policy(path: str | Path) -> LoadedPolicy:
         followups_by_stage=followups_by_stage,
         modifiers=modifiers,
         fallbacks=fallbacks,
+        cooldowns=cooldowns,        # NEW
+        approvals=approvals,        # NEW
+        dry_run=dry_run,            # NEW
         version=version,
     )
 # ******************************************************************************************

@@ -46,8 +46,8 @@ class Context:
     repeat_attempts: int = 0            # prior similar events in lookback
     has_mfa_bypass_indicators: bool = False
     has_dlp_hit: bool = False           # for exfil scenarios
-    environment: str = "prod"           # NEW: for approval gates (e.g., prod/stage/dev)
-    target_id: Optional[str] = None     # NEW: entity for cooldown scope ("target")
+    environment: str = "prod"           # for approval gates (e.g., prod/stage/dev)
+    target_id: Optional[str] = None     # entity for cooldown scope ("target")
     notes: Optional[str] = None         # freeform
 
 @dataclass
@@ -57,8 +57,8 @@ class Decision:
     rationale: List[str]
     notify: List[str]
     followups: List[str]
-    requires_approval: bool = False        # NEW
-    approval_reason: Optional[str] = None  # NEW
+    requires_approval: bool = False
+    approval_reason: Optional[str] = None
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Hardcoded baseline (used only when no policy is provided)
@@ -293,11 +293,11 @@ def _enforce_cooldowns(
         if actions and not any(_action_matches(decision.action, a, pol) for a in actions):
             continue
 
-        # Only enforce if scope == target and we have a target_id (or if future scopes are supported)
+        # Only enforce if scope == target and we have a target_id
         if scope == "target":
             if not ctx.target_id or not recent_action_lookup:
                 continue
-            # Choose the first matching action key for lookup
+            # Choose first matching action key for lookup
             for akey in (actions or {"OPEN_TICKET"}):
                 if actions and not _action_matches(decision.action, akey, pol):
                     continue
@@ -312,7 +312,6 @@ def _enforce_cooldowns(
                     decision.notify += list(rule.get("notify", []))
                     if on_v == "defer_to_ticket":
                         decision.action = pol.actions.get("OPEN_TICKET", OPEN_TICKET) if pol else OPEN_TICKET
-                        # do not change urgency unless you want to; keep existing to preserve triage priority
                     else:  # require_approval
                         decision.requires_approval = True
                         decision.approval_reason = reason
@@ -326,7 +325,6 @@ def _enforce_approvals(pol, decision: Decision, stg: Stage, sev: Severity, ctx: 
         return decision
 
     for rule in rules:
-      # Conditions
         when = rule.get("when", {})
         min_urg = when.get("urgency_at_least")
         envs = set(when.get("environments", [])) or None
@@ -348,7 +346,6 @@ def _enforce_approvals(pol, decision: Decision, stg: Stage, sev: Severity, ctx: 
         if actions and not any(_action_matches(decision.action, a, pol) for a in actions):
             continue
 
-        # Requirement
         req = rule.get("require", {})
         group = req.get("approver_group", "Security-Approvers")
         reason = req.get("reason", "Approval required by policy")
@@ -358,6 +355,20 @@ def _enforce_approvals(pol, decision: Decision, stg: Stage, sev: Severity, ctx: 
         decision.notify += list(req.get("notify", []))
 
     decision.notify = sorted(set(decision.notify))
+    return decision
+
+def _enforce_dry_run(pol, decision: Decision) -> Decision:
+    dr = (getattr(pol, "dry_run", {}) or {}) if pol else {}
+    if not dr or not dr.get("enabled", False):
+        return decision
+    keys = set(dr.get("mark_actions", []))
+    if keys and any(_action_matches(decision.action, k, pol) for k in keys):
+        reason = dr.get("reason", "Dry run: approval required before enforcement")
+        decision.requires_approval = True
+        decision.approval_reason = reason
+        decision.rationale.append(f"Dry-run: {reason}")
+        decision.notify += list(dr.get("notify", []))
+        decision.notify = sorted(set(decision.notify))
     return decision
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -373,7 +384,7 @@ def recommend_action(
     severity_probs: Optional[Dict[str, float]] = None,
     policy_path: Optional[str] = None,
     policy: Optional["LoadedPolicy"] = None,
-    # NEW: hooks for enforcement
+    dry_run: bool = False,
     recent_action_lookup: Optional[Callable[[str, str], Optional[float]]] = None,
     now_ts: Optional[float] = None,
 ) -> str:
@@ -386,6 +397,7 @@ def recommend_action(
         severity_probs=severity_probs,
         policy_path=policy_path,
         policy=policy,
+        dry_run=dry_run,
         recent_action_lookup=recent_action_lookup,
         now_ts=now_ts,
     )
@@ -401,7 +413,7 @@ def recommend_decision(
     severity_probs: Optional[Dict[str, float]] = None,
     policy_path: Optional[str] = None,
     policy: Optional["LoadedPolicy"] = None,
-    # NEW: hooks for enforcement
+    dry_run: bool = False,
     recent_action_lookup: Optional[Callable[[str, str], Optional[float]]] = None,
     now_ts: Optional[float] = None,
 ) -> Decision:
@@ -483,11 +495,17 @@ def recommend_decision(
     else:
         decision = _apply_modifiers(stg, sev, ctx, decision)
 
-    # ENFORCEMENT: cooldowns & approvals (policy must be present)
+    # ENFORCEMENT: cooldowns & approvals & dry-run (policy must be present for policy-driven pieces)
     if pol is not None:
         now = now_ts if now_ts is not None else time.time()
         decision = _enforce_cooldowns(pol, decision, stg, sev, ctx, recent_action_lookup=recent_action_lookup, now_ts=now)
         decision = _enforce_approvals(pol, decision, stg, sev, ctx)
+        decision = _enforce_dry_run(pol, decision)
+    # Global dry-run override (function arg)
+    if dry_run and not decision.requires_approval:
+        decision.requires_approval = True
+        decision.approval_reason = "Global dry-run enabled"
+        decision.rationale.append("Dry-run: Global override")
 
     return decision
 
@@ -499,7 +517,7 @@ def batch_recommend_actions(
     contexts: Optional[List[Context]] = None,
     policy_path: Optional[str] = None,
     policy: Optional["LoadedPolicy"] = None,
-    # NEW: enforcement hooks
+    dry_run: bool = False,
     recent_action_lookup: Optional[Callable[[str, str], Optional[float]]] = None,
     now_ts: Optional[float] = None,
 ) -> List[str]:
@@ -514,6 +532,7 @@ def batch_recommend_actions(
                 context=ctx,
                 policy_path=policy_path,
                 policy=policy,
+                dry_run=dry_run,
                 recent_action_lookup=recent_action_lookup,
                 now_ts=now_ts,
             )
@@ -545,7 +564,16 @@ def decision_as_dict(dec: Decision, stage: str, severity: str, ctx: Context) -> 
         "dlp_hit": str(ctx.has_dlp_hit),
         "notes": ctx.notes or "",
     }
-# ******************************************************************************************
-# End of File
-# models/action_recommender.py
-# ******************************************************************************************
+
+# Optional helper: record executed actions for cooldown lookups
+def record_execution(recorder_fn, ctx: Context, dec: Decision, *, now_ts: Optional[float] = None) -> None:
+    """Call with a persistence function to store last-executed timestamps per action.
+    recorder_fn(target_id: str, action_label: str, ts: float) -> None
+    """
+    if not recorder_fn or not ctx.target_id:
+        return
+    ts = now_ts if now_ts is not None else time.time()
+    # Split compound actions like "Kill Process + Temporary Network Quarantine"
+    parts = [p.strip() for p in dec.action.replace("→", "+").split("+") if p.strip()]
+    for label in parts:
+        recorder_fn(ctx.target_id, label, ts)
