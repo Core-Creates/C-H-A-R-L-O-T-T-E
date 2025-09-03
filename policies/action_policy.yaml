@@ -1,0 +1,101 @@
+version: 1
+# Canonical action labels used across CHARLOTTE (display text is the value)
+actions:
+  ISOLATE: "Isolate Host"
+  KILL_PROC: "Kill Process"
+  BLOCK_IP_MONITOR: "Block IP and Monitor Process"
+  THROTTLE_ALERT: "Throttle Outbound Traffic + Alert SOC"
+  KILL_MONITOR_REGROWTH: "Kill Process and Monitor for Regrowth"
+  OPEN_TICKET: "Open SOC Ticket for Review"
+  OPEN_TICKET_HIGH: "Open Incident Ticket (High Priority)"
+  NO_ACTION: "No Action Required"
+
+# Base policy matrix: stage × severity → action
+base_matrix:
+  - stage: data_exfil
+    severity: high
+    action: ISOLATE
+  - stage: data_exfil
+    severity: critical
+    action: ISOLATE
+  - stage: exploit_attempt
+    severity: high
+    action: "KILL_PROC + OPEN_TICKET_HIGH"
+  - stage: exploit_attempt
+    severity: critical
+    action: "KILL_PROC + OPEN_TICKET_HIGH"
+  - stage: persistence
+    severity: medium
+    action: KILL_MONITOR_REGROWTH
+  - stage: persistence
+    severity: high
+    action: KILL_MONITOR_REGROWTH
+  - stage: exploit_attempt
+    severity: medium
+    action: BLOCK_IP_MONITOR
+  - stage: data_exfil
+    severity: medium
+    action: THROTTLE_ALERT
+  - stage: persistence
+    severity: low
+    action: "Log and Monitor Registry Key"
+  - stage: benign
+    severity: low
+    action: NO_ACTION
+
+urgency_by_severity:
+  critical: P1
+  high: P2
+  medium: P3
+  low: P4
+
+followups_by_stage:
+  exploit_attempt:
+    - "Acquire process dump & indicators"
+    - "Block offending IOC"
+    - "Confirm patch level"
+  persistence:
+    - "List autoruns & scheduled tasks"
+    - "Baseline diffs for startup items"
+    - "EDR scan sweep"
+  data_exfil:
+    - "Quantify data scope"
+    - "Revoke tokens/keys"
+    - "Rotate credentials"
+    - "Legal/GRC review"
+
+modifiers:
+  asset_criticality_escalation:
+    enabled: true
+    levels: ["high", "crown_jewel"]
+    escalate_to: ISOLATE
+    notify: ["IncidentResponse", "ServiceOwner"]
+  data_sensitivity:
+    enabled: true
+    sensitive_classes: ["confidential", "regulated"]
+    dlp_hit_triggers: true
+    escalate_to: ISOLATE
+    urgency: P1
+  remote_origin_quarantine:
+    enabled: true
+    stages: ["exploit_attempt"]
+    severities: ["medium", "high", "critical"]
+    append_text: " + Temporary Network Quarantine"
+    notify: ["NetworkOps"]
+  repeat_attempts:
+    enabled: true
+    threshold: 3
+    min_severity: medium
+    raise_urgency_to: P2
+    notify: ["ThreatHunting"]
+  mfa_bypass:
+    enabled: true
+    stages: ["persistence", "exploit_attempt"]
+    escalate_to: ISOLATE
+    urgency: P1
+    notify: ["IdentitySec"]
+
+fallbacks:
+  unknown_stage: exploit_attempt
+  low_confidence_urgency: P3
+  low_confidence_action: OPEN_TICKET

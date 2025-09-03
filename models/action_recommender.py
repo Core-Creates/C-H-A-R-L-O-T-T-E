@@ -1,6 +1,6 @@
 # ******************************************************************************************
 # models/action_recommender.py
-# Context-aware, auditable recommender with rule-matrix + ML blending
+# Context-aware, auditable recommender with rule-matrix + ML blending (policy-driven)
 # ******************************************************************************************
 from __future__ import annotations
 from dataclasses import dataclass
@@ -56,8 +56,7 @@ class Decision:
     followups: List[str]
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Baseline policy matrix (stage × severity → default action)
-# Keep this tiny & opinionated; modifiers add nuance.
+# Hardcoded baseline (used only when no policy is provided)
 # ──────────────────────────────────────────────────────────────────────────────
 BASE_POLICY: Dict[Tuple[Stage, Severity], str] = {
     (Stage.DATA_EXFIL, Severity.HIGH): ISOLATE,
@@ -90,7 +89,6 @@ def _to_severity(x: str) -> Severity:
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Modifiers: context-aware adjustments to the base decision
-# Each modifier can append rationale and adjust action/urgency/notifications.
 # ──────────────────────────────────────────────────────────────────────────────
 def _apply_modifiers(
     stage: Stage, severity: Severity, ctx: Context, decision: Decision
@@ -142,7 +140,6 @@ def _apply_modifiers(
 
 # ──────────────────────────────────────────────────────────────────────────────
 # ML blending: optional probability dicts to modulate severity/stage/confidence
-# Pass in: stage_probs={'exploit_attempt':0.7,...}, severity_probs={'high':0.55,...}
 # ──────────────────────────────────────────────────────────────────────────────
 def _blend_with_ml(
     stage: Stage,
@@ -169,6 +166,23 @@ def _blend_with_ml(
     return stage, severity, ctx, notes
 
 # ──────────────────────────────────────────────────────────────────────────────
+# Policy support (optional)
+# ──────────────────────────────────────────────────────────────────────────────
+try:
+    # These imports are optional; only used when policy is supplied
+    from models.policy_loader import load_policy, LoadedPolicy
+except Exception:  # pragma: no cover
+    load_policy = None
+    LoadedPolicy = None  # type: ignore
+
+def _ensure_policy(policy_path: Optional[str], policy_obj: Optional["LoadedPolicy"]) -> Optional["LoadedPolicy"]:
+    if policy_obj is not None:
+        return policy_obj
+    if policy_path and load_policy:
+        return load_policy(policy_path)
+    return None
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Public API
 # ──────────────────────────────────────────────────────────────────────────────
 def recommend_action(
@@ -179,13 +193,22 @@ def recommend_action(
     context: Optional[Context] = None,
     stage_probs: Optional[Dict[str, float]] = None,
     severity_probs: Optional[Dict[str, float]] = None,
+    policy_path: Optional[str] = None,                 # NEW (1): path to YAML/JSON policy
+    policy: Optional["LoadedPolicy"] = None,           # NEW (2): preloaded policy object
 ) -> str:
     """
     Backward-compatible single-string action for quick uses.
     Prefer `recommend_decision` if you want rationale & metadata.
     """
     dec = recommend_decision(
-        stage, severity, is_remote=is_remote, context=context, stage_probs=stage_probs, severity_probs=severity_probs
+        stage,
+        severity,
+        is_remote=is_remote,
+        context=context,
+        stage_probs=stage_probs,
+        severity_probs=severity_probs,
+        policy_path=policy_path,
+        policy=policy,
     )
     return dec.action
 
@@ -197,57 +220,89 @@ def recommend_decision(
     context: Optional[Context] = None,
     stage_probs: Optional[Dict[str, float]] = None,
     severity_probs: Optional[Dict[str, float]] = None,
+    policy_path: Optional[str] = None,                 # NEW (1)
+    policy: Optional["LoadedPolicy"] = None,           # NEW (2)
 ) -> Decision:
     """
     Rich decision including urgency, rationale, notify targets, and follow-ups.
+    Uses policy-driven tables when `policy` or `policy_path` is provided; otherwise
+    falls back to built-in defaults.
     """
+    # Normalize inputs
     stg = _to_stage(stage)
     sev = _to_severity(severity)
     ctx = context or Context(is_remote=is_remote)
     ctx.is_remote = is_remote if context is None else ctx.is_remote
 
-    # Blend with ML (optional)
+    # Resolve policy (if any)
+    pol = _ensure_policy(policy_path, policy)
+
+    # ML blending (optional)
     ml_notes: List[str] = []
     stg, sev, ctx, ml_notes = _blend_with_ml(stg, sev, ctx, stage_probs, severity_probs)
 
-    # Low-confidence safeguard
+    # Low-confidence safeguard (policy-aware)
     if ctx.detection_confidence < 0.4:
+        low_conf_action = (
+            (pol.actions.get(pol.fallbacks.get("low_confidence_action", "OPEN_TICKET"), OPEN_TICKET))
+            if pol else OPEN_TICKET
+        )
+        low_conf_urgency = pol.fallbacks.get("low_confidence_urgency", "P3") if pol else "P3"
         return Decision(
-            action=OPEN_TICKET,
-            urgency="P3",
+            action=low_conf_action,
+            urgency=low_conf_urgency,
             rationale=["Low detection confidence (<0.4)"] + ml_notes,
             notify=["SOC"],
             followups=["Collect additional telemetry", "Run targeted hunt query"],
         )
 
-    # Base action
-    action = BASE_POLICY.get((stg, sev))
+    # Base action (policy-driven first, otherwise hardcoded)
+    if pol:
+        action = pol.base_matrix.get((stg, sev))
+    else:
+        action = BASE_POLICY.get((stg, sev))
+
     rationale = [f"Base policy match: stage={stg.value}, severity={sev.value}"]
     notify = ["SOC"]
-    followups = []  # fill below
+    followups: List[str] = []
 
     if action is None:
-        # Fallback defaults (keeps behavior similar to original)
-        action = NO_ACTION if stg == Stage.BENIGN else OPEN_TICKET
+        # Fallback defaults (policy-aware)
+        if stg == Stage.BENIGN:
+            action = NO_ACTION
+        else:
+            action = (pol.actions.get("OPEN_TICKET", OPEN_TICKET) if pol else OPEN_TICKET)
         rationale.append("No explicit matrix entry → fallback")
 
-    # Default urgency derived from severity
-    urgency = {
-        Severity.CRITICAL: "P1",
-        Severity.HIGH: "P2",
-        Severity.MEDIUM: "P3",
-        Severity.LOW: "P4",
-    }[sev]
+    # Urgency mapping (policy-driven if available)
+    if pol:
+        urgency = pol.urgency_by_severity.get(sev, "P3")
+    else:
+        urgency = {
+            Severity.CRITICAL: "P1",
+            Severity.HIGH: "P2",
+            Severity.MEDIUM: "P3",
+            Severity.LOW: "P4",
+        }[sev]
 
-    # Suggested follow-ups by stage
-    if stg == Stage.EXPLOIT_ATTEMPT:
-        followups += ["Acquire process dump & indicators", "Block offending IOC", "Confirm patch level"]
-    elif stg == Stage.PERSISTENCE:
-        followups += ["List autoruns & scheduled tasks", "Baseline diffs for startup items", "EDR scan sweep"]
-    elif stg == Stage.DATA_EXFIL:
-        followups += ["Quantify data scope", "Revoke tokens/keys", "Rotate credentials", "Legal/GRC review"]
+    # Follow-ups (policy-driven if available)
+    if pol and stg in pol.followups_by_stage:
+        followups.extend(pol.followups_by_stage[stg])
+    else:
+        if stg == Stage.EXPLOIT_ATTEMPT:
+            followups += ["Acquire process dump & indicators", "Block offending IOC", "Confirm patch level"]
+        elif stg == Stage.PERSISTENCE:
+            followups += ["List autoruns & scheduled tasks", "Baseline diffs for startup items", "EDR scan sweep"]
+        elif stg == Stage.DATA_EXFIL:
+            followups += ["Quantify data scope", "Revoke tokens/keys", "Rotate credentials", "Legal/GRC review"]
 
     decision = Decision(action=action, urgency=urgency, rationale=rationale + ml_notes, notify=notify, followups=followups)
+
+    # Apply modifiers:
+    # - If a policy is supplied and you also want policy-tuned modifiers, you can either:
+    #   (A) handle them in this function using `pol.modifiers` (as in the prior example), or
+    #   (B) keep using your existing code-path below for now.
+    #   Here we keep your original modifiers for simplicity & stability.
     decision = _apply_modifiers(stg, sev, ctx, decision)
 
     return decision
@@ -258,6 +313,8 @@ def batch_recommend_actions(
     is_remote_flags: Optional[List[bool]] = None,
     *,
     contexts: Optional[List[Context]] = None,
+    policy_path: Optional[str] = None,                 # NEW (1)
+    policy: Optional["LoadedPolicy"] = None,           # NEW (2)
 ) -> List[str]:
     """
     Backward-compatible vectorized interface returning string actions.
@@ -268,5 +325,9 @@ def batch_recommend_actions(
     results: List[str] = []
     for i, (stg, sev, rem) in enumerate(zip(stages, severities, is_remote_flags)):
         ctx = (contexts[i] if contexts and i < len(contexts) else None)
-        results.append(recommend_action(stg, sev, rem, context=ctx))
+        results.append(
+            recommend_action(
+                stg, sev, rem, context=ctx, policy_path=policy_path, policy=policy
+            )
+        )
     return results
