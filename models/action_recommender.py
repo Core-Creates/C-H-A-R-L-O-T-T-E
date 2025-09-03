@@ -88,7 +88,104 @@ def _to_severity(x: str) -> Severity:
         return Severity.MEDIUM
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Modifiers: context-aware adjustments to the base decision
+# Policy helpers (action resolution & policy-driven modifiers)
+# ──────────────────────────────────────────────────────────────────────────────
+def _norm_key(s: str) -> str:
+    """Normalize policy action keys (tolerate spaces, hyphens, case)."""
+    return s.replace("-", "_").replace(" ", "_").upper()
+
+def _resolve_action_from_policy(pol, key_or_text: str) -> str:
+    """
+    If key_or_text matches a key in policy.actions, return its display label.
+    Otherwise, return the text as-is. Supports simple 'A + B' combos.
+    """
+    if not pol:
+        return key_or_text
+    if "+" in key_or_text:
+        parts = [p.strip() for p in key_or_text.split("+")]
+        return " + ".join(pol.actions.get(_norm_key(p), p) for p in parts)
+    return pol.actions.get(_norm_key(key_or_text), key_or_text)
+
+def _apply_modifiers_with_policy(
+    stage: Stage, severity: Severity, ctx: Context, decision: Decision, pol
+) -> Decision:
+    """
+    Policy-driven modifiers. Mirrors the YAML structure.
+    Keys are optional; disabled or missing blocks are skipped.
+    """
+    mods = pol.modifiers if pol else {}
+
+    # 1) Asset criticality escalation
+    m = mods.get("asset_criticality_escalation", {})
+    if m.get("enabled", False):
+        levels = set(m.get("levels", []))
+        if ctx.asset_criticality in levels:
+            decision.rationale.append(f"Asset criticality={ctx.asset_criticality}")
+            decision.urgency = "P1"
+            escalate_to_key = m.get("escalate_to", "ISOLATE")
+            escalate_to = _resolve_action_from_policy(pol, escalate_to_key)
+            if decision.action != escalate_to:
+                decision.action = f"{decision.action} → {escalate_to}"
+                decision.rationale.append("Escalated due to asset importance")
+            decision.notify += list(m.get("notify", []))
+
+    # 2) Data sensitivity / DLP
+    m = mods.get("data_sensitivity", {})
+    if m.get("enabled", False):
+        sensitive_classes = set(m.get("sensitive_classes", []))
+        dlp_hit_triggers = bool(m.get("dlp_hit_triggers", True))
+        if (ctx.data_classification in sensitive_classes) or (dlp_hit_triggers and ctx.has_dlp_hit):
+            decision.rationale.append("Sensitive data condition")
+            if m.get("urgency"):
+                decision.urgency = str(m["urgency"])
+            escalate_key = m.get("escalate_to")
+            if escalate_key:
+                escalate_to = _resolve_action_from_policy(pol, escalate_key)
+                if stage == Stage.DATA_EXFIL and decision.action != escalate_to:
+                    decision.action = escalate_to
+
+    # 3) Remote origin quarantine
+    m = mods.get("remote_origin_quarantine", {})
+    if m.get("enabled", False) and ctx.is_remote:
+        allowed_stages = set(m.get("stages", []))
+        allowed_sevs = set(m.get("severities", []))
+        if (stage.value in allowed_stages) and (severity.value in allowed_sevs):
+            append_text = str(m.get("append_text", " + Temporary Network Quarantine"))
+            if append_text and append_text not in decision.action:
+                decision.action = decision.action + append_text
+            decision.rationale.append("Remote origin → network quarantine applied")
+            decision.notify += list(m.get("notify", []))
+
+    # 4) Repeat attempts escalation (use safe normalizer for min_severity)
+    m = mods.get("repeat_attempts", {})
+    if m.get("enabled", False):
+        threshold = int(m.get("threshold", 3))
+        min_sev = _to_severity(str(m.get("min_severity", "medium")))
+        sev_rank = ["low", "medium", "high", "critical"].index(severity.value)
+        min_rank = ["low", "medium", "high", "critical"].index(min_sev.value)
+        if ctx.repeat_attempts >= threshold and sev_rank >= min_rank:
+            decision.rationale.append(f"Repeat attempts={ctx.repeat_attempts}")
+            decision.urgency = str(m.get("raise_urgency_to", decision.urgency))
+            decision.notify += list(m.get("notify", []))
+
+    # 5) MFA bypass triggers isolation
+    m = mods.get("mfa_bypass", {})
+    if m.get("enabled", False) and ctx.has_mfa_bypass_indicators:
+        allowed_stages = set(m.get("stages", []))
+        if (not allowed_stages) or (stage.value in allowed_stages):
+            escalate_to = _resolve_action_from_policy(pol, m.get("escalate_to", "ISOLATE"))
+            decision.action = escalate_to
+            decision.urgency = str(m.get("urgency", "P1"))
+            decision.notify += list(m.get("notify", []))
+            decision.rationale.append("MFA bypass indicators present")
+
+    # De-dup and sort
+    decision.notify = sorted(set(decision.notify))
+    decision.followups = sorted(set(decision.followups))
+    return decision
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Modifiers: (hardcoded fallback) context-aware adjustments to the base decision
 # ──────────────────────────────────────────────────────────────────────────────
 def _apply_modifiers(
     stage: Stage, severity: Severity, ctx: Context, decision: Decision
@@ -140,6 +237,7 @@ def _apply_modifiers(
 
 # ──────────────────────────────────────────────────────────────────────────────
 # ML blending: optional probability dicts to modulate severity/stage/confidence
+# Pass in: stage_probs={'exploit_attempt':0.7,...}, severity_probs={'high':0.55,...}
 # ──────────────────────────────────────────────────────────────────────────────
 def _blend_with_ml(
     stage: Stage,
@@ -193,8 +291,8 @@ def recommend_action(
     context: Optional[Context] = None,
     stage_probs: Optional[Dict[str, float]] = None,
     severity_probs: Optional[Dict[str, float]] = None,
-    policy_path: Optional[str] = None,                 # NEW (1): path to YAML/JSON policy
-    policy: Optional["LoadedPolicy"] = None,           # NEW (2): preloaded policy object
+    policy_path: Optional[str] = None,                 # path to YAML/JSON policy
+    policy: Optional["LoadedPolicy"] = None,           # preloaded policy object
 ) -> str:
     """
     Backward-compatible single-string action for quick uses.
@@ -220,8 +318,8 @@ def recommend_decision(
     context: Optional[Context] = None,
     stage_probs: Optional[Dict[str, float]] = None,
     severity_probs: Optional[Dict[str, float]] = None,
-    policy_path: Optional[str] = None,                 # NEW (1)
-    policy: Optional["LoadedPolicy"] = None,           # NEW (2)
+    policy_path: Optional[str] = None,
+    policy: Optional["LoadedPolicy"] = None,
 ) -> Decision:
     """
     Rich decision including urgency, rationale, notify targets, and follow-ups.
@@ -241,13 +339,14 @@ def recommend_decision(
     ml_notes: List[str] = []
     stg, sev, ctx, ml_notes = _blend_with_ml(stg, sev, ctx, stage_probs, severity_probs)
 
-    # Low-confidence safeguard (policy-aware)
+    # Low-confidence safeguard (policy-aware) — guarded if policy omits OPEN_TICKET
     if ctx.detection_confidence < 0.4:
-        low_conf_action = (
-            (pol.actions.get(pol.fallbacks.get("low_confidence_action", "OPEN_TICKET"), OPEN_TICKET))
-            if pol else OPEN_TICKET
-        )
-        low_conf_urgency = pol.fallbacks.get("low_confidence_urgency", "P3") if pol else "P3"
+        if pol:
+            lc_key = pol.fallbacks.get("low_confidence_action", "OPEN_TICKET")
+            low_conf_action = pol.actions.get(lc_key, OPEN_TICKET)
+            low_conf_urgency = pol.fallbacks.get("low_confidence_urgency", "P3")
+        else:
+            low_conf_action, low_conf_urgency = OPEN_TICKET, "P3"
         return Decision(
             action=low_conf_action,
             urgency=low_conf_urgency,
@@ -296,14 +395,19 @@ def recommend_decision(
         elif stg == Stage.DATA_EXFIL:
             followups += ["Quantify data scope", "Revoke tokens/keys", "Rotate credentials", "Legal/GRC review"]
 
-    decision = Decision(action=action, urgency=urgency, rationale=rationale + ml_notes, notify=notify, followups=followups)
+    decision = Decision(
+        action=action,
+        urgency=urgency,
+        rationale=rationale + ml_notes,
+        notify=notify,
+        followups=followups,
+    )
 
-    # Apply modifiers:
-    # - If a policy is supplied and you also want policy-tuned modifiers, you can either:
-    #   (A) handle them in this function using `pol.modifiers` (as in the prior example), or
-    #   (B) keep using your existing code-path below for now.
-    #   Here we keep your original modifiers for simplicity & stability.
-    decision = _apply_modifiers(stg, sev, ctx, decision)
+    # Apply modifiers (policy-driven when available; otherwise hardcoded)
+    if pol is not None:
+        decision = _apply_modifiers_with_policy(stg, sev, ctx, decision, pol)
+    else:
+        decision = _apply_modifiers(stg, sev, ctx, decision)
 
     return decision
 
@@ -313,8 +417,8 @@ def batch_recommend_actions(
     is_remote_flags: Optional[List[bool]] = None,
     *,
     contexts: Optional[List[Context]] = None,
-    policy_path: Optional[str] = None,                 # NEW (1)
-    policy: Optional["LoadedPolicy"] = None,           # NEW (2)
+    policy_path: Optional[str] = None,
+    policy: Optional["LoadedPolicy"] = None,
 ) -> List[str]:
     """
     Backward-compatible vectorized interface returning string actions.
@@ -331,3 +435,29 @@ def batch_recommend_actions(
             )
         )
     return results
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Optional: audit/export helper for logging decisions
+# ──────────────────────────────────────────────────────────────────────────────
+def decision_as_dict(dec: Decision, stage: str, severity: str, ctx: Context) -> Dict[str, str]:
+    """Flatten a Decision + inputs to a dict suitable for JSON/CSV audit logs."""
+    return {
+        "stage": stage,
+        "severity": severity,
+        "action": dec.action,
+        "urgency": dec.urgency,
+        "rationale": " | ".join(dec.rationale),
+        "notify": ",".join(dec.notify),
+        "followups": ",".join(dec.followups),
+        "remote": str(ctx.is_remote),
+        "asset_criticality": ctx.asset_criticality,
+        "data_classification": ctx.data_classification,
+        "confidence": f"{ctx.detection_confidence:.2f}",
+        "repeat_attempts": str(ctx.repeat_attempts),
+        "mfa_bypass": str(ctx.has_mfa_bypass_indicators),
+        "dlp_hit": str(ctx.has_dlp_hit),
+        "notes": ctx.notes or "",
+    }
+# ******************************************************************************************
+# End of models/action_recommender.py
+# ******************************************************************************************
