@@ -1,0 +1,22 @@
+{
+  "generated_at": "2025-09-03T02:16:55.890958+00:00",
+  "version": 2,
+  "items": [
+    {
+      "host": "host-1",
+      "cve": "CVE-2024-1111",
+      "kev": true,
+      "epss": 0.7,
+      "cvss": 9.8,
+      "exposure": "internet",
+      "criticality": "tier-0",
+      "package": null,
+      "current_version": null,
+      "fix_version": null,
+      "ring": 0,
+      "window": "2025-09-03T14:00:00+00:00",
+      "rollback": "snapshot-host-1",
+      "os": null
+    }
+  ]
+}

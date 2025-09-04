@@ -1,0 +1,43 @@
+name: CI
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+
+jobs:
+  lint:
+    name: pre-commit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Run pre-commit
+        uses: pre-commit/action@v3.0.1
+
+  test:
+    name: pytest (ubuntu, py${{ matrix.python-version }})
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.11", "3.12"]
+    env:
+      ACTION_POLICY_PATH: policies/action_policy.yaml
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+          cache: "pip"
+      - name: Upgrade pip
+        run: python -m pip install --upgrade pip
+      - name: Install deps (if present) + test deps
+        run: |
+          if [ -f requirements.txt ]; then pip install -r requirements.txt; fi
+          # minimal test deps used by this repo
+          pip install pytest pyyaml
+      - name: Run tests
+        run: pytest -q

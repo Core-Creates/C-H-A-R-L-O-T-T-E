@@ -1,0 +1,66 @@
+# ******************************************************************************************
+# data/autopilot.yaml — Autopilot policy (schedules, bandwidth, approvals)
+# ******************************************************************************************
+autopilot:
+  enabled: true
+
+  # Token used by REST control endpoints (X-CHARLOTTE-Token).
+  # For production, prefer setting via env CHARLOTTE_TOKEN.
+  # If omitted here, it MUST be provided via CHARLOTTE_TOKEN.
+  approval_token: "change-me"
+
+  # Interface & bandwidth policy
+  interfaces:
+    - name: auto                 # "auto" picks the busiest non-loopback interface
+  link_bps: 100000000            # approximate link capacity in bytes/sec (default 100 Mbps)
+  net_utilization_max: 0.35      # fraction of *idle* link Autopilot may consume
+  min_idle_bps: 1000000          # (optional) headroom hint for heavy jobs (1 Mbps)
+
+  scheduler:
+    tick_seconds: 5
+    max_concurrent_detectors: 2
+
+  # Global backoff when the system is hot (CPU or bandwidth). Scales detector intervals.
+  adaptive_backoff:
+    cpu_hot_percent: 85
+    net_hot_utilization: 0.70
+    scale_factor: 2.0            # doubles effective intervals under hot conditions
+
+  detectors:
+    port_exposure:
+      enabled: true
+      interval: 15m
+      cooldown: 10m
+      approval_gate: false
+      target_cidr: "192.168.0.0/24"
+      scan_top_n: 100
+      intensity: slow            # slow | normal | fast (maps to nmap -T2/-T3/-T4)
+
+    log_anomaly:
+      enabled: true
+      interval: 5m
+      cooldown: 2m
+      approval_gate: false
+
+      # EITHER list files explicitly (highest priority)…
+      # files:
+      #   - "C:\\ProgramData\\CHARLOTTE\\logs\\agent.log"
+      #   - "/var/log/syslog"
+
+      # …OR let the detector auto-discover logs in this directory:
+      directory: "/data/logs/charlotte_sessions"
+      pattern: "*.log"           # glob pattern within directory
+      recursive: false           # set true to allow ** patterns
+      max_files: 20              # newest N files each run
+
+      window_lines: 1000
+      error_threshold: 10
+
+    # Optional (only if detectors/port_probe.py exists). Disabled by default.
+    # port_probe:
+    #   enabled: false
+    #   interval: 15m
+    #   cooldown: 5m
+    #   hosts: ["192.168.0.10", "192.168.0.20"]
+    #   ports: [22, 80, 443, 445, 3389, 5900]
+    #   timeout_seconds: 0.3

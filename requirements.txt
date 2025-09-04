@@ -71,3 +71,10 @@ tqdm
 pymetasploit3
 
 torch
+
+reportlab
+
+bs4
+
+# OWASP ZAP API client
+python-owasp-zap-v2.4

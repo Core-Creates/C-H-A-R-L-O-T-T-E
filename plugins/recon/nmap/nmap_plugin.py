@@ -3,6 +3,7 @@ nmap_plugin.py - CHARLOTTE plugin for interactive and chained Nmap scanning.
 
 Supports multiple scan types (TCP SYN, Connect, UDP, OS detection, etc.)
 Handles plugin chaining and saves results to timestamped folders.
+Now optionally enriches results with GHDB intel based on open ports/banners.
 
 Author: CHARLOTTE (network voyeur extraordinaire)
 """
@@ -10,14 +11,50 @@ Author: CHARLOTTE (network voyeur extraordinaire)
 import os
 import sys
 import json
-import nmap
+import re
 from datetime import datetime
-from tabulate import tabulate  # Optional dependency for summary display
-from core.logic_modules import recon_heuristics  # Optional: scoring module
+from typing import Dict, Any, List
 
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-# Define available scan types and their corresponding Nmap flags + descriptions
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# Dynamically locate CHARLOTTE root and add to Python path
+ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
+if ROOT_DIR not in sys.path:
+    sys.path.insert(0, ROOT_DIR)
+
+
+# Robust display_path import (single block)
+try:
+    from utils.paths import display_path
+except Exception:
+    def display_path(path: str, base: str | None = None) -> str:
+        return str(path).replace("\\", "/")
+
+# GHDB provider
+from plugins.intell.google_dorks.dorks.dorks import ghdb
+
+# Optional: rich table
+try:
+    from tabulate import tabulate
+except Exception:  # pragma: no cover
+    tabulate = None
+
+# Optional scoring/heuristics module
+try:
+    from core.logic_modules import recon_heuristics
+except Exception:  # pragma: no cover
+    recon_heuristics = None
+
+# Optional linker (preferred if available)
+try:
+    from plugins.intell.google_dorks.ghbd.ghdb_linker import suggest_from_nmap as _suggest_from_nmap
+except Exception:  # pragma: no cover
+    _suggest_from_nmap = None
+
+# python-nmap
+import nmap
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Scan types (menu)
+# ──────────────────────────────────────────────────────────────────────────────
 SCAN_TYPES = {
     "1": {"name": "TCP SYN Scan", "arg": "-sS", "description": "Stealthy, fast TCP scan (default)"},
     "2": {"name": "TCP Connect Scan", "arg": "-sT", "description": "Standard TCP connect scan"},
@@ -25,95 +62,87 @@ SCAN_TYPES = {
     "4": {"name": "Service Version Detection", "arg": "-sV", "description": "Detect service versions"},
     "5": {"name": "OS Detection", "arg": "-O", "description": "Try to identify the target OS"},
     "6": {"name": "Aggressive Scan", "arg": "-A", "description": "All-in-one: OS, services, scripts"},
-    "7": {"name": "Ping Scan", "arg": "-sn", "description": "Discover live hosts (no port scan)"}
+    "7": {"name": "Ping Scan", "arg": "-sn", "description": "Discover live hosts (no port scan)"},
 }
 
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
 # Device settings management
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-
+# ──────────────────────────────────────────────────────────────────────────────
 DEVICE_SETTINGS_PATH = "data/device_settings.json"
 
-# Load device settings from JSON file
-# If file does not exist, return empty settings
 def load_device_settings():
+    """
+    Robust loader for device_settings.json.
+    Treats missing/empty/invalid files as empty dict rather than crashing.
+    """
     if os.path.exists(DEVICE_SETTINGS_PATH):
-        with open(DEVICE_SETTINGS_PATH, "r") as f:
-            return json.load(f)
+        try:
+            with open(DEVICE_SETTINGS_PATH, "r", encoding="utf-8") as f:
+                txt = f.read().strip()
+                if not txt:
+                    # empty file, treat as fresh
+                    return {}
+                return json.loads(txt)
+        except json.JSONDecodeError:
+            print("[!] device_settings.json is invalid JSON. Resetting it to an empty object.")
+            return {}
+        except Exception as e:
+            print(f"[!] Could not read device settings ({e}). Continuing with defaults.")
+            return {}
     return {}
 
-# Save device settings to JSON file
-# Creates directory if it doesn't exist and makes a backup before writing
 def save_device_settings(settings):
     os.makedirs(os.path.dirname(DEVICE_SETTINGS_PATH), exist_ok=True)
-    if os.path.exists(DEVICE_SETTINGS_PATH):
-        backup_path = DEVICE_SETTINGS_PATH.replace(".json", "_backup.json")
-        os.replace(DEVICE_SETTINGS_PATH, backup_path)
-    with open(DEVICE_SETTINGS_PATH, "w") as f:
+    # write atomically
+    tmp_path = DEVICE_SETTINGS_PATH + ".tmp"
+    with open(tmp_path, "w", encoding="utf-8") as f:
         json.dump(settings, f, indent=4)
+    os.replace(tmp_path, DEVICE_SETTINGS_PATH)
 
-# Assign priority based on heuristic score (headless mode)
-# Returns "High", "Medium", or "Low" based on score thresholds
-def assign_priority_by_score(score):
+def assign_priority_by_score(score: int) -> str:
     if score >= 80:
         return "High"
-    elif score >= 50:
+    if score >= 50:
         return "Medium"
     return "Low"
 
-# Prompt user to assign priority based on heuristic score
-# Provides a suggested priority based on score
-def prompt_device_priority(host, default_score):
+def prompt_device_priority(host: str, default_score: int) -> str:
     print(f"\n[🧠 CHARLOTTE says:] \"Let's rank {host} based on how juicy it looks...\"")
     print(f"  Heuristic Score: {default_score}")
-    print("  Suggested Priority based on score:")
-    
     if default_score >= 80:
         suggested = "High"
     elif default_score >= 50:
         suggested = "Medium"
     else:
         suggested = "Low"
-
     print(f"  → Suggested: {suggested}")
     priority = input(f"Enter priority for {host} [High/Medium/Low] (default: {suggested}): ").strip().capitalize()
-    if priority not in ["High", "Medium", "Low"]:
+    if priority not in {"High", "Medium", "Low"}:
         print(f"[!] Invalid input. Defaulting to {suggested}.")
         priority = suggested
     return priority
 
-# Save device settings with assigned priority
-def save_device_with_priority(host, priority, settings):
-    if host not in settings:
-        settings[host] = {}
-    settings[host]['priority'] = priority
-    save_device_settings(settings)
-    print(f"[✔️] Device {host} saved with priority: {priority}")
-
 def extract_services_for_msf(nmap_json_path):
-    """Extracts ports and services useful for Metasploit."""
-    with open(nmap_json_path, "r") as f:
+    """Extract likely-exploitable services from our saved JSON (host → ports dict)."""
+    with open(nmap_json_path, "r", encoding="utf-8") as f:
         data = json.load(f)
 
     candidates = []
     for host, results in data.items():
         for port, svc in results.get("ports", {}).items():
-            if "http" in svc["name"] or "smb" in svc["name"] or "ftp" in svc["name"]:
-                candidates.append((host, svc["name"], port))
+            name = str(svc.get("name", "")).lower()
+            if any(k in name for k in ("http", "smb", "ftp", "ssh", "rdp", "rpc")):
+                candidates.append((host, name, int(port)))
     return candidates
 
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-# Plugin functions
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-
-# Nmap settings ─────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-# List available scan options
+# ──────────────────────────────────────────────────────────────────────────────
+# UI helpers
+# ──────────────────────────────────────────────────────────────────────────────
 def list_scan_options():
     print("\n[CHARLOTTE] Available Nmap Scan Types:\n")
     for key, scan in SCAN_TYPES.items():
         print(f"  {key}. {scan['name']} – {scan['description']}")
 
-# Prompt user to select a scan type
 def choose_scan():
     while True:
         choice = input("\nSelect scan type by number: ").strip()
@@ -121,115 +150,454 @@ def choose_scan():
             return SCAN_TYPES[choice]
         print("[!] Invalid choice. Try again.")
 
-# Run Nmap scan with selected type and target
-# Supports both interactive and automated chaining modes
+# ──────────────────────────────────────────────────────────────────────────────
+# Core scan
+# ──────────────────────────────────────────────────────────────────────────────
+def _make_scanner():
+    """
+    Create a PortScanner. On Windows, allow override with NMAP_EXE env var:
+      set NMAP_EXE=C:\\Program Files (x86)\\Nmap\\nmap.exe
+    """
+    nmap_path = os.environ.get("NMAP_EXE")
+    if nmap_path:
+        return nmap.PortScanner(nmap_search_path=nmap_path)
+    return nmap.PortScanner()
+
 def run_nmap_scan(scan_type, target, ports=None, output_dir="data/findings"):
     """
     Executes an Nmap scan with a given scan type and saves results.
-    Supports both interactive and chained automation modes.
+
+    Output JSON shape:
+    {
+      "<host>": {
+        "state": "up",
+        "last_scanned": "<timestamp>",
+        "ports": {
+          "22": {"state":"open","name":"ssh","product":"OpenSSH","version":"8.4"},
+          "80": {"state":"open","name":"http","product":"Apache httpd","version":"2.4.57"}
+        },
+        "heuristics": {"score": 73, "rating": "elevated", "findings": [...]}
+      },
+      ...
+    }
     """
     os.makedirs(output_dir, exist_ok=True)
-    scanner = nmap.PortScanner()
+    scanner = _make_scanner()
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_path = os.path.join(output_dir, f"nmap_{target}_{timestamp}.json")
+    output_path = os.path.join(output_dir, f"nmap_{target.replace('/', '_')}_{timestamp}.json")
     port_arg = f"-p {ports}" if ports else ""
 
-    # Print scan details
-    print(f"\n[CHARLOTTE] Preparing to run Nmap scan:")
     try:
-        print(f"\n[NMAP] Running {scan_type['name']} on {target} {f'ports: {ports}' if ports else ''}")
+        print(f"\n[NMAP] {scan_type['name']} on {target} {f'(ports: {ports})' if ports else ''}")
         scanner.scan(hosts=target, arguments=f"{scan_type['arg']} {port_arg}")
     except Exception as e:
         print(f"[ERROR] Nmap failed on {target}: {e}")
-        return
+        return None
 
-    scan_output = []
+    results = {}
     device_settings = load_device_settings()
 
     for host in scanner.all_hosts():
-        print(f"\nScan Results for {host}")
-        print(f"  Host Status: {scanner[host].state()}")
-        host_record = []
+        host_state = scanner[host].state()
+        ports_dict = {}
 
         for proto in scanner[host].all_protocols():
-            print(f"  Protocol: {proto.upper()}")
-            port_list = scanner[host][proto].keys()
-            for port in sorted(port_list):
-                state = scanner[host][proto][port]['state']
-                banner = scanner[host][proto][port].get('product', '') + ' ' + scanner[host][proto][port].get('version', '')
-                print(f"    Port {port}: {state} - {banner.strip()}")
-                host_record.append({"port": port, "banner": banner.strip()})
+            for port in sorted(scanner[host][proto].keys()):
+                entry = scanner[host][proto][port]
+                # Normalize
+                ports_dict[str(port)] = {
+                    "state": entry.get("state", ""),
+                    "name": entry.get("name", ""),
+                    "product": entry.get("product", ""),
+                    "version": entry.get("version", ""),
+                    # proto stored so GHDB mapping can use it
+                    "proto": proto,
+                    # pass through CPE if python-nmap provided it
+                    "cpe": entry.get("cpe", []) or entry.get("cpe23", []),
+                    "extrainfo": entry.get("extrainfo", ""),
+                }
 
-        # Heuristics
-        heuristic_result = recon_heuristics.triage_host(host_record)
-        print(f"\n[⚙️  Heuristic Score: {heuristic_result['score']} - {heuristic_result['rating']}]")
-        for finding in heuristic_result['findings']:
-            print(f"  → {finding}")
-
-        # Prompt user for device priority or auto-assign if headless
-        if os.environ.get("CHARLOTTE_HEADLESS") == "1" or not sys.stdin.isatty():
-            priority = assign_priority_by_score(heuristic_result['score'])
-            print(f"[AUTO] Assigned priority '{priority}' for {host}")
+        # Heuristics (optional)
+        if recon_heuristics and hasattr(recon_heuristics, "triage_host"):
+            host_record = [
+                {
+                    "port": int(p),
+                    "name": v.get("name", ""),
+                    "product": v.get("product", ""),
+                    "version": v.get("version", "")
+                }
+                for p, v in ports_dict.items()
+            ]
+            heuristic_result = recon_heuristics.triage_host(host_record)
         else:
-            priority = prompt_device_priority(host, heuristic_result['score'])
+            heuristic_result = {"score": 50, "rating": "baseline", "findings": ["Heuristics module not available"]}
 
-        # Update device settings file
+        # Priority (interactive vs headless)
+        interactive = sys.stdin.isatty() and os.environ.get("CHARLOTTE_HEADLESS") != "1"
+        if interactive:
+            priority = prompt_device_priority(host, heuristic_result["score"])
+        else:
+            priority = assign_priority_by_score(heuristic_result["score"])
+            print(f"[AUTO] Assigned priority '{priority}' for {host}")
+
+        # Persist device settings
         device_settings[host] = {
             "priority": priority,
             "last_scanned": timestamp,
-            "heuristic_score": heuristic_result['score']
+            "heuristic_score": heuristic_result["score"],
         }
         save_device_settings(device_settings)
         print(f"[💾 Saved priority '{priority}' for {host} to device_settings.json]")
 
-        # Save heuristic results
-        scan_output.append({
-            "host": host,
-            "state": scanner[host].state(),
-            "ports": host_record,
-            "heuristics": heuristic_result
-        })
+        # Assemble result for this host
+        results[host] = {
+            "state": host_state,
+            "last_scanned": timestamp,
+            "ports": ports_dict,
+            "heuristics": heuristic_result,
+        }
 
-    with open(output_path, "w") as f:
-        json.dump(scan_output, f, indent=4)
+        # Pretty print summary to console
+        print(f"\nScan Results for {host} ({host_state})")
+        for p, v in sorted(ports_dict.items(), key=lambda kv: int(kv[0])):
+            banner = f"{v.get('product','')} {v.get('version','')}".strip()
+            print(f"  {p}/{v.get('proto','tcp')}: {v.get('state','')}  {v.get('name','')}  {banner}")
+
+        print(f"\n[⚙️  Heuristic Score: {heuristic_result['score']} - {heuristic_result['rating']}]")
+        for finding in heuristic_result.get("findings", []):
+            print(f"  → {finding}")
+
+    # Save to disk
+    os.makedirs(output_dir, exist_ok=True)
+    with open(output_path, "w", encoding="utf-8") as f:
+        json.dump(results, f, indent=4)
 
     print(f"\n[📁 Results saved to: {output_path}]")
+    return output_path
 
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-# Plugin entry point
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-def run_plugin(targets=None, output_dir="data/findings"):
+# ──────────────────────────────────────────────────────────────────────────────
+# GHDB linker (fallback if plugins.intell.google_dorks.ghdb_linker is not present)
+# ──────────────────────────────────────────────────────────────────────────────
+_SERVICE_SEEDS = {
+    "http":  [r"intitle:\s*index\.of", r"inurl:admin", r"inurl:login", r"inurl:phpmyadmin", r"\"powered by\""],
+    "https": [r"intitle:\s*index\.of", r"inurl:admin", r"inurl:login", r"inurl:phpmyadmin", r"\"powered by\""],
+    "ftp":   [r"intitle:\s*index\.of\s+ftp", r"inurl:ftp", r"anonymous ftp", r"vsftpd"],
+    "mysql": [r"inurl:phpmyadmin", r"intitle:phpmyadmin", r"intext:\"Welcome to phpMyAdmin\""],
+    "postgresql": [r"inurl:pgadmin"],
+    "mongodb": [r"mongo express", r"inurl:8081"],
+    "rdp":   [r"inurl:tsweb", r"Remote Desktop Web Connection"],
+    "rtsp":  [r"rtsp", r"intitle:\"Network Camera\"", r"inurl:view/view\.shtml"],
+    "smtp":  [r"Roundcube", r"SquirrelMail", r"RainLoop", r"inurl:webmail"],
+    "imap":  [r"inurl:webmail", r"Roundcube", r"SquirrelMail"],
+}
+
+_STOPWORDS = {"service", "server", "device", "unknown", "open", "ssl", "tls", "protocol", "daemon", "http", "https", "tcp", "udp"}
+
+def _tok(s: str) -> List[str]:
+    if not s:
+        return []
+    toks = re.split(r"[^A-Za-z0-9]+", s.lower())
+    return [t for t in toks if len(t) >= 3 and t not in _STOPWORDS]
+
+def _tokens_from_cpe(cpe: str) -> List[str]:
+    if not cpe:
+        return []
+    parts = cpe.split(":")
+    segs = []
+    if len(parts) >= 4:
+        segs.extend([parts[2], parts[3]])  # vendor, product
+    if len(parts) >= 5 and parts[4]:
+        segs.append(parts[4])  # version
+    out = []
+    for s in segs:
+        out.extend(_tok(s.replace("_", " ")))
+    return out
+
+def _derive_service(port: int | None, name: str | None) -> str:
+    if name:
+        return name.lower()
+    common = {
+        21: "ftp", 22: "ssh", 23: "telnet", 25: "smtp",
+        80: "http", 81: "http", 88: "http", 110: "pop3",
+        143: "imap", 443: "https", 465: "smtps", 554: "rtsp",
+        587: "submission", 993: "imaps", 995: "pop3s",
+        3306: "mysql", 3389: "rdp", 5432: "postgresql",
+        6379: "redis", 8080: "http", 8081: "http", 8443: "https",
+    }
+    return common.get(port or -1, "unknown")
+
+def _build_or_regex(tokens: List[str], seeds: List[str], port: int | None) -> str:
+    alts = set()
+    for t in tokens:
+        if t:
+            alts.add(re.escape(t))
+    for s in seeds:
+        if s:
+            alts.add(s)  # seeds are regex snippets already
+    if port in (81, 88, 8000, 8008, 8080, 8081, 8181, 8443, 8888):
+        alts.add(str(port))
+    if not alts:
+        return r"(?!)"  # match nothing
+    return "(" + "|".join(sorted(alts)) + ")"
+
+def _suggest_from_nmap_fallback(scan_results: Dict[str, Any], source="dump", limit_per_port=20, extra_grep=None, debug=False):
+    # Pull GHDB rows once
+    rows = ghdb.query(source=source, limit=None, grep=None, debug=debug)
+    out: Dict[str, List[Dict[str, Any]]] = {}
+
+    def filt(rows, pattern):
+        try:
+            rx = re.compile(pattern, re.IGNORECASE)
+        except re.error:
+            rx = re.compile(re.escape(pattern), re.IGNORECASE)
+        m = []
+        for r in rows:
+            if rx.search(r.get("dork") or "") or rx.search(r.get("title") or ""):
+                m.append(r)
+        return m
+
+    for host in (scan_results.get("hosts") or []):
+        ip = host.get("ip") or host.get("host") or host.get("address") or "unknown"
+        for p in (host.get("ports") or []):
+            port = p.get("port") or p.get("portid")
+            svc = _derive_service(port, p.get("service") or p.get("name"))
+            product = p.get("product") or ""
+            version = p.get("version") or ""
+            extrainfo = p.get("extrainfo") or ""
+            cpes = p.get("cpe") or p.get("cpes") or []
+
+            tokens = set()
+            tokens.update(_tok(svc))
+            tokens.update(_tok(product))
+            tokens.update(_tok(version))
+            tokens.update(_tok(extrainfo))
+            for c in (cpes if isinstance(cpes, list) else [cpes]):
+                tokens.update(_tokens_from_cpe(c))
+
+            seeds = _SERVICE_SEEDS.get(svc, [])
+            pattern = _build_or_regex(list(tokens), seeds, port)
+            if extra_grep:
+                pattern = f"(?:{pattern})|(?:{extra_grep})"
+
+            matches = filt(rows, pattern)
+
+            # light rank: occurrences of product tokens
+            if product:
+                prod_words = set(_tok(product))
+                def score(row):
+                    txt = (row.get("dork") or "") + " " + (row.get("title") or "")
+                    low = txt.lower()
+                    return sum(1 for w in prod_words if w and w in low)
+                matches.sort(key=score, reverse=True)
+
+            key = f"{ip}:{port}/{p.get('proto','tcp')} {svc} {product} {version}".strip()
+            out[key] = matches[:limit_per_port]
+    return out
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Plugin entry point (manager-compatible) + GHDB enrichment (FULL result)
+# ──────────────────────────────────────────────────────────────────────────────
+def run_plugin_full(args=None, output_dir="data/findings"):
     """
-    CHARLOTTE plugin entry point.
-    - If `targets` provided: used for automated chaining (uses -sV).
-    - Else: prompts user for scan type, target, ports.
+    CHARLOTTE plugin entry point. Signature is manager-compatible.
+
+    Behavior:
+      - Headless chaining:
+          args = {"targets": ["10.0.0.5", "10.0.0.6"], "scan_type": "-sV", "ports": "1-1024",
+                  "ghdb": True, "ghdb_limit": 15, "ghdb_grep": "wordpress|joomla", "ghdb_source": "dump"}
+      - Interactive:
+          no args or no 'targets' -> (disabled here; see commented section if you want prompts)
+
+    Returns (extended):
+      {
+        "task": "port_scan",
+        "status": "ok",
+        "output_paths": [...],
+        "results": { "hosts": [ { "ip": ..., "ports": [...] }, ... ] },
+        "intel": { "ghdb": { "<key>": [<entries>], ... } }
+      }
     """
     os.makedirs(output_dir, exist_ok=True)
+    args = args or {}
 
-    if targets:
-        # Automated mode: run quiet service version detection on each target
-        default_scan = {"name": "Service Version Detection", "arg": "-sV"}
-        for host in targets:
-            run_nmap_scan(default_scan, host, ports=None, output_dir=output_dir)
-    else:
-        # Interactive mode
-        list_scan_options()
-        selected = choose_scan()
-        target = input("\nEnter target IP or domain: ").strip()
-        ports = input("Enter port(s) to scan (e.g. 22,80 or 1-1000): ").strip()
-        run_nmap_scan(selected, target, ports)
+    # -------- Normalize/Extract args -------- #
+    # Accept either 'targets' (list) or 'target' (string/comma-separated)
+    targets = args.get("targets") or args.get("target")
+    if isinstance(targets, str):
+        targets = [t.strip() for t in targets.split(",") if t.strip()]
 
-    # Show final summary sorted by score (desc)
+    scan_flag = args.get("scan_type")  # e.g., "-sV"
+    ports = args.get("ports")
+    output_dir = args.get("output_dir", output_dir)
+
+    # GHDB enrichment options (with safe defaults)
+    ghdb_enabled = bool(args.get("ghdb", True))
+    ghdb_source = args.get("ghdb_source", "dump")
+    ghdb_limit = int(args.get("ghdb_limit", 15))
+    ghdb_grep = args.get("ghdb_grep")
+    ghdb_debug = bool(args.get("debug", False))
+
+    if not targets:
+        # If you prefer interactive prompts, re-enable the block below.
+        return {"task": "port_scan", "status": "error", "error": "No targets provided."}
+
+    # -------- Perform scans (headless) -------- #
+    output_paths: List[str] = []
+
+    # default to Service Version Detection (-sV)
+    chosen = next((v for v in SCAN_TYPES.values() if v["arg"] == (scan_flag or "-sV")), None)
+    if not chosen:
+        chosen = SCAN_TYPES["4"]  # Service Version Detection
+
+    for host in targets:
+        path = run_nmap_scan(chosen, host, ports=ports, output_dir=output_dir)
+        if path:
+            output_paths.append(path)
+
+    # -------- Build unified results (hosts/ports) -------- #
+    scan_result = {"hosts": []}
+    for path in output_paths:
+        try:
+            with open(path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+        except Exception as e:
+            print(f"[!] Could not load {path}: {e}")
+            continue
+
+        for host, hdata in data.items():
+            host_entry = {"ip": host, "ports": []}
+            for pstr, v in (hdata.get("ports") or {}).items():
+                host_entry["ports"].append({
+                    "port": int(pstr),
+                    "proto": v.get("proto", "tcp"),
+                    "service": v.get("name") or "",
+                    "name": v.get("name") or "",
+                    "product": v.get("product") or "",
+                    "version": v.get("version") or "",
+                    "extrainfo": v.get("extrainfo") or "",
+                    "cpe": v.get("cpe") or [],
+                })
+            scan_result["hosts"].append(host_entry)
+
+    # -------- Optional GHDB enrichment -------- #
+    ghdb_suggestions = {}
+    if ghdb_enabled and scan_result["hosts"]:
+        try:
+            # call _suggest_from_nmap if present; else fallback
+            if "_suggest_from_nmap" in globals() and callable(globals()["_suggest_from_nmap"]):
+                ghdb_suggestions = _suggest_from_nmap(
+                    scan_results=scan_result,
+                    source=ghdb_source,
+                    limit_per_port=ghdb_limit,
+                    extra_grep=ghdb_grep,
+                    debug=ghdb_debug,
+                )
+            else:
+                ghdb_suggestions = _suggest_from_nmap_fallback(
+                    scan_results=scan_result,
+                    source=ghdb_source,
+                    limit_per_port=ghdb_limit,
+                    extra_grep=ghdb_grep,
+                    debug=ghdb_debug,
+                )
+        except Exception as e:
+            ghdb_suggestions = {"error": f"GHDB suggestion error: {e}"}
+
+        # Console summary (top few per key)
+        for key, entries in ghdb_suggestions.items():
+            if key == "error":
+                print(f"[GHDB] {entries}")
+                continue
+            print(f"\n[GHDB] Suggestions for {key}:")
+            for r in entries[:min(10, ghdb_limit)]:
+                t = r.get("title") or "(no title)"
+                u = r.get("url") or ""
+                dork = (r.get("dork") or "")
+                d = dork[:80]
+                print(f"  - {t} -> {u} | dork: {d}{'…' if len(dork) > 80 else ''}")
+
+    # -------- Device priority summary -------- #
     device_settings = load_device_settings()
-    summary = [(host, data['priority'], data['heuristic_score']) for host, data in device_settings.items()]
+    summary_rows = [
+        (host, data.get("priority", "?"), data.get("heuristic_score", 0))
+        for host, data in device_settings.items()
+    ]
+
     print("\n[🔍 CHARLOTTE Device Priority Summary]")
-    print(tabulate(sorted(summary, key=lambda x: x[2], reverse=True), headers=["Host", "Priority", "Score"]))
+    if "tabulate" in globals() and callable(globals().get("tabulate")):
+        print(tabulate(sorted(summary_rows, key=lambda x: x[2], reverse=True),
+                       headers=["Host", "Priority", "Score"]))
+    else:
+        for row in sorted(summary_rows, key=lambda x: x[2], reverse=True):
+            print(f"  {row[0]:<20} {row[1]:<6} {row[2]}")
 
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
-# If this script is run directly, execute the plugin
-# ────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+    # -------- Return extended structure -------- #
+    return {
+        "task": "port_scan",
+        "status": "ok",
+        "output_paths": output_paths,
+        "results": scan_result,
+        "intel": {
+            "ghdb": ghdb_suggestions
+        },
+    }
+
+    # -------- Optional interactive block (disabled) -------- #
+    # list_scan_options()
+    # chosen = choose_scan()
+    # target = input("\nEnter target IP or domain (comma-separated for multiple): ").strip()
+    # ports = input("Enter port(s) to scan (e.g. 22,80 or 1-1000) [optional]: ").strip()
+    # targets = [t.strip() for t in target.split(",") if t.strip()]
+    # for host in targets:
+    #     path = run_nmap_scan(chosen, host, ports=ports or None, output_dir=output_dir)
+    #     if path:
+    #         output_paths.append(path)
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Plugin entry point (manager-compatible)
+# ──────────────────────────────────────────────────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# Plugin entry point (manager-compatible)
+# ──────────────────────────────────────────────────────────────────────────────
+def run_plugin(args=None, output_dir="data/findings"):
+    """
+    CHARLOTTE plugin entry point. Signature is manager-compatible.
+    Now with optional GHDB intelligence suggestions.
+
+    Behavior:
+      - Headless chaining:
+          args = {"targets": ["10.0.0.5", "10.0.0.6"], "scan_type": "-sV", "ports": "1-1024"}
+      - Interactive:
+          no args or no 'targets' -> show menu + prompt user
+    """
+    args = args or {}
+    # 1) Run your existing Nmap scan logic to produce `scan_result`
+    #    Ensure it has the shape described in ghdb_linker.suggest_from_nmap(...)
+    #    Example skeleton:
+    #
+    # scan_result = {
+    #   "hosts": [
+    #      {"ip": "192.168.1.10",
+    #       "ports": [
+    #          {"port": 80, "proto": "tcp", "service": "http",
+    #           "product": "Apache httpd", "version": "2.4.52",
+    #           "extrainfo": "(Ubuntu)",
+    #           "cpe": ["cpe:/a:apache:http_server:2.4.52"]},
+    #       ]
+    #      }
+    #   ]
+    # }
+
+    # Delegate to the full implementation (saves results, prints summaries, GHDB intel, etc.)
+    full = run_plugin_full(args=args, output_dir=output_dir)
+
+    # Return the FULL dict so downstream code can do result.get(...)
+    return full
+# ──────────────────────────────────────────────────────────────────────────────
 if __name__ == "__main__":
-    run_plugin()
-
-# This code is part of the CHARLOTTE CLI application, a network reconnaissance tool.
-# It provides an interactive interface for running Nmap scans and supports chaining with other plugins.
+    # When running as a script, use the full version so you see intel + summaries
+    run_plugin_full()
+    # For testing purposes, you can still call run_nmap_scan manually if desired:
+    # run_nmap_scan(SCAN_TYPES["4"], "scanme.nmap.org", ports="22,80,443", output_dir="data/findings")
+    # Note: this won't include GHDB suggestions, just raw scan results.

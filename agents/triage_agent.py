@@ -30,6 +30,18 @@ from core.cve_data_loader import load_cve_data  # Loads CVE dataset from Hugging
 from plugins.servicenow.servicenow_client import create_incident, maybe_create_tickets
 from plugins.servicenow.servicenow_setup import configure_servicenow
 
+# Path helper (robust import)
+try:
+    from utils.paths import display_path        # preferred location
+except Exception:
+    try:
+        from paths import display_path          # fallback if you keep paths.py at repo root
+    except Exception:
+        # last-resort shim so nothing crashes
+        def display_path(path: str, base: str | None = None) -> str:
+            return str(path).replace("\\", "/")
+# Ensure ServiceNow configuration is loaded
+
 SERVICENOW_CONFIG_PATH = "data/servicenow_config.json"
 
 

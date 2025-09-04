@@ -1,7 +1,7 @@
 # 🧠 C.H.A.R.L.O.T.T.E.
 
 **Cybernetic Heuristic Assistant for Recon, Logic, Offensive Tactics, Triage & Exploitation**  
-A modular, AI-augmented offensive security framework — designed for autonomy, adaptability, and advanced analysis.
+A modular, AI-augmented offensive and defensive security framework — designed for autonomy, adaptability, and advanced analysis.
 
 > **🛠️ 100% Open Source. Toggle between self-contained or LLM-augmented operation.**
 
@@ -17,6 +17,10 @@ CHARLOTTE is built for multi-phase defensive and offensive security tasks, enabl
 - **Triage** – Auto-ranking vulnerabilities, CVSS prediction, clustering  
 - **Exploitation** – Proof-of-concept generation, post-exploitation handling  
 - **Reverse Engineering** – Binary dissection, deobfuscation, symbolic tracing
+
+---
+website:
+## https://www.c-h-a-r-l-o-t-t-e.org/
 
 ---
 
@@ -110,7 +114,8 @@ charlotte/
 │   |   └── (other recon plugins)
 |   |
 │   ├── vulnscan/           # XSS, SQLi detectors, etc.
-│       └─ web_scanner/
+│       ├── nessus_plugin.py
+│       ├──web_scanner/
 │           └─ burp_suite_plugin.py     # Pure Python scanner
 |
 |
@@ -175,8 +180,177 @@ charlotte/
 
 ---
 
-## 🚀 Coming Soon
-- CVE matching from live scan data  
-- GUI dashboard  
-- Plugin wizard with YAML-based tool descriptions  
+## 🧩 Plugin System
+
+CHARLOTTE uses a flexible plugin system supporting both statically registered and dynamically discovered plugins for easy extension and modularity.
+
+### Plugin Flow
+
+1. **Static Plugins**
+   - Registered in `core/plugin_manager.py` via the `PLUGIN_REGISTRY` dictionary.
+   - Each entry maps a logical task name to a plugin module (e.g., `("re", "symbolic_trace")`).
+   - Aliases in `ALIASES` allow menu labels to map to registry keys.
+   - The `run_plugin(task, args)` function loads and executes the plugin, preferring a `run(args)` entrypoint, with fallbacks.
+
+2. **Dynamic Plugins**
+   - Discovered by scanning subdirectories in the `plugins/` folder for a `plugin.yaml` file.
+   - Metadata (label, description, entry_point) is loaded from `plugin.yaml`.
+   - The `run_dynamic_plugin(entry_point)` function loads and runs the specified function (e.g., `module.submodule:function`).
+
+3. **Unified Loader**
+   - `load_plugins()` prints all available static and dynamic plugins for visibility.
+
+### File Structure
+
+- `core/plugin_manager.py`: Main logic for plugin registration, loading, and execution.
+- `plugins/`: Directory containing plugin subfolders.
+  - Each static plugin is a Python module (e.g., `plugins/re/symbolic_trace.py`).
+  - Each dynamic plugin has a `plugin.yaml` and its code.
+
+### Creating a New Plugin
+
+#### Static Plugin
+
+1. Add your plugin module under the appropriate subdirectory in `plugins/`.
+2. Implement a `run(args)` or `run_plugin(args=None)` function.
+3. Register your plugin in `PLUGIN_REGISTRY` in `core/plugin_manager.py`.
+4. (Optional) Add an alias in `ALIASES` if needed.
+
+#### Dynamic Plugin
+
+1. Create a new subdirectory in `plugins/`.
+2. Add your plugin code and a `plugin.yaml` with metadata:
+   ```yaml
+   label: My Plugin
+   description: Does something useful
+   entry_point: plugins.my_plugin.module:function
+   ```
+   
+---
+
+## Separation of Ownership
+```
+
+                 🎓 C-H-A-R-L-O-T-T-E (501(c)(3))
+   ─────────────────────────────────────────────────────────────
+   • Owns IP of CHARLOTTE OSS
+   • Distributes core under AGPLv3
+   • Manages community, grants, contributors
+   • Contributors sign CLA (allows relicensing)
+
+                     │
+                     │ Dual-License Authority
+                     ▼
+                 💼 C-H-A-R-L-O-T-T-E Corp (C-Corp)
+   ─────────────────────────────────────────────────────────────
+   • Sells proprietary enterprise licenses
+   • Provides commercial support, SLAs
+   • Can develop proprietary add-ons
+   • Revenues help sustain Foundation mission
+```
+---
+
+## 🔧 Plugin `__init__.py` Guidelines
+
+Each plugin folder (e.g., `plugins/recon/`, `plugins/exploitation/`) must include a properly structured `__init__.py`.
+
+### Static Style (Recommended for Most CHARLOTTE Plugins)
+
+```python
+__all__ = [
+    "plugin_one",
+    "plugin_two",
+    "plugin_three",
+]
+
+RECON_PLUGIN_PKG_VERSION = "0.1.0"  # Replace with appropriate label
+```
+
+### Dynamic Style (Optional for Auto-Discovery)
+
+```python
+import importlib
+import traceback
+from pathlib import Path
+
+__all__ = []
+
+def load_plugins():
+    base_dir = Path(__file__).parent
+    for file in base_dir.glob("*.py"):
+        if file.name == "__init__.py":
+            continue
+        try:
+            name = file.stem
+            importlib.import_module(f"{__name__}.{name}")
+            __all__.append(name)
+        except Exception:
+            print(f"[!] Failed to load plugin: {file.name}")
+            traceback.print_exc()
+
+load_plugins()
+PLUGIN_PKG_VERSION = "0.1.0"
+```
+
+---
+
+## 🧩 CHARLOTTE Modularity and Plugin Style Guidelines
+
+CHARLOTTE is built to support clean, extendable plugin-based development.
+
+### File Structure
+
+- Each plugin lives under a meaningful folder path (e.g., `plugins/recon/nmap/`)
+- Include:
+  - `plugin.yaml` (for dynamic discovery)
+  - Main logic file (e.g., `nmap_plugin.py`)
+  - Optional helpers/utilities
+
+### Design Principles
+
+- Plugins should be **single-purpose** and **chainable** (e.g., recon → exploit → triage).
+- Use `run(args)` or `run_plugin(args=None)` as the callable entrypoint.
+- Modular helpers should go in `utils/` or submodules inside the plugin folder.
+
+### Coding Style
+
+- Follow `PEP8`
+- Write modular functions with type hints
+- Add signature-toned comments if appropriate (snark optional 😈)
+- Use `output_path = display_path(path)` if outputting file paths for CHARLOTTE
+
+---
+
+## ✅ Example Static Plugin Init File
+
+```python
+# plugins/recon/__init__.py
+
+__all__ = [
+    "amass",
+    "nmap",
+    "subdomain_enum",
+]
+
+RECON_PLUGIN_PKG_VERSION = "0.1.0"
+```
+
+## ✅ Example OWASP ZAP Init File
+
+```python
+# plugins/exploitation/owasp_zap/__init__.py
+
+__all__ = [
+    "zap_plugin",
+]
+
+OWASP_ZAP_PLUGIN_PKG_VERSION = "0.1.0"
+```
+---
+
+## 🚀 Coming Soon 
+- GUI dashboard   
 - Full offline mode with local CVE database and LLM weights
+- Self-Patching agents that can patch their hosts
+
+---

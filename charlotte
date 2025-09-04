@@ -1,0 +1,10 @@
+#!/usr/bin/env python
+import os, sys, runpy
+
+# Put repo root on sys.path so 'core.*' imports resolve
+ROOT = os.path.dirname(os.path.abspath(__file__))
+if ROOT not in sys.path:
+    sys.path.insert(0, ROOT)
+
+# Run core.main as a module so absolute package imports work
+runpy.run_module("core.main", run_name="__main__")
