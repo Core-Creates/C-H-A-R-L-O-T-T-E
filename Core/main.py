@@ -247,6 +247,30 @@ def _llm_recommend_next(
         from core.ai.llm import analyze_plugin_output, redact_for_prompt
     except Exception:
         return None, ""
+
+    def _extract_next_and_summary(md: str) -> tuple[str | None, str | None]:
+        # Prefer fenced ```json blocks
+        m = re.search(r"```json\s*(\{[\s\S]*?\})\s*```", md, re.I)
+        if not m:
+            m = re.search(r"\{[\s\S]*\}", md)  # fallback: first JSON-ish object
+        if not m:
+            return None, None
+        txt = m.group(1) if m.lastindex else m.group(0)
+        # normalize a few common issues
+        txt = txt.replace("“", '"').replace("”", '"').replace("’", "'")
+        txt = re.sub(r",(\s*[}\]])", r"\1", txt)  # trailing commas
+        try:
+            j = json.loads(txt)
+        except Exception:
+            return None, None
+        next_label = j.get("next_label")
+        summary_md = j.get("summary_md") or ""
+        if isinstance(next_label, str):
+            next_label = next_label.strip() or None
+        else:
+            next_label = None
+        return next_label, summary_md
+
     try:
         # Build candidate labels from dynamic discovery
         try:
@@ -256,32 +280,34 @@ def _llm_recommend_next(
             labels = sorted(list(dyn_map.keys()))
         except Exception:
             labels = []
+
         payload = {
             "session_id": session_id,
             "result": current_result,
             "available_dynamic_labels": labels,
-            "instruction": "Summarize concisely, then pick exactly ONE label from available_dynamic_labels to run next. "
-            'Respond with a JSON block: {"summary_md": str, "next_label": str}. '
-            "The next_label MUST match one item from available_dynamic_labels. Keep summary short.",
+            "instruction": (
+                "Reply with ONLY a single minified JSON object:\n"
+                '{"summary_md": string, "next_label": string}.\n'
+                "No preamble, no code fences."
+            ),
         }
+        from core.ai.llm import analyze_plugin_output, redact_for_prompt
+
         safe = redact_for_prompt(payload)
+
         md = analyze_plugin_output("post-run router", safe, model=None, max_tokens=700)
 
-        next_label = None
-        summary_md = ""
-        m = re.search(r"\{[\s\S]*\}", md)
-        if m:
-            try:
-                j = json.loads(m.group(0))
-                summary_md = j.get("summary_md", "") or ""
-                nl = j.get("next_label")
-                if isinstance(nl, str):
-                    next_label = nl.strip()
-            except Exception:
-                pass
-        return next_label, (summary_md or md or "")
-    except Exception as e:
-        return None, f"_LLM router error: {e}_"
+        next_label, summary_md = _extract_next_and_summary(md)
+        # Fallback: no JSON → treat whole text as summary, don't auto-pick
+        if not summary_md:
+            summary_md = md if isinstance(md, str) else ""
+        # Validate that suggested label is available
+        if next_label not in labels:
+            next_label = None
+        return next_label, (summary_md or "")
+    except Exception:
+        # Quiet failure; don't print noisy errors to the user
+        return None, ""
 
 
 # ──────────────────────────────────────────────────────────────────────────────
