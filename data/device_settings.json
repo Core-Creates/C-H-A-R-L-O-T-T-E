@@ -6,7 +6,7 @@
     },
     "192.168.1.7": {
         "priority": "Low",
-        "last_scanned": "20250904_183042",
-        "heuristic_score": 30
+        "last_scanned": "20250904_220852",
+        "heuristic_score": 27
     }
 }

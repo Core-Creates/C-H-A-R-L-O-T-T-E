@@ -32,6 +32,18 @@ except ModuleNotFoundError:
     print("[!] Missing dependency: InquirerPy\n    pip install InquirerPy")
     raise
 
+
+from core.plugin_manager import (
+    run_plugin,
+    _call_plugin_entrypoint,
+    register_post_run,
+    PLUGIN_REGISTRY,
+    ALIASES,
+    # run_dynamic_by_label,  # only keep if you actually use it later
+)
+
+from utils.logger import start_session, append_session_event, end_session, log_error
+
 # Make internal helpers importable by other modules
 # Exposing these names allows other modules/tests to import entries neatly.
 __all__ = ["run_plugin", "_call_plugin_entrypoint", "PLUGIN_REGISTRY", "ALIASES"]
@@ -52,25 +64,31 @@ if PROJECT_ROOT not in sys.path:
 # ──────────────────────────────────────────────────────────────────────────────
 try:
     # ⬇️ import robust plugin loader + convenience runners
-    from core.plugin_manager import load_plugins, run_plugin, _load_plugin_module, _call_plugin_entrypoint
+    from core.plugin_manager import (
+        load_plugins,
+        run_plugin,
+        _load_plugin_module,
+        _call_plugin_entrypoint,
+        register_post_run,
+        run_dynamic_by_label,
+    )
     from agents.triage_agent import run_triage_agent, load_findings, save_results
     from core.charlotte_personality import CharlottePersonality
     from utils.paths import display_path
     import core.cve_lookup
 except ModuleNotFoundError as e:
-    print(f"[!] Missing CHARLOTTE module: {e.name}\n    Did you activate the venv and install requirements?")
+    print(
+        f"[!] Missing CHARLOTTE module: {e.name}\n    Did you activate the venv and install requirements?"
+    )
     raise
 
-# Centralized, structured logging for sessions and plugins.
-from utils.logger import start_session, append_session_event, end_session, log_error, log_plugin_event
-from pathlib import Path
-import uuid  # (Currently unused here; kept for forward compatibility)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Initialize personality (for future contextual use)
 # Currently used for theming + possible persona-based responses later.
 # ──────────────────────────────────────────────────────────────────────────────
 charlotte = CharlottePersonality()
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Banner (for ✨ vibes ✨)
@@ -80,8 +98,8 @@ def print_banner():
     PURPLE = "\033[35m"
     RESET = "\033[0m"
     skull_banner = f"""{PURPLE}
-        
-           ......      
+
+           ......
         ...........    🔮  C - H - A - R - L - O - T - T - E  🔮
        '.....,.....,
       '...... . . . .
@@ -90,9 +108,10 @@ def print_banner():
            ''''''''
 
                   {PURPLE}  CHARLOTTE - The Cybersecurity Assistant  {RESET}
-                        {PURPLE}  Version: 0.1.0  {RESET}   
+                        {PURPLE}  Version: 0.1.0  {RESET}
 {RESET}"""
     print(skull_banner)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Menu label → plugin key mapping (static registry)
@@ -115,7 +134,7 @@ PLUGIN_TASKS = {
     "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
     "🌐 Web Recon (Subdomains)": "web_recon",
     "🧼 XSS Scan": "xss_scan",
-    "🐝 OWASP ZAP Exploitability": "owasp_zap"
+    "🐝 OWASP ZAP Exploitability": "owasp_zap",
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -124,9 +143,11 @@ PLUGIN_TASKS = {
 # keeping cve_lookup clean as a data-access layer that only expects ISO timestamps.
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _iso_z(dt: datetime) -> str:
     """NVD wants ISO8601 with milliseconds and Z suffix: YYYY-MM-DDTHH:MM:SS.000Z"""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
 
 def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     """
@@ -169,7 +190,9 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     m = re.match(r"^since\s+(\d{4}-\d{2}-\d{2})\s*$", s)
     if m:
         try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
             return _iso_z(start), _iso_z(now)
         except Exception:
             return None, None
@@ -178,9 +201,15 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     m = re.match(r"^between\s+(\d{4}-\d{2}-\d{2})\s+and\s+(\d{4}-\d{2}-\d{2})\s*$", s)
     if m:
         try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
             # End-of-day inclusive: add a day then subtract 1 ms
-            end = datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1) - timedelta(milliseconds=1)
+            end = (
+                datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                + timedelta(days=1)
+                - timedelta(milliseconds=1)
+            )
             return _iso_z(start), _iso_z(end)
         except Exception:
             return None, None
@@ -189,8 +218,14 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     m = re.match(r"^(\d{4}-\d{2}-\d{2})\s*\.\.\s*(\d{4}-\d{2}-\d{2})$", s)
     if m:
         try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            end = datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1) - timedelta(milliseconds=1)
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
+            end = (
+                datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                + timedelta(days=1)
+                - timedelta(milliseconds=1)
+            )
             return _iso_z(start), _iso_z(end)
         except Exception:
             return None, None
@@ -198,15 +233,16 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     # Fallback: unrecognized expression
     return None, None
 
-# ──────────────────────────────────────────────────────────────────────────────
-# Helpers for special flows (CVE date filter parsing)
+
 # These helpers live here (UI/orchestration layer) rather than in cve_lookup.py,
 # keeping cve_lookup clean as a data-access layer that only expects ISO timestamps.
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _iso_z(dt: datetime) -> str:
     """NVD wants ISO8601 with milliseconds and Z suffix: YYYY-MM-DDTHH:MM:SS.000Z"""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
+
 
 def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     """
@@ -249,7 +285,9 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     m = re.match(r"^since\s+(\d{4}-\d{2}-\d{2})\s*$", s)
     if m:
         try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
             return _iso_z(start), _iso_z(now)
         except Exception:
             return None, None
@@ -258,9 +296,15 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     m = re.match(r"^between\s+(\d{4}-\d{2}-\d{2})\s+and\s+(\d{4}-\d{2}-\d{2})\s*$", s)
     if m:
         try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
             # End-of-day inclusive: add a day then subtract 1 ms
-            end = datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1) - timedelta(milliseconds=1)
+            end = (
+                datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                + timedelta(days=1)
+                - timedelta(milliseconds=1)
+            )
             return _iso_z(start), _iso_z(end)
         except Exception:
             return None, None
@@ -269,14 +313,21 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     m = re.match(r"^(\d{4}-\d{2}-\d{2})\s*\.\.\s*(\d{4}-\d{2}-\d{2})$", s)
     if m:
         try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(tzinfo=timezone.utc)
-            end = datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc) + timedelta(days=1) - timedelta(milliseconds=1)
+            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
+                tzinfo=timezone.utc
+            )
+            end = (
+                datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                + timedelta(days=1)
+                - timedelta(milliseconds=1)
+            )
             return _iso_z(start), _iso_z(end)
         except Exception:
             return None, None
 
     # Fallback: unrecognized expression
     return None, None
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # CVE Lookup sub-menu
@@ -288,7 +339,9 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
 # ──────────────────────────────────────────────────────────────────────────────
 def run_cve_lookup(session_id: str | None = None):
     print("\n=== CHARLOTTE CVE Intelligence Module ===")
-    from InquirerPy import inquirer  # local import keeps startup faster if CVE flow unused
+    from InquirerPy import (
+        inquirer,
+    )  # local import keeps startup faster if CVE flow unused
 
     # Prompt for CVE lookup mode
     mode = inquirer.select(
@@ -300,7 +353,9 @@ def run_cve_lookup(session_id: str | None = None):
     if mode.startswith("🔎"):
         # ---- CVE ID path (unchanged) ----
         # Accepts a mix of full IDs and short numeric IDs (with optional year hint)
-        ids = input("Enter CVE ID(s) (comma-separated or short IDs with year): ").strip()
+        ids = input(
+            "Enter CVE ID(s) (comma-separated or short IDs with year): "
+        ).strip()
         year_hint = input("Optional year hint for short IDs (YYYY): ").strip()
 
         # Normalize input to a list of full CVE IDs (CVE-YYYY-NNNN)
@@ -320,7 +375,9 @@ def run_cve_lookup(session_id: str | None = None):
                 print(f"[!] Invalid CVE ID format: '{c}'. Skipping.")
 
         # Fetch in batch and display/export via cve_lookup
-        results = core.cve_lookup.fetch_cves_batch(cve_ids, year_filter=year_hint or None)
+        results = core.cve_lookup.fetch_cves_batch(
+            cve_ids, year_filter=year_hint or None
+        )
         core.cve_lookup.show_and_export(results, multiple=True)
         return
 
@@ -332,8 +389,10 @@ def run_cve_lookup(session_id: str | None = None):
         return
 
     # Offer examples to reduce user error in natural-language date filters.
-    print("\n(Date filter is optional. Examples: 'last 30 days', 'since 2025-07-01', "
-          "'between 2025-07-01 and 2025-07-31', '2025-07-01..2025-07-31')")
+    print(
+        "\n(Date filter is optional. Examples: 'last 30 days', 'since 2025-07-01', "
+        "'between 2025-07-01 and 2025-07-31', '2025-07-01..2025-07-31')"
+    )
     filt = input("Date filter (press Enter to skip): ").strip()
 
     # Convert human text → NVD ISO window (pubStartDate/pubEndDate) if provided.
@@ -357,6 +416,7 @@ def run_cve_lookup(session_id: str | None = None):
 
     # Normalize + pretty print + export (CSV/JSON) for later pipelines.
     core.cve_lookup.show_and_export(results, multiple=True)
+
 
 # ── Helpers to fetch dynamic registry robustly ───────────────────────────────
 def _get_dynamic_registry():
@@ -383,6 +443,7 @@ def _get_dynamic_registry():
     # Fallbacks: probe for common attribute names exposed by plugin_manager
     try:
         from core import plugin_manager as _pm
+
         for attr in ("DYNAMIC_PLUGINS", "PLUGINS", "REGISTRY", "_PLUGINS"):
             obj = getattr(_pm, attr, None)
             if isinstance(obj, dict):
@@ -395,33 +456,40 @@ def _get_dynamic_registry():
         pass
     return {}
 
+
 # ── Classifiers for dynamic plugin surfacing ─────────────────────────────────
 def _is_recon_like(task_key: str, pretty: str, desc: str, tags: list[str]) -> bool:
     """
     Heuristically classify a dynamic plugin as 'Recon' so it appears with recon items.
     We check tags and fuzzy match against common recon-related keywords.
     """
-    t = set(x.lower() for x in (tags or []))
+    t = {x.lower() for x in (tags or [])}
     name_lc = (pretty or "").lower()
     desc_lc = (desc or "").lower()
-    key_lc  = (task_key or "").lower()
+    key_lc = (task_key or "").lower()
 
     recon_tags = {"recon", "dns", "subdomains", "amass", "enumeration", "http", "web"}
     if t & recon_tags:
         return True
 
     needles = ("recon", "amass", "subdomain", "dns", "enum", "banner", "http", "nmap")
-    return any(n in name_lc for n in needles) or any(n in desc_lc for n in needles) or any(n in key_lc for n in needles)
+    return (
+        any(n in name_lc for n in needles)
+        or any(n in desc_lc for n in needles)
+        or any(n in key_lc for n in needles)
+    )
+
 
 def _is_amass_like(task_key: str, pretty: str, desc: str, tags: list[str]) -> bool:
     """Special check so we can add a neat satellite emoji for Amass-like entries."""
-    t = set(x.lower() for x in (tags or []))
+    t = {x.lower() for x in (tags or [])}
     if "amass" in t:
         return True
     name_lc = (pretty or "").lower()
     desc_lc = (desc or "").lower()
-    key_lc  = (task_key or "").lower()
+    key_lc = (task_key or "").lower()
     return ("amass" in name_lc) or ("amass" in desc_lc) or ("amass" in key_lc)
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Special handling: OWASP ZAP with comprehensive parameter input
@@ -431,91 +499,90 @@ def run_owasp_zap_interface(session_id: str | None = None):
     """
     Interactive interface for OWASP ZAP vulnerability scanning.
     Prompts user for target URL, ZAP server settings, and scan parameters.
-    
+
     ⚠️  IMPORTANT DISCLAIMER:
     - Passive scan: Only analyzes responses without modifying target pages
     - Spider crawler: Actively requests pages by following links (may generate server logs)
     - Active scan: Sends malicious payloads to test for vulnerabilities (REQUIRES EXPLICIT PERMISSION)
-    
-    Testing websites or applications without proper authorization may violate laws in many 
-    countries and regions. Always ensure you have written permission from the target 
+
+    Testing websites or applications without proper authorization may violate laws in many
+    countries and regions. Always ensure you have written permission from the target
     owner before conducting any security assessments.
     """
     print("\n=== 🐝 OWASP ZAP Vulnerability Scanner ===")
     print("⚠️  IMPORTANT: Only scan targets you have permission to test!")
     print("Configure your ZAP scan parameters below:\n")
-    
+
     try:
         # Target URL input with validation
         target = inquirer.text(
             message="Enter target URL to scan:",
             default="https://public-firing-range.appspot.com",
-            validate=lambda x: x.startswith(("http://", "https://")) if x else True
+            validate=lambda x: x.startswith(("http://", "https://")) if x else True,
         ).execute()
-        
+
         if not target:
             target = "https://public-firing-range.appspot.com"
             print(f"[ℹ️] Using default target: {target}")
-        
+
         # Scan type selection
         scan_type_tuple = inquirer.select(
             message="Select scan type:",
             choices=[
                 ("Passive Scan (Spider + Analysis)", "passive"),
-                ("Active Scan (Spider + Active Testing)", "active")
+                ("Active Scan (Spider + Active Testing)", "active"),
             ],
-            default="passive"
+            default="passive",
         ).execute()
-        
+
         # Extract the actual value from the tuple
-        scan_type = scan_type_tuple[1] if isinstance(scan_type_tuple, tuple) else scan_type_tuple
-        
+        scan_type = (
+            scan_type_tuple[1]
+            if isinstance(scan_type_tuple, tuple)
+            else scan_type_tuple
+        )
+
         # ZAP server configuration
         zap_host = inquirer.text(
-            message="ZAP server host (press Enter for default):",
-            default="127.0.0.1"
+            message="ZAP server host (press Enter for default):", default="127.0.0.1"
         ).execute()
-        
+
         zap_port = inquirer.text(
-            message="ZAP server port (press Enter for default):",
-            default="8080"
+            message="ZAP server port (press Enter for default):", default="8080"
         ).execute()
-        
+
         # Scan configuration
         scan_timeout = inquirer.text(
-            message="Scan timeout in seconds (press Enter for default):",
-            default="900"
+            message="Scan timeout in seconds (press Enter for default):", default="900"
         ).execute()
-        
+
         # API key (optional)
         api_key = inquirer.text(
-            message="ZAP API key (press Enter if not required):",
-            default=""
+            message="ZAP API key (press Enter if not required):", default=""
         ).execute()
-        
+
         # HTTP timeout
         http_timeout = inquirer.text(
-            message="HTTP timeout in seconds (press Enter for default):",
-            default="5.0"
+            message="HTTP timeout in seconds (press Enter for default):", default="5.0"
         ).execute()
-        
+
         # Build arguments dictionary
         args = {
             "target": target,
             "zap_host": zap_host or "127.0.0.1",
             "zap_port": int(zap_port or "8080"),
             "scan_timeout": int(scan_timeout or "900"),
-            "http_timeout": float(http_timeout or "5.0")
+            "http_timeout": float(http_timeout or "5.0"),
         }
-        
+
         # Add API key if provided
         if api_key:
             args["api_key"] = api_key
-        
+
         # Add scan type to args
         args["scan_type"] = scan_type
-        
-        print(f"\n[🔧] Configuration:")
+
+        print("\n[🔧] Configuration:")
         print(f"  Target: {args['target']}")
         print(f"  Scan Type: {scan_type.upper()}")
         print(f"  ZAP Server: {args['zap_host']}:{args['zap_port']}")
@@ -523,46 +590,53 @@ def run_owasp_zap_interface(session_id: str | None = None):
         print(f"  HTTP Timeout: {args['http_timeout']}s")
         if api_key:
             print(f"  API Key: {'*' * min(len(api_key), 8)}...")
-        
+
         # Special warning for active scans
         if scan_type == "active":
-            print(f"\n🚨  ACTIVE SCAN WARNING 🚨")
+            print("\n🚨  ACTIVE SCAN WARNING 🚨")
             print(f"Active scanning will send malicious payloads to {target}")
-            print(f"This may trigger security alerts and could be illegal without permission!")
-            print(f"By proceeding, you confirm you have explicit permission to test this target.")
-            
+            print(
+                "This may trigger security alerts and could be illegal without permission!"
+            )
+            print(
+                "By proceeding, you confirm you have explicit permission to test this target."
+            )
+
             # Require explicit confirmation for active scans
             proceed = inquirer.confirm(
                 message="⚠️  I understand the risks and have permission to perform active scanning. Proceed?",
-                default=False
+                default=False,
             ).execute()
         else:
             # Confirm before proceeding for passive scans
             proceed = inquirer.confirm(
-                message="Proceed with scan?",
-                default=True
+                message="Proceed with scan?", default=True
             ).execute()
-        
+
         if not proceed:
             print("[❌] Scan cancelled by user.")
             return
-        
+
         print(f"\n[🚀] Starting OWASP ZAP scan of {target}...")
-        
+
         # Log the action
         if session_id:
-            append_session_event(session_id, "ACTION_BEGIN", {"plugin": "owasp_zap", "target": target})
-        
+            append_session_event(
+                session_id, "ACTION_BEGIN", {"plugin": "owasp_zap", "target": target}
+            )
+
         # Execute the scan
         result = run_plugin("owasp_zap", args)
-        
+
         # Log the result
         if session_id:
-            append_session_event(session_id, "ACTION_RESULT", {"plugin": "owasp_zap", "result": result})
-        
-        print(f"\n[✅] OWASP ZAP scan completed!")
+            append_session_event(
+                session_id, "ACTION_RESULT", {"plugin": "owasp_zap", "result": result}
+            )
+
+        print("\n[✅] OWASP ZAP scan completed!")
         print(f"\n{result}")
-        
+
     except KeyboardInterrupt:
         print("\n[❌] Scan cancelled by user.")
     except Exception as e:
@@ -610,6 +684,15 @@ def main():
         end_session(session_id, status="ok")
         return
 
+    # ── Register post-run LLM hook so every plugin result gets analyzed ──
+    try:
+        from core.ai.postrun_llm import postrun_llm
+
+        register_post_run(postrun_llm)
+        print("[hooks] postrun_llm registered")
+    except Exception as hook_err:
+        print(f"[hook] postrun_llm not registered: {hook_err}")
+
     # ── Collect dynamic plugins robustly ─────────────────────────────────────
     dynamic_registry = _get_dynamic_registry()
 
@@ -623,21 +706,38 @@ def main():
     # We attempt to group recon-ish plugins into the Recon section for UX polish.
     recon_dynamic_entries = []
     for task_key, meta in (dynamic_registry or {}).items():
-        pretty = (meta.get("pretty_name") or meta.get("name") or meta.get("label") or task_key).strip()
-        desc   = (meta.get("description") or meta.get("desc") or "")
-        tags   = meta.get("tags") or meta.get("categories") or []
+        pretty = (
+            meta.get("pretty_name") or meta.get("name") or meta.get("label") or task_key
+        ).strip()
+        desc = meta.get("description") or meta.get("desc") or ""
+        tags = meta.get("tags") or meta.get("categories") or []
 
         if _is_recon_like(task_key, pretty, desc, tags):
             prefix = "🛰️" if _is_amass_like(task_key, pretty, desc, tags) else "🧭"
-            recon_dynamic_entries.append({"name": f"{prefix} {pretty}", "value": ("dynamic", task_key)})
+            recon_dynamic_entries.append(
+                {
+                    "name": f"{prefix} {pretty}",
+                    "value": ("dynamic", (meta.get("label") or pretty)),
+                }
+            )
 
     # If nothing classified as Recon, we still show a catch-all dynamic section.
     show_dynamic_fallback = not bool(recon_dynamic_entries)
     dynamic_fallback_entries = []
     if show_dynamic_fallback:
         for task_key, meta in (dynamic_registry or {}).items():
-            pretty = (meta.get("pretty_name") or meta.get("name") or meta.get("label") or task_key).strip()
-            dynamic_fallback_entries.append({"name": f"🧩 {pretty}", "value": ("dynamic", task_key)})
+            pretty = (
+                meta.get("pretty_name")
+                or meta.get("name")
+                or meta.get("label")
+                or task_key
+            ).strip()
+            dynamic_fallback_entries.append(
+                {
+                    "name": f"🧩 {pretty}",
+                    "value": ("dynamic", (meta.get("label") or pretty)),
+                }
+            )
 
     # ── Main menu loop: keep letting the user run tasks until exit ───────────
     while True:
@@ -645,23 +745,20 @@ def main():
         menu_choices = [
             Separator("=== Binary Ops ==="),
             *[k for k in PLUGIN_TASKS if "Binary" in k],
-
             Separator("=== Recon ==="),
             *[k for k in PLUGIN_TASKS if ("Scan" in k or "Recon" in k)],
             *recon_dynamic_entries,
-
-            *( [Separator("=== Dynamic (unclassified) ===")] + dynamic_fallback_entries
-               if show_dynamic_fallback else [] ),
-
+            *(
+                [Separator("=== Dynamic (unclassified) ===")] + dynamic_fallback_entries
+                if show_dynamic_fallback
+                else []
+            ),
             Separator("=== Exploitation ==="),
             *[k for k in PLUGIN_TASKS if "Exploit" in k],
-
             Separator("=== Intelligence ==="),
             "🕵️ CVE Lookup (CHARLOTTE)",
-
             Separator("=== Scoring & Analysis ==="),
             *[k for k in PLUGIN_TASKS if ("Triage" in k or "Assessment" in k)],
-
             Separator(),
             "❌ Exit",
         ]
@@ -687,19 +784,26 @@ def main():
             _, dyn_key = task
             try:
                 append_session_event(session_id, "ACTION_BEGIN", {"plugin": dyn_key})
-                result = run_plugin(dyn_key, args=None)
+                result = run_dynamic_by_label(dyn_key, args=None)
                 # If plugin returned a structured result, hand it to report dispatcher.
                 from core import report_dispatcher
+
                 if result:
-                    file_path = report_dispatcher.save_report_locally(result, interactive=False)
-                    append_session_event(session_id, "TRIAGE_DONE", {"report_path": file_path})
+                    file_path = report_dispatcher.save_report_locally(
+                        result, interactive=False
+                    )
+                    append_session_event(
+                        session_id, "TRIAGE_DONE", {"report_path": file_path}
+                    )
                     print(f"\n[📁 Saved] {file_path}")
             except Exception as e:
                 # Log + surface the error without crashing the whole CLI.
                 log_error(session_id, f"Dynamic plugin '{dyn_key}' failed: {e}")
                 print(f"[!] Error running dynamic plugin '{dyn_key}': {e}")
             # Offer to run another task before we loop back.
-            again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
+            again = inquirer.confirm(
+                message="Would you like to run another plugin?", default=True
+            ).execute()
             if not again:
                 graceful_exit(session_id)
                 break
@@ -712,9 +816,13 @@ def main():
         # We bypass the generic path to ensure a great interactive UX.
         if plugin_key == "port_scan":
             try:
-                append_session_event(session_id, "PROMPT_SELECTION", {"selected": "port_scan"})
+                append_session_event(
+                    session_id, "PROMPT_SELECTION", {"selected": "port_scan"}
+                )
                 target = inquirer.text(message="Enter target IP or domain:").execute()
-                ports = inquirer.text(message="Enter ports (e.g., 80,443 or leave blank):").execute()
+                ports = inquirer.text(
+                    message="Enter ports (e.g., 80,443 or leave blank):"
+                ).execute()
 
                 # 🔒 Robust load with nested category support
                 nmap_module = _load_plugin_module("recon.nmap", "nmap_plugin")
@@ -725,11 +833,21 @@ def main():
 
                 # Dispatch result to report pipeline (local file + any downstream hooks)
                 from core import report_dispatcher
-                append_session_event(session_id, "ACTION_RESULT",
-                                     {"plugin": "port_scan", "result_kind": type(result).__name__})
+
+                append_session_event(
+                    session_id,
+                    "ACTION_RESULT",
+                    {"plugin": "port_scan", "result_kind": type(result).__name__},
+                )
                 if result:
-                    file_path = report_dispatcher.save_report_locally(result, interactive=False)
-                    append_session_event(session_id, "TRIAGE_DONE", {"report_path": display_path(file_path)})
+                    file_path = report_dispatcher.save_report_locally(
+                        result, interactive=False
+                    )
+                    append_session_event(
+                        session_id,
+                        "TRIAGE_DONE",
+                        {"report_path": display_path(file_path)},
+                    )
                     report_dispatcher.dispatch_report(file_path)
                 else:
                     print("[!] No report data returned.")
@@ -737,13 +855,17 @@ def main():
                 # We attempt a graceful fallback even if the direct module path fails
                 print(f"[!] Nmap plugin error: {e}")
                 log_error(session_id, f"Nmap error: {e}")
-                append_session_event(session_id, "ERROR", {"where": "nmap", "error": str(e)})
+                append_session_event(
+                    session_id, "ERROR", {"where": "nmap", "error": str(e)}
+                )
                 try:
                     run_plugin(plugin_key, args=None)
                 except Exception as e2:
                     print(f"[!] Plugin manager also failed to run Nmap: {e2}")
             # Offer to run another task after Nmap completes.
-            again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
+            again = inquirer.confirm(
+                message="Would you like to run another plugin?", default=True
+            ).execute()
             if not again:
                 graceful_exit(session_id)
                 break
@@ -756,7 +878,9 @@ def main():
             ).execute()
             scan_path = (scan_path or "").strip() or "data/findings.json"
             run_triage_agent(scan_file=scan_path)
-            again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
+            again = inquirer.confirm(
+                message="Would you like to run another plugin?", default=True
+            ).execute()
             if not again:
                 graceful_exit(session_id)
                 break
@@ -765,6 +889,7 @@ def main():
         # ── Special handling: exploit predictor (batch model inference)
         if plugin_key == "exploit_predictor":
             from core.logic_modules.exploit_predictor import batch_predict
+
             scan_path = inquirer.text(
                 message="Enter path to scan file (press Enter for default: data/findings.json):"
             ).execute()
@@ -775,10 +900,14 @@ def main():
                 output_path = "data/findings_with_predictions.json"
                 save_results(enriched, output_file=output_path)
                 print(f"\n[✔] Exploit predictions saved to {output_path}")
-                print("Use '🧮 Vulnerability Triage' to further refine prioritization.\n")
+                print(
+                    "Use '🧮 Vulnerability Triage' to further refine prioritization.\n"
+                )
             except Exception as e:
                 print(f"[!] Error processing exploit prediction: {e}")
-            again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
+            again = inquirer.confirm(
+                message="Would you like to run another plugin?", default=True
+            ).execute()
             if not again:
                 graceful_exit(session_id)
                 break
@@ -788,7 +917,9 @@ def main():
         if plugin_key == "owasp_zap":
             run_owasp_zap_interface(session_id)
             # Offer to run another task after OWASP ZAP completes.
-            again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
+            again = inquirer.confirm(
+                message="Would you like to run another plugin?", default=True
+            ).execute()
             if not again:
                 graceful_exit(session_id)
                 break
@@ -799,18 +930,21 @@ def main():
         try:
             run_plugin(plugin_key, args=None)
             print(f"\n[✔] Running plugin: {plugin_key}...\n")
-        except TypeError as te:
+        except TypeError as the:
             # Helpful tip if plugin signature doesn't match expectations.
-            print(f"[!] Plugin '{plugin_key}' raised a TypeError: {te}")
+            print(f"[!] Plugin '{plugin_key}' raised a TypeError: {the}")
             print("    Tip: Ensure its entrypoint is 'def run_plugin(args=None, ...):'")
         except Exception as e:
             print(f"[!] Error running plugin '{plugin_key}': {e}")
 
         # Post-run: ask if the user wants to continue; end session if not.
-        again = inquirer.confirm(message="Would you like to run another plugin?", default=True).execute()
+        again = inquirer.confirm(
+            message="Would you like to run another plugin?", default=True
+        ).execute()
         if not again:
             graceful_exit(session_id)
             break
+
 
 # ******************************************************************************************
 # This is the main entry point for the CHARLOTTE CLI application.

@@ -768,3 +768,4 @@ if __name__ == "__main__":
     # For testing purposes, you can still call run_nmap_scan manually if desired:
     # run_nmap_scan(SCAN_TYPES["4"], "scanme.nmap.org", ports="22,80,443", output_dir=p("data","findings"))
     # Note: this won't include GHDB suggestions, just raw scan results.
+# ──────────────────────────────────────────────────────────────────────────────
