@@ -6,22 +6,30 @@
 # ==========================================================================================
 from __future__ import annotations
 
-import argparse, json, math, sys, csv
+import argparse
+import json
+import math
+import sys
+import csv
 from dataclasses import dataclass, asdict
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 ROOT_DIR = Path(__file__).resolve().parents[1]
 REPORTS_DIR = ROOT_DIR / "reports" / "patch_runs"
 DATA_DIR = ROOT_DIR / "data"
 
 DEFAULT_TRIAGE = DATA_DIR / "triaged_findings.json"
-DEFAULT_ASSETS = DATA_DIR / "assets.json"  # {host: {owner, tier, tags, os: 'windows|linux|macos', window: ISO8601|'+8h'}}
+DEFAULT_ASSETS = (
+    DATA_DIR / "assets.json"
+)  # {host: {owner, tier, tags, os: 'windows|linux|macos', window: ISO8601|'+8h'}}
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Models
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 @dataclass
 class Finding:
@@ -32,9 +40,9 @@ class Finding:
     cvss: float = 0.0
     exposure: str = "internal"
     criticality: str = "tier-2"
-    package: Optional[str] = None
-    current_version: Optional[str] = None
-    fix_version: Optional[str] = None
+    package: str | None = None
+    current_version: str | None = None
+    fix_version: str | None = None
 
     @staticmethod
     def _to_float(v: Any, default: float = 0.0) -> float:
@@ -48,7 +56,7 @@ class Finding:
             return default
 
     @staticmethod
-    def from_dict(d: Dict[str, Any]) -> "Finding":
+    def from_dict(d: dict[str, Any]) -> Finding:
         return Finding(
             cve=(d.get("cve") or d.get("CVE") or "").strip(),
             asset=(d.get("asset") or d.get("host") or "").strip(),
@@ -62,6 +70,7 @@ class Finding:
             fix_version=d.get("fix_version"),
         )
 
+
 @dataclass
 class PlanItem:
     host: str
@@ -71,21 +80,24 @@ class PlanItem:
     cvss: float
     exposure: str
     criticality: str
-    package: Optional[str]
-    current_version: Optional[str]
-    fix_version: Optional[str]
+    package: str | None
+    current_version: str | None
+    fix_version: str | None
     ring: int
     window: str
     rollback: str
-    os: Optional[str] = None  # 'windows' | 'linux' | 'macos' | None
+    os: str | None = None  # 'windows' | 'linux' | 'macos' | None
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # IO helpers
 # ──────────────────────────────────────────────────────────────────────────────
 
+
 def _read_json(path: Path) -> Any:
-    with open(path, "r", encoding="utf-8") as f:
+    with open(path, encoding="utf-8") as f:
         return json.load(f)
+
 
 def _read_json_or_inline(value: str) -> Any:
     """
@@ -96,16 +108,30 @@ def _read_json_or_inline(value: str) -> Any:
         return _read_json(p)
     return json.loads(value)
 
+
 def _write_json(obj: Any, path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     with open(path, "w", encoding="utf-8") as f:
         json.dump(obj, f, indent=2, sort_keys=False)
 
+
 def _write_csv(items: Iterable[PlanItem], path: Path) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     fields = [
-        "host","os","cve","ring","window","kev","epss","cvss",
-        "exposure","criticality","package","current_version","fix_version","rollback"
+        "host",
+        "os",
+        "cve",
+        "ring",
+        "window",
+        "kev",
+        "epss",
+        "cvss",
+        "exposure",
+        "criticality",
+        "package",
+        "current_version",
+        "fix_version",
+        "rollback",
     ]
     with open(path, "w", encoding="utf-8", newline="") as f:
         w = csv.DictWriter(f, fieldnames=fields)
@@ -115,28 +141,32 @@ def _write_csv(items: Iterable[PlanItem], path: Path) -> None:
             # keep only listed fields, preserve order
             w.writerow({k: row.get(k) for k in fields})
 
-def load_assets(path: Path) -> Dict[str, Dict[str, Any]]:
+
+def load_assets(path: Path) -> dict[str, dict[str, Any]]:
     if not path.exists():
         return {}
     data = _read_json(path)
     if not isinstance(data, dict):
         return {}
     # normalize keys to strings
-    out: Dict[str, Dict[str, Any]] = {}
+    out: dict[str, dict[str, Any]] = {}
     for k, v in data.items():
         if isinstance(k, str) and isinstance(v, dict):
             out[k] = v
     return out
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Business logic
 # ──────────────────────────────────────────────────────────────────────────────
 
-def resolve_fix_version(f: Finding) -> Optional[str]:
+
+def resolve_fix_version(f: Finding) -> str | None:
     # Stub: integrate OSV/vendor lookups here.
     return f.fix_version or None
 
-def _parse_relative_window(expr: str) -> Optional[timedelta]:
+
+def _parse_relative_window(expr: str) -> timedelta | None:
     """
     Accepts simple relative expressions like '+8h', '+2d', '+45m'
     """
@@ -145,7 +175,7 @@ def _parse_relative_window(expr: str) -> Optional[timedelta]:
             return None
         num = "".join(ch for ch in expr[1:] if ch.isdigit())
         unit = "".join(ch for ch in expr[1:] if not ch.isdigit()).lower()
-        if not num or unit not in {"h","d","m"}:
+        if not num or unit not in {"h", "d", "m"}:
             return None
         n = int(num)
         if unit == "h":
@@ -157,6 +187,7 @@ def _parse_relative_window(expr: str) -> Optional[timedelta]:
     except Exception:
         pass
     return None
+
 
 def _normalize_window(raw: Any, hours_ahead: int) -> str:
     """
@@ -184,16 +215,23 @@ def _normalize_window(raw: Any, hours_ahead: int) -> str:
             pass
 
     # Fallback: default offset
-    start = (now + timedelta(hours=hours_ahead)).replace(minute=0, second=0, microsecond=0)
+    start = (now + timedelta(hours=hours_ahead)).replace(
+        minute=0, second=0, microsecond=0
+    )
     return start.isoformat()
 
-def maintenance_window(host: str, assets: Dict[str, Dict[str, Any]], hours_ahead: int = 12) -> str:
+
+def maintenance_window(
+    host: str, assets: dict[str, dict[str, Any]], hours_ahead: int = 12
+) -> str:
     raw = None
     if host in assets and isinstance(assets[host], dict):
         raw = assets[host].get("window")
     return _normalize_window(raw, hours_ahead)
 
+
 RING_BY_TIER = {"tier-0": 0, "tier-1": 1, "tier-2": 2, "tier-3": 3}
+
 
 def score_finding(f: Finding) -> float:
     score = 0.0
@@ -207,7 +245,8 @@ def score_finding(f: Finding) -> float:
         score += 0.3
     return round(score, 6)
 
-def assign_ring(f: Finding, ring_by_tier: Dict[str, int] | None = None) -> int:
+
+def assign_ring(f: Finding, ring_by_tier: dict[str, int] | None = None) -> int:
     mapping = ring_by_tier or RING_BY_TIER
     ring = mapping.get(f.criticality, 2)
     try:
@@ -217,7 +256,8 @@ def assign_ring(f: Finding, ring_by_tier: Dict[str, int] | None = None) -> int:
     # keep rings within a sane range for downstream UIs
     return max(0, min(9, r))
 
-def _infer_os(meta: Dict[str, Any]) -> Optional[str]:
+
+def _infer_os(meta: dict[str, Any]) -> str | None:
     raw = str(meta.get("os") or meta.get("platform") or "").lower()
     if not raw:
         return None
@@ -227,21 +267,22 @@ def _infer_os(meta: Dict[str, Any]) -> Optional[str]:
         return "macos"
     return "linux"
 
+
 def build_plan(
-    findings: List[Finding],
-    assets: Dict[str, Dict[str, Any]],
+    findings: list[Finding],
+    assets: dict[str, dict[str, Any]],
     min_epss: float = 0.0,
     kev_only: bool = False,
-    ring_by_tier: Optional[Dict[str, int]] = None,
+    ring_by_tier: dict[str, int] | None = None,
     hours_ahead: int = 12,
     dedupe: bool = True,
-    exposure_filter: Optional[List[str]] = None,   # e.g. ["internet","dmz"]
-    tiers_filter: Optional[List[str]] = None,      # e.g. ["tier-0","tier-1"]
-) -> List[PlanItem]:
-    exposure_set = set(x.lower() for x in (exposure_filter or []))
-    tiers_set = set(x.lower() for x in (tiers_filter or []))
+    exposure_filter: list[str] | None = None,  # e.g. ["internet","dmz"]
+    tiers_filter: list[str] | None = None,  # e.g. ["tier-0","tier-1"]
+) -> list[PlanItem]:
+    exposure_set = {x.lower() for x in (exposure_filter or [])}
+    tiers_set = {x.lower() for x in (tiers_filter or [])}
 
-    filtered: List[Finding] = []
+    filtered: list[Finding] = []
     seen: set[tuple[str, str]] = set()
     for f in findings:
         if kev_only and not f.kev:
@@ -274,7 +315,7 @@ def build_plan(
         )
     )
 
-    plan: List[PlanItem] = []
+    plan: list[PlanItem] = []
     for f in filtered:
         ring = assign_ring(f, ring_by_tier)
         window = maintenance_window(f.asset, assets, hours_ahead=hours_ahead)
@@ -283,24 +324,39 @@ def build_plan(
         meta = assets.get(f.asset) or {}
         if isinstance(meta, dict):
             host_os = _infer_os(meta)
-        plan.append(PlanItem(
-            host=f.asset, cve=f.cve, kev=f.kev, epss=f.epss, cvss=f.cvss,
-            exposure=f.exposure, criticality=f.criticality,
-            package=f.package, current_version=f.current_version, fix_version=f.fix_version,
-            ring=ring, window=window, rollback=rollback, os=host_os
-        ))
+        plan.append(
+            PlanItem(
+                host=f.asset,
+                cve=f.cve,
+                kev=f.kev,
+                epss=f.epss,
+                cvss=f.cvss,
+                exposure=f.exposure,
+                criticality=f.criticality,
+                package=f.package,
+                current_version=f.current_version,
+                fix_version=f.fix_version,
+                ring=ring,
+                window=window,
+                rollback=rollback,
+                os=host_os,
+            )
+        )
     return plan
 
-def plan_to_dict(plan: List[PlanItem]) -> Dict[str, Any]:
+
+def plan_to_dict(plan: list[PlanItem]) -> dict[str, Any]:
     return {
         "generated_at": datetime.now(timezone.utc).isoformat(),
         "version": 2,
         "items": [asdict(p) for p in plan],
     }
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # CLI
 # ──────────────────────────────────────────────────────────────────────────────
+
 
 def _read_triage_arg(arg_val: str) -> Any:
     """
@@ -322,29 +378,76 @@ def _read_triage_arg(arg_val: str) -> Any:
     if isinstance(data, dict) and "items" in data and isinstance(data["items"], list):
         return data["items"]
     # tolerate vendor-ish shapes that wrap under another key
-    for k, v in (data.items() if isinstance(data, dict) else []):
-        if isinstance(v, list) and v and isinstance(v[0], dict) and ("cve" in v[0] or "CVE" in v[0]):
+    for k, v in data.items() if isinstance(data, dict) else []:
+        if (
+            isinstance(v, list)
+            and v
+            and isinstance(v[0], dict)
+            and ("cve" in v[0] or "CVE" in v[0])
+        ):
             return v
-    raise SystemExit("[!] Triaged data must be a list of findings or an object with 'items': [...].")
+    raise SystemExit(
+        "[!] Triaged data must be a list of findings or an object with 'items': [...]."
+    )
+
 
 def parse_args() -> argparse.Namespace:
     ap = argparse.ArgumentParser(description="CHARLOTTE Patch Planner (portable)")
-    ap.add_argument("--triage", default=str(DEFAULT_TRIAGE),
-                    help="Path to triaged_findings.json, inline JSON, or '-' for STDIN")
-    ap.add_argument("--assets", default=str(DEFAULT_ASSETS), help="Optional assets.json with OS & windows")
-    ap.add_argument("--kev-only", action="store_true", help="Only include CISA KEV items")
-    ap.add_argument("--min-epss", type=float, default=0.0, help="Filter out items with EPSS below this")
-    ap.add_argument("--ring-map", type=str, default=None,
-                    help="JSON mapping tier->ring override (file path or inline JSON)")
-    ap.add_argument("--hours-ahead", type=int, default=12, help="Default maintenance window offset hours")
-    ap.add_argument("--exposure", type=str, default=None,
-                    help="Comma-separated exposure filters (e.g., 'internet,dmz')")
-    ap.add_argument("--tiers", type=str, default=None,
-                    help="Comma-separated tier filters (e.g., 'tier-0,tier-1')")
-    ap.add_argument("--out", type=str, default=None, help="Output path (.json). Default under reports/patch_runs/")
-    ap.add_argument("--csv-out", type=str, default=None, help="Optional CSV summary output path")
+    ap.add_argument(
+        "--triage",
+        default=str(DEFAULT_TRIAGE),
+        help="Path to triaged_findings.json, inline JSON, or '-' for STDIN",
+    )
+    ap.add_argument(
+        "--assets",
+        default=str(DEFAULT_ASSETS),
+        help="Optional assets.json with OS & windows",
+    )
+    ap.add_argument(
+        "--kev-only", action="store_true", help="Only include CISA KEV items"
+    )
+    ap.add_argument(
+        "--min-epss",
+        type=float,
+        default=0.0,
+        help="Filter out items with EPSS below this",
+    )
+    ap.add_argument(
+        "--ring-map",
+        type=str,
+        default=None,
+        help="JSON mapping tier->ring override (file path or inline JSON)",
+    )
+    ap.add_argument(
+        "--hours-ahead",
+        type=int,
+        default=12,
+        help="Default maintenance window offset hours",
+    )
+    ap.add_argument(
+        "--exposure",
+        type=str,
+        default=None,
+        help="Comma-separated exposure filters (e.g., 'internet,dmz')",
+    )
+    ap.add_argument(
+        "--tiers",
+        type=str,
+        default=None,
+        help="Comma-separated tier filters (e.g., 'tier-0,tier-1')",
+    )
+    ap.add_argument(
+        "--out",
+        type=str,
+        default=None,
+        help="Output path (.json). Default under reports/patch_runs/",
+    )
+    ap.add_argument(
+        "--csv-out", type=str, default=None, help="Optional CSV summary output path"
+    )
     ap.add_argument("--sass", action="store_true", help="Sassy console output")
     return ap.parse_args()
+
 
 def main() -> None:
     args = parse_args()
@@ -367,11 +470,14 @@ def main() -> None:
         except Exception:
             ring_map = None
 
-    exposure_filter = [s.strip() for s in args.exposure.split(",")] if args.exposure else None
+    exposure_filter = (
+        [s.strip() for s in args.exposure.split(",")] if args.exposure else None
+    )
     tiers_filter = [s.strip() for s in args.tiers.split(",")] if args.tiers else None
 
     plan_items = build_plan(
-        findings, assets,
+        findings,
+        assets,
         min_epss=args.min_epss,
         kev_only=args.kev_only,
         ring_by_tier=ring_map,
@@ -398,6 +504,7 @@ def main() -> None:
         print(f"[i] Items: {len(plan_doc['items'])}")
         if args.csv_out:
             print(f"[i] CSV summary: {args.csv_out}")
+
 
 if __name__ == "__main__":
     main()

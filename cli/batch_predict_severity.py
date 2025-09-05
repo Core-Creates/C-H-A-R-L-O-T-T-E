@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+# Reason: this script adjusts sys.path before importing project modules.
 # ******************************************************************************************
 # cli/batch_predict_severity.py
 # Command-line tool for batch CVE severity prediction using CHARLOTTE's neural model
@@ -16,7 +18,8 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 # Now you can import from models/cve_severity_predictor.py
-from models.cve_severity_predictor import predict_severity, predict_batch, load_model, load_scaler
+from models.cve_severity_predictor import predict_batch, load_model, load_scaler
+
 
 # ==========================================================================================
 # FUNCTION: load_input_data
@@ -44,7 +47,7 @@ def load_input_data(file_path):
     data = []
 
     if ext == ".csv":
-        with open(file_path, newline='', encoding="utf-8") as csvfile:
+        with open(file_path, newline="", encoding="utf-8") as csvfile:
             reader = csv.DictReader(csvfile)
             for i, row in enumerate(reader):
                 try:
@@ -53,14 +56,14 @@ def load_input_data(file_path):
                         float(row["cvss_impact"]),
                         float(row["exploitability_score"]),
                         int(row["is_remote"]),
-                        int(row["cwe_id"])
+                        int(row["cwe_id"]),
                     ]
                     data.append(features)
                 except (KeyError, ValueError) as e:
                     print(f"[!] Skipping malformed CSV row #{i + 1}: {e}")
 
     elif ext == ".json":
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             first_line = f.readline().strip()
             f.seek(0)
 
@@ -88,7 +91,7 @@ def load_input_data(file_path):
                             float(entry["cvss_impact"]),
                             float(entry["exploitability_score"]),
                             int(entry["is_remote"]),
-                            int(entry["cwe_id"])
+                            int(entry["cwe_id"]),
                         ]
                         data.append(features)
                     except (KeyError, ValueError) as e:
@@ -104,25 +107,33 @@ def load_input_data(file_path):
 
     return data
 
+
 # ==========================================================================================
 # FUNCTION: save_predictions
 # Optionally saves predictions to disk
 # ==========================================================================================
 def save_predictions(output_path, predictions):
-    with open(output_path, "w", newline='', encoding="utf-8") as out_csv:
+    with open(output_path, "w", newline="", encoding="utf-8") as out_csv:
         writer = csv.writer(out_csv)
         writer.writerow(["predicted_severity"])
         for label in predictions:
             writer.writerow([label])
     print(f"[+] Saved predictions to {output_path}")
 
+
 # ==========================================================================================
 # MAIN ENTRY POINT
 # ==========================================================================================
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Bulk CVE Severity Prediction CLI Tool (CHARLOTTE)")
-    parser.add_argument("input_file", help="Path to input CSV or JSON file with CVE features")
-    parser.add_argument("--output", help="Optional output CSV file to save predictions", default=None)
+    parser = argparse.ArgumentParser(
+        description="Bulk CVE Severity Prediction CLI Tool (CHARLOTTE)"
+    )
+    parser.add_argument(
+        "input_file", help="Path to input CSV or JSON file with CVE features"
+    )
+    parser.add_argument(
+        "--output", help="Optional output CSV file to save predictions", default=None
+    )
 
     args = parser.parse_args()
     cve_records = load_input_data(args.input_file)

@@ -2,13 +2,14 @@
 # netmon.py — Lightweight bandwidth & CPU monitor (optional psutil)
 # ******************************************************************************************
 from __future__ import annotations
-import threading, time
-from typing import Dict, Optional
+import threading
+import time
 
 try:
     import psutil  # type: ignore
 except Exception:  # soft dep
     psutil = None  # type: ignore
+
 
 class BandwidthMonitor:
     """
@@ -21,12 +22,18 @@ class BandwidthMonitor:
       - link_bps: int (default 100_000_000)
       - interfaces: [ { "name": "auto" | "<iface>" } ]
     """
-    def __init__(self, cfg: Dict):
+
+    def __init__(self, cfg: dict):
         self.cfg = cfg or {}
         self._lock = threading.Lock()
         self._run = False
         link_bps = int(self.cfg.get("link_bps", 100_000_000))
-        self._state = {"iface": "unknown", "bps_in": 0, "bps_out": 0, "idle_bps": link_bps}
+        self._state = {
+            "iface": "unknown",
+            "bps_in": 0,
+            "bps_out": 0,
+            "idle_bps": link_bps,
+        }
         self._cpu = 0.0
 
         # pick configured iface if provided (else 'auto')
@@ -47,7 +54,7 @@ class BandwidthMonitor:
     def stop(self):
         self._run = False
 
-    def read(self) -> Dict:
+    def read(self) -> dict:
         with self._lock:
             return dict(self._state)
 

@@ -2,7 +2,9 @@
 # rate_limit.py — Token-bucket limiter for network bytes
 # ******************************************************************************************
 from __future__ import annotations
-import threading, time
+import threading
+import time
+
 
 class TokenBucketLimiter:
     """
@@ -10,6 +12,7 @@ class TokenBucketLimiter:
     - rate_bps: token fill rate (bytes/sec)
     - capacity_bytes: bucket size (max burst)
     """
+
     def __init__(self, rate_bps: int, capacity_bytes: int):
         self._rate = max(1, int(rate_bps))
         self._cap = max(1, int(capacity_bytes))
@@ -35,7 +38,9 @@ class TokenBucketLimiter:
                 elapsed = now - self._last
                 self._last = now
                 # refill
-                self._tokens = min(float(self._cap), self._tokens + elapsed * self._rate)
+                self._tokens = min(
+                    float(self._cap), self._tokens + elapsed * self._rate
+                )
                 if self._tokens >= need:
                     self._tokens -= need
                     return

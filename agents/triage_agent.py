@@ -1,4 +1,3 @@
-
 # ******************************************************************************************
 # agents/triage_agent.py
 # Handles triage of vulnerabilities using rule-based scoring and classification.
@@ -14,28 +13,27 @@ import json
 from InquirerPy import inquirer
 
 # Add project root to sys.path for module imports
-sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
+sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), "..")))
 
 from core.logic_modules.triage_rules import triage
 from core.logic_modules.exploit_predictor import predict_exploitability
 from core.logic_modules.report_utils import (
     generate_markdown_report,
     generate_pdf_report,
-    generate_html_report
+    generate_html_report,
 )
 from core.report_dispatcher import dispatch_report, resend_queued_reports
 from core.cve_data_loader import load_cve_data  # Loads CVE dataset from Hugging Face
 
 # ServiceNow integration
-from plugins.servicenow.servicenow_client import create_incident, maybe_create_tickets
-from plugins.servicenow.servicenow_setup import configure_servicenow
+from plugins.servicenow.servicenow_client import maybe_create_tickets
 
 # Path helper (robust import)
 try:
-    from utils.paths import display_path        # preferred location
+    from utils.paths import display_path  # preferred location
 except Exception:
     try:
-        from paths import display_path          # fallback if you keep paths.py at repo root
+        from paths import display_path  # fallback if you keep paths.py at repo root
     except Exception:
         # last-resort shim so nothing crashes
         def display_path(path: str, base: str | None = None) -> str:
@@ -73,15 +71,16 @@ def load_findings(file_path):
         return []
 
     if not file_path.lower().endswith(".json"):
-        print(f"[!] Invalid file type. Please provide a .json file.")
+        print("[!] Invalid file type. Please provide a .json file.")
         return []
 
     try:
-        with open(file_path, "r", encoding="utf-8") as f:
+        with open(file_path, encoding="utf-8") as f:
             return json.load(f)
     except Exception as e:
         print(f"[!] Failed to parse JSON: {e}")
         return []
+
 
 # ==========================================================================================
 # FUNCTION: triage_findings()
@@ -115,7 +114,9 @@ def triage_findings(findings):
         cve_info = cve_map.get(cve_id)
 
         if cve_info:
-            vuln["cve_description"] = cve_info.get("description", "No description available.")
+            vuln["cve_description"] = cve_info.get(
+                "description", "No description available."
+            )
             vuln["tags"] = cve_info.get("tags", [])
             vuln["source_dataset"] = "Bouquets/Cybersecurity-LLM-CVE"
         else:
@@ -139,16 +140,21 @@ def triage_findings(findings):
 
     return enriched
 
+
 # ==========================================================================================
 # FUNCTION: display_summary()
 # CLI summary of top N triaged findings
 # ==========================================================================================
 def display_summary(findings, limit=10):
     sorted_findings = sorted(findings, key=lambda f: f["score"], reverse=True)
-    print("\n===== 🧠 TRIAGE RESULTS (Top {0}) =====".format(limit))
+    print(f"\n===== 🧠 TRIAGE RESULTS (Top {limit}) =====")
     for vuln in sorted_findings[:limit]:
-        print(f"- {vuln.get('id', 'N/A')}: {vuln['priority']} | {vuln['severity']} | Score: {vuln['score']}")
-        print(f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')} | Exploit: {vuln.get('exploit_prediction')} ({vuln.get('confidence')})")
+        print(
+            f"- {vuln.get('id', 'N/A')}: {vuln['priority']} | {vuln['severity']} | Score: {vuln['score']}"
+        )
+        print(
+            f"  CWE: {vuln.get('cwe', 'N/A')} | Impact: {vuln.get('impact', 'N/A')} | Exploit: {vuln.get('exploit_prediction')} ({vuln.get('confidence')})"
+        )
         if vuln.get("cve_description"):
             print(f"  Desc: {vuln['cve_description'][:100]}...")
         if vuln.get("tags"):
@@ -156,6 +162,7 @@ def display_summary(findings, limit=10):
         if vuln.get("emoji_tags"):
             print(f"  🚩 {', '.join(vuln['emoji_tags'])}")
         print()
+
 
 # ==========================================================================================
 # FUNCTION: save_results()
@@ -166,6 +173,7 @@ def save_results(findings, output_file="data/triaged_findings.json"):
     with open(output_file, "w", encoding="utf-8") as f:
         json.dump(findings, f, indent=4)
     print(f"[+] Triaged results saved to {output_file}")
+
 
 # ==========================================================================================
 # FUNCTION: run_triage_agent()
@@ -187,17 +195,29 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
 
     format_choice = inquirer.select(
         message="Select report output format:",
-        choices=["📄 Markdown (.md)", "🧾 PDF (.pdf)", "🌐 HTML (.html)", "♻️ Resend Queued Reports", "❌ Skip report"]
+        choices=[
+            "📄 Markdown (.md)",
+            "🧾 PDF (.pdf)",
+            "🌐 HTML (.html)",
+            "♻️ Resend Queued Reports",
+            "❌ Skip report",
+        ],
     ).execute()
 
     report_file = None
 
     if format_choice.startswith("📄"):
-        report_file = generate_markdown_report(enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"])
+        report_file = generate_markdown_report(
+            enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"]
+        )
     elif format_choice.startswith("🧾"):
-        report_file = generate_pdf_report(enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"])
+        report_file = generate_pdf_report(
+            enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"]
+        )
     elif format_choice.startswith("🌐"):
-        report_file = generate_html_report(enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"])
+        report_file = generate_html_report(
+            enriched_findings, include_fields=["cve_description", "tags", "emoji_tags"]
+        )
     elif format_choice.startswith("♻️"):
         resend_queued_reports()
         return
@@ -209,12 +229,12 @@ def run_triage_agent(scan_file="data/findings.json", dispatch=True):
         dispatch_report(report_file)
 
     auto_ticket = inquirer.confirm(
-        message="Auto-create ServiceNow tickets for critical findings?",
-        default=True
+        message="Auto-create ServiceNow tickets for critical findings?", default=True
     ).execute()
 
     if auto_ticket:
         maybe_create_tickets(enriched_findings)
+
 
 # ==========================================================================================
 # MAIN EXECUTION BLOCK

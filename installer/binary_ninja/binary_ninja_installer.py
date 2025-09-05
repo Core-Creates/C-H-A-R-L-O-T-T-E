@@ -1,6 +1,5 @@
-
-import platform
 import webbrowser
+
 
 def get_binary_ninja_free_url():
     # Always use the main download page for reliability

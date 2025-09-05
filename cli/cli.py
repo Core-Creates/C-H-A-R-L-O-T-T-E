@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+# Reason: this script adjusts sys.path before importing project modules.
 # ******************************************************************************************
 # CHARLOTTE CLI - Interactive Interface for the Cybernetic Heuristic Assistant
 # Provides task selection, personality configuration, and scan execution via plugin engine.
@@ -20,21 +22,11 @@ if ROOT_DIR not in sys.path:
 # 🧠 All other imports now work:
 
 import json
-import random
 import inspect
-import argparse
-from datetime import datetime
-from InquirerPy import inquirer
-from utils.logger import log_session
-from InquirerPy.separator import Separator
-from core.plugin_manager import run_plugin
 from core import report_dispatcher
 from core.charlotte_personality import CharlottePersonality
 from plugins.recon.amass.owasp_amass import run_plugin as run_amass_plugin
-from plugins.recon.nmap.nmap_plugin import run_plugin as run_nmap_plugin
-from plugins.recon.http_banner.http_banner import run_plugin as run_http_banner_plugin
 
-import inspect
 
 def safe_run_plugin(func, **params):
     """
@@ -49,7 +41,11 @@ def safe_run_plugin(func, **params):
 
     # Map common synonyms
     mapped = dict(params)
-    if "domain" in params and "domain" not in sig.parameters and "target" in sig.parameters:
+    if (
+        "domain" in params
+        and "domain" not in sig.parameters
+        and "target" in sig.parameters
+    ):
         mapped["target"] = params["domain"]
 
     # If the function takes exactly one param, it often expects a dict
@@ -69,6 +65,7 @@ def safe_run_plugin(func, **params):
         ordered = [mapped[name] for name in param_names if name in mapped]
         return func(*ordered)
 
+
 # ******************************************************************************************
 # Plugin Task + Argument Setup
 # Maps human-readable labels to internal plugin keys and defines required input arguments.
@@ -83,7 +80,7 @@ PLUGIN_TASKS = {
     "🩺 XSS Scan": "xss_scan",
     "🚨 Exploit Generator": "exploit_generation",
     "🔎 OWASP Amass Subdomain Recon": "owasp_amass",
-    "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent"
+    "🧮 Vulnerability Triage (Score + Prioritize)": "triage_agent",
 }
 
 REQUIRED_ARGS = {
@@ -109,23 +106,32 @@ PLUGIN_DOCS = {
 }
 
 # List of CHARLOTTE's predefined mood+tone profiles available to the user
-PREDEFINED_MODES = ["goth_queen", "mischief", "gremlin_mode", "professional", "apathetic_ai"]
+PREDEFINED_MODES = [
+    "goth_queen",
+    "mischief",
+    "gremlin_mode",
+    "professional",
+    "apathetic_ai",
+]
 
 # ******************************************************************************************
 # Personality Configuration
 # Loads, saves, and instantiates CHARLOTTE's sass/sarcasm/chaos settings from JSON config.
 # ******************************************************************************************
 
+
 def load_personality_config(path="personality_config.json"):
     try:
-        with open(path, "r") as f:
+        with open(path) as f:
             return json.load(f)
     except FileNotFoundError:
         return {}
 
+
 def save_personality_config(config, path="personality_config.json"):
     with open(path, "w") as f:
         json.dump(config, f, indent=4)
+
 
 def create_charlotte_from_config(config):
     mode = config.get("mode", "goth_queen")
@@ -134,9 +140,11 @@ def create_charlotte_from_config(config):
     chaos = config.get("chaos", 0.5)
     return CharlottePersonality(sass=sass, sarcasm=sarcasm, chaos=chaos, mode=mode)
 
+
 # ******************************************************************************************
 # Plugin Documentation Helper
 # ******************************************************************************************
+
 
 def check_plugin_doc():
     for arg in sys.argv:
@@ -147,14 +155,20 @@ def check_plugin_doc():
                     print(f"\n🗾 CHARLOTTE Plugin Help: {plugin_key}\n")
                     print(PLUGIN_DOCS[plugin_key])
                 else:
-                    print(f"\n[!] Unknown plugin '{plugin_key}'. Try one of: {', '.join(PLUGIN_DOCS.keys())}")
+                    print(
+                        f"\n[!] Unknown plugin '{plugin_key}'. Try one of: {', '.join(PLUGIN_DOCS.keys())}"
+                    )
             except IndexError:
-                print("[!] Please specify a plugin after --doc (e.g., --doc binary_strings)")
+                print(
+                    "[!] Please specify a plugin after --doc (e.g., --doc binary_strings)"
+                )
             sys.exit(0)
+
 
 # ******************************************************************************************
 # Report Helper
 # ******************************************************************************************
+
 
 def handle_report(report_data):
     if not report_data:
@@ -163,15 +177,19 @@ def handle_report(report_data):
     file_path = report_dispatcher.save_report_locally(report_data, interactive=False)
     report_dispatcher.dispatch_report(file_path)
 
+
 # ******************************************************************************************
 # Task Explanation Handler
 # ******************************************************************************************
+
 
 def explain_task(task, mood):
     print("\n🥪 CHARLOTTE says:")
     if task == "binary_strings":
         if mood == "sassy":
-            print("  Honey, entropy is just chaos — measured mathematically.\n  If it looks random and sus, it probably is. Let’s dig in.\n")
+            print(
+                "  Honey, entropy is just chaos — measured mathematically.\n  If it looks random and sus, it probably is. Let’s dig in.\n"
+            )
         elif mood == "brooding":
             print("  Entropy... the measure of disorder. Like code. Like people.\n")
         elif mood == "manic":
@@ -179,25 +197,39 @@ def explain_task(task, mood):
         elif mood == "apathetic":
             print("  Entropy is a number. It’s whatever. Just run the scan.\n")
         else:
-            print("  Entropy measures how *random* or *unstructured* a string is.\n  Higher entropy often means encryption, encoding, or something suspicious.\n")
+            print(
+                "  Entropy measures how *random* or *unstructured* a string is.\n  Higher entropy often means encryption, encoding, or something suspicious.\n"
+            )
     elif task == "reverse_engineering":
-        print("  Symbolic tracing helps analyze binary behavior without execution.\n  Useful for malware analysis or understanding complex binaries.\n")
+        print(
+            "  Symbolic tracing helps analyze binary behavior without execution.\n  Useful for malware analysis or understanding complex binaries.\n"
+        )
     elif task == "web_recon":
-        print("  Web recon helps discover hidden subdomains and potential attack surfaces.\n")
+        print(
+            "  Web recon helps discover hidden subdomains and potential attack surfaces.\n"
+        )
     elif task == "owasp_amass":
-        print("  OWASP Amass performs passive or active subdomain enumeration.\n  Great for expanding your domain's footprint and finding weak spots.\n")
+        print(
+            "  OWASP Amass performs passive or active subdomain enumeration.\n  Great for expanding your domain's footprint and finding weak spots.\n"
+        )
     elif task == "nmap_scan":
-        print("  Nmap is my favorite. Classic recon, updated with heuristics.\n  Let’s scan and see what secrets your network is whispering.\n")
+        print(
+            "  Nmap is my favorite. Classic recon, updated with heuristics.\n  Let’s scan and see what secrets your network is whispering.\n"
+        )
     elif task == "sql_injection":
         print("  SQL injection scans look for vulnerabilities in web applications.\n")
     elif task == "xss_scan":
         print("  XSS scans detect cross-site scripting vulnerabilities in web apps.\n")
     elif task == "exploit_generation":
-        print("  Exploit generation creates payloads based on vulnerability descriptions.\n")
+        print(
+            "  Exploit generation creates payloads based on vulnerability descriptions.\n"
+        )
+
 
 # ******************************************************************************************
 # Entry Point Logic
 # ******************************************************************************************
+
 
 def main():
     check_plugin_doc()
@@ -207,11 +239,11 @@ def main():
 
     # Use the shim so we don't care how the plugin’s signature looks
     result = safe_run_plugin(
-        run_amass_plugin,
-        domain="www.c-h-a-r-l-o-t-t-e.org",
-        interactive=False
+        run_amass_plugin, domain="www.c-h-a-r-l-o-t-t-e.org", interactive=False
     )
     handle_report(result)
+
+
 # ******************************************************************************************
 # This is the main entry point for the CHARLOTTE CLI.
 # ******************************************************************************************

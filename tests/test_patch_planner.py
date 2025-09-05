@@ -2,7 +2,6 @@
 import io
 import json
 import sys
-from pathlib import Path
 
 import pytest
 
@@ -28,20 +27,22 @@ def test_build_plan_basics(patch_planner, triage_sample, assets_sample, tmp_path
     by_host = {p.host: p for p in plan}
     assert by_host["db-01"].os == "linux"
     assert by_host["web-01"].os == "windows"
-    assert by_host["app-01"].os == "linux"    # inferred from platform 'ubuntu'
+    assert by_host["app-01"].os == "linux"  # inferred from platform 'ubuntu'
     assert by_host["mac-01"].os == "macos"
 
     # Window normalization: db-01 uses +8h, mac-01 uses +45m, web-01 fixed ISO, app-01 default offset
     assert "T" in by_host["db-01"].window and by_host["db-01"].window.endswith("+00:00")
-    assert "T" in by_host["mac-01"].window and by_host["mac-01"].window.endswith("+00:00")
+    assert "T" in by_host["mac-01"].window and by_host["mac-01"].window.endswith(
+        "+00:00"
+    )
     assert by_host["web-01"].window.startswith("2030-01-01T10:00:00")
     assert "T" in by_host["app-01"].window
 
     # Ring assignment from default map
-    assert by_host["db-01"].ring == 0      # tier-0
-    assert by_host["web-01"].ring == 1     # tier-1
-    assert by_host["app-01"].ring == 2     # tier-2
-    assert by_host["mac-01"].ring == 1     # tier-1
+    assert by_host["db-01"].ring == 0  # tier-0
+    assert by_host["web-01"].ring == 1  # tier-1
+    assert by_host["app-01"].ring == 2  # tier-2
+    assert by_host["mac-01"].ring == 1  # tier-1
 
 
 def test_filters_and_sorting(patch_planner, triage_sample, assets_sample):
@@ -50,7 +51,8 @@ def test_filters_and_sorting(patch_planner, triage_sample, assets_sample):
 
     # Only internet exposure, min EPSS 0.2, tiers tier-0/tier-1
     plan = patch_planner.build_plan(
-        findings, assets,
+        findings,
+        assets,
         min_epss=0.2,
         kev_only=False,
         exposure_filter=["internet"],
@@ -100,7 +102,10 @@ def test_csv_export(patch_planner, triage_sample, assets_sample, tmp_path):
 
     text = csv_path.read_text(encoding="utf-8")
     # Header and at least one line
-    assert "host,os,cve,ring,window,kev,epss,cvss,exposure,criticality,package,current_version,fix_version,rollback" in text
+    assert (
+        "host,os,cve,ring,window,kev,epss,cvss,exposure,criticality,package,current_version,fix_version,rollback"
+        in text
+    )
     assert "db-01" in text
 
 

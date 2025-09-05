@@ -16,6 +16,8 @@
 #            normalized payload so LLM/reporting layers can analyze results.
 # ******************************************************************************************
 
+from __future__ import annotations
+
 import os
 import sys
 import yaml
@@ -319,13 +321,16 @@ def _resolve_dynamic_entry(entry_point: str):
     Resolve a dynamic entry point that may be dotted or a file path.
     Returns a loaded module.
     """
-    # If dotted (has dots and no path separators), try dotted import first
+    # If dotted (has dots and no path separators), try dotted import first.
     if ("/" not in entry_point) and ("\\" not in entry_point):
-        mod = _import_by_dotted(entry_point)
+        ep = entry_point.rstrip()
+        # Allow accidental trailing '.py' in dotted form, e.g. 'plugins.recon.amass.owasp_amass.py'
+        ep_noext = ep[:-3] if ep.endswith(".py") else ep
+        mod = _import_by_dotted(ep_noext)
         if mod:
             return mod
         # If it looked dotted but didn't import, try translating to a path
-        file_path = ROOT_DIR / (entry_point.replace(".", "/") + ".py")
+        file_path = ROOT_DIR / (ep_noext.replace(".", "/") + ".py")
         if file_path.exists():
             return _import_by_path(f"charlotte.dynamic.{file_path.stem}", file_path)
         raise ModuleNotFoundError(f"Dynamic module '{entry_point}' not found.")

@@ -1,3 +1,5 @@
+# ruff: noqa: E402
+# Reason: this script adjusts sys.path before importing project modules.
 # ******************************************************************************************
 # scripts/train_severity_model.py
 # Trains CVESeverityNet using pre-parsed CVE data from CSVs
@@ -10,7 +12,6 @@
 import torch
 import torch.nn as nn
 import torch.optim as optim
-import numpy as np
 import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
@@ -56,7 +57,11 @@ X_scaled = scaler.fit_transform(X)
 
 # Split the data into training and validation sets (80% train / 20% val)
 X_train, X_val, y_train, y_val = train_test_split(
-    X_scaled, y, test_size=0.2, random_state=42, stratify=y  # Maintain class balance
+    X_scaled,
+    y,
+    test_size=0.2,
+    random_state=42,
+    stratify=y,  # Maintain class balance
 )
 
 # Convert data to PyTorch tensors for model training

@@ -7,12 +7,21 @@
 # - No hard non-stdlib deps; optional psutil if installed for richer net metrics
 # ==========================================================================================
 from __future__ import annotations
-import json, os, signal, sys, time, threading, logging, platform, socket, concurrent.futures
+import json
+import os
+import signal
+import sys
+import time
+import threading
+import logging
+import platform
+import socket
+import concurrent.futures
 from logging.handlers import RotatingFileHandler
 from pathlib import Path
 from datetime import datetime
 from http.server import BaseHTTPRequestHandler, HTTPServer
-from typing import Dict, Any, List, Optional
+from typing import Any
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Paths (relative to this file):
@@ -27,17 +36,19 @@ DEFAULT_CONFIG = DATA_DIR / "config.json"
 # OLD:
 # DEFAULT_LOG_DIR = (ROOT / ".." / "logs").resolve()
 # NEW:
-DEFAULT_LOG_DIR = Path("/data/logs/charlotte_sessions")  # <- use your sessions path by default
+DEFAULT_LOG_DIR = Path(
+    "/data/logs/charlotte_sessions"
+)  # <- use your sessions path by default
 
 
 STOP_EVENT = threading.Event()
 RELOAD_EVENT = threading.Event()
 
 METRICS_LOCK = threading.Lock()
-METRICS_STATE: Dict[str, Any] = {
-    "start_time": time.time(),         # unix epoch seconds
-    "last_heartbeat": time.time(),     # unix epoch seconds
-    "interval": 300,                   # seconds between heartbeats
+METRICS_STATE: dict[str, Any] = {
+    "start_time": time.time(),  # unix epoch seconds
+    "last_heartbeat": time.time(),  # unix epoch seconds
+    "interval": 300,  # seconds between heartbeats
     "autopilot": {
         "running": False,
         "net_fraction": 0.35,
@@ -45,8 +56,8 @@ METRICS_STATE: Dict[str, Any] = {
         "iface": "unknown",
         "idle_bps": 0,
         "utilization": 0.0,
-        "detectors": {}
-    }
+        "detectors": {},
+    },
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -56,6 +67,7 @@ try:
     import psutil  # type: ignore
 except Exception:  # psutil remains optional
     psutil = None  # type: ignore
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Token-bucket limiter (network bytes)
@@ -83,12 +95,15 @@ class TokenBucketLimiter:
                 elapsed = now - self._last
                 self._last = now
                 # add tokens
-                self._tokens = min(float(self._cap), self._tokens + elapsed * self._rate)
+                self._tokens = min(
+                    float(self._cap), self._tokens + elapsed * self._rate
+                )
                 if self._tokens >= cost_bytes:
                     self._tokens -= cost_bytes
                     return
             # back off proportional to deficit (bounded)
             time.sleep(min(0.5, max(0.01, cost_bytes / max(1.0, self._rate))))
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Lightweight bandwidth monitor
@@ -96,9 +111,15 @@ class TokenBucketLimiter:
 # - Else: uses a static link capacity heuristic and reports only configured headroom
 # ──────────────────────────────────────────────────────────────────────────────
 class BandwidthMonitor:
-    def __init__(self, link_bps: int = 100_000_000, iface: Optional[str] = None):
+    def __init__(self, link_bps: int = 100_000_000, iface: str | None = None):
         self._lock = threading.Lock()
-        self._state = {"iface": iface or "unknown", "bps_in": 0, "bps_out": 0, "idle_bps": link_bps, "cpu": 0.0}
+        self._state = {
+            "iface": iface or "unknown",
+            "bps_in": 0,
+            "bps_out": 0,
+            "idle_bps": link_bps,
+            "cpu": 0.0,
+        }
         self._run = False
         self._link_bps = int(link_bps)
 
@@ -129,7 +150,11 @@ class BandwidthMonitor:
         return best
 
     def _loop(self):
-        iface = self._state["iface"] if self._state["iface"] != "unknown" else self._pick_iface()
+        iface = (
+            self._state["iface"]
+            if self._state["iface"] != "unknown"
+            else self._pick_iface()
+        )
         pernic_prev = psutil.net_io_counters(pernic=True)
         prev = pernic_prev.get(iface)
         if prev is None:
@@ -157,7 +182,7 @@ class BandwidthMonitor:
                 }
             prev = cur
 
-    def read(self) -> Dict[str, Any]:
+    def read(self) -> dict[str, Any]:
         with self._lock:
             return dict(self._state)
 
@@ -169,6 +194,7 @@ class BandwidthMonitor:
     def cpu_percent(self) -> float:
         return float(self.read().get("cpu", 0.0))
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Issue model + detectors (stdlib-only examples)
 # - LogAnomalyDetector: scans last N lines for ERROR/Exception spikes
@@ -176,23 +202,30 @@ class BandwidthMonitor:
 #   (no sweeping scans; safe “known hosts” probe only)
 # ──────────────────────────────────────────────────────────────────────────────
 class Issue:
-    def __init__(self, title: str, severity: str, details: Dict[str, Any], hint: Optional[str] = None):
+    def __init__(
+        self,
+        title: str,
+        severity: str,
+        details: dict[str, Any],
+        hint: str | None = None,
+    ):
         self.title = title
         self.severity = severity
         self.details = details
         self.hint = hint or ""
 
+
 class LogAnomalyDetector:
-    def __init__(self, cfg: Dict[str, Any], logger: logging.Logger):
+    def __init__(self, cfg: dict[str, Any], logger: logging.Logger):
         self.cfg = cfg
         self.logger = logger.getChild("loganom")
         self._last_run = 0.0
         self._metrics = {"last_files": 0, "last_errors": 0}
 
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         return dict(self._metrics)
 
-    def _tail(self, path: str, n: int) -> List[str]:
+    def _tail(self, path: str, n: int) -> list[str]:
         avg_len = 120
         to_read = n * avg_len
         with open(path, "rb") as f:
@@ -203,13 +236,15 @@ class LogAnomalyDetector:
             data = f.read().decode("utf-8", errors="ignore")
         return data.splitlines()[-n:]
 
-    def run(self) -> List[Issue]:
-        import re, os
+    def run(self) -> list[Issue]:
+        import re
+        import os
+
         patt = re.compile(r"ERROR|Exception|Traceback", re.IGNORECASE)
-        files: List[str] = list(self.cfg.get("files", []))
+        files: list[str] = list(self.cfg.get("files", []))
         window = int(self.cfg.get("window_lines", 1000))
         thresh = int(self.cfg.get("error_threshold", 10))
-        issues: List[Issue] = []
+        issues: list[Issue] = []
         total_err = 0
         for f in files:
             if not os.path.exists(f):
@@ -218,17 +253,26 @@ class LogAnomalyDetector:
             cnt = sum(1 for ln in lines if patt.search(ln))
             total_err += cnt
             if cnt >= thresh:
-                issues.append(Issue(
-                    title=f"Error spike in {Path(f).name}: {cnt} hits / last {window} lines",
-                    severity="medium",
-                    details={"file": f, "count": cnt, "window_lines": window},
-                    hint="Inspect recent errors; consider restart/escalation."
-                ))
+                issues.append(
+                    Issue(
+                        title=f"Error spike in {Path(f).name}: {cnt} hits / last {window} lines",
+                        severity="medium",
+                        details={"file": f, "count": cnt, "window_lines": window},
+                        hint="Inspect recent errors; consider restart/escalation.",
+                    )
+                )
         self._metrics.update({"last_files": len(files), "last_errors": total_err})
         return issues
 
+
 class PortProbeDetector:
-    def __init__(self, cfg: Dict[str, Any], limiter: TokenBucketLimiter, netmon: BandwidthMonitor, logger: logging.Logger):
+    def __init__(
+        self,
+        cfg: dict[str, Any],
+        limiter: TokenBucketLimiter,
+        netmon: BandwidthMonitor,
+        logger: logging.Logger,
+    ):
         self.cfg = cfg
         self.limiter = limiter
         self.netmon = netmon
@@ -236,20 +280,24 @@ class PortProbeDetector:
         self._last_run = 0.0
         self._metrics = {"last_probes": 0, "open_hits": 0}
 
-    def metrics(self) -> Dict[str, Any]:
+    def metrics(self) -> dict[str, Any]:
         return dict(self._metrics)
 
-    def run(self) -> List[Issue]:
-        hosts: List[str] = list(self.cfg.get("hosts", []))      # e.g., ["192.168.0.10","192.168.0.20"]
-        ports: List[int] = list(self.cfg.get("ports", [22, 80, 443, 445, 3389, 5900]))
+    def run(self) -> list[Issue]:
+        hosts: list[str] = list(
+            self.cfg.get("hosts", [])
+        )  # e.g., ["192.168.0.10","192.168.0.20"]
+        ports: list[int] = list(self.cfg.get("ports", [22, 80, 443, 445, 3389, 5900]))
         timeout_s = float(self.cfg.get("timeout_seconds", 0.3))
-        approx_cost = max(5_000, len(hosts) * len(ports) * 120)  # ~120 bytes/probe rough estimate
+        approx_cost = max(
+            5_000, len(hosts) * len(ports) * 120
+        )  # ~120 bytes/probe rough estimate
         self.limiter.acquire(approx_cost)
 
         open_hits = 0
-        issues: List[Issue] = []
+        issues: list[Issue] = []
         for h in hosts:
-            flagged: List[int] = []
+            flagged: list[int] = []
             for p in ports:
                 try:
                     with socket.create_connection((h, p), timeout=timeout_s):
@@ -258,27 +306,36 @@ class PortProbeDetector:
                 except Exception:
                     pass
             if flagged:
-                issues.append(Issue(
-                    title=f"Host {h} has open ports: {flagged}",
-                    severity="high",
-                    details={"host": h, "open_ports": flagged},
-                    hint="Verify necessity; restrict via firewall/ACL; segment to DMZ where appropriate."
-                ))
-        self._metrics.update({"last_probes": len(hosts) * max(1, len(ports)), "open_hits": open_hits})
+                issues.append(
+                    Issue(
+                        title=f"Host {h} has open ports: {flagged}",
+                        severity="high",
+                        details={"host": h, "open_ports": flagged},
+                        hint="Verify necessity; restrict via firewall/ACL; segment to DMZ where appropriate.",
+                    )
+                )
+        self._metrics.update(
+            {"last_probes": len(hosts) * max(1, len(ports)), "open_hits": open_hits}
+        )
         return issues
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Autopilot (bandwidth-aware scheduler)
 # ──────────────────────────────────────────────────────────────────────────────
 class AutoPilot:
-    def __init__(self, cfg: Dict[str, Any], logger: logging.Logger):
+    def __init__(self, cfg: dict[str, Any], logger: logging.Logger):
         self.logger = logger.getChild("autopilot")
         self.cfg = cfg or {}
         self._running = threading.Event()
         self._stop = threading.Event()
-        self._thread: Optional[threading.Thread] = None
-        self.tick_seconds = max(1, int(self.cfg.get("scheduler", {}).get("tick_seconds", 5)))
-        self.max_workers = int(self.cfg.get("scheduler", {}).get("max_concurrent_detectors", 2))
+        self._thread: threading.Thread | None = None
+        self.tick_seconds = max(
+            1, int(self.cfg.get("scheduler", {}).get("tick_seconds", 5))
+        )
+        self.max_workers = int(
+            self.cfg.get("scheduler", {}).get("max_concurrent_detectors", 2)
+        )
 
         # bandwidth policy
         self.net_fraction = float(self.cfg.get("net_utilization_max", 0.35))
@@ -294,23 +351,34 @@ class AutoPilot:
 
         # detectors registry
         dconf = self.cfg.get("detectors", {}) or {}
-        self.detectors: Dict[str, Any] = {}
+        self.detectors: dict[str, Any] = {}
         if (dconf.get("log_anomaly") or {}).get("enabled", False):
-            self.detectors["log_anomaly"] = LogAnomalyDetector(dconf["log_anomaly"], self.logger)
+            self.detectors["log_anomaly"] = LogAnomalyDetector(
+                dconf["log_anomaly"], self.logger
+            )
         if (dconf.get("port_probe") or {}).get("enabled", False):
-            self.detectors["port_probe"] = PortProbeDetector(dconf["port_probe"], self.limiter, self.netmon, self.logger)
+            self.detectors["port_probe"] = PortProbeDetector(
+                dconf["port_probe"], self.limiter, self.netmon, self.logger
+            )
 
         # scheduling windows
-        self.intervals: Dict[str, float] = {
-            name: self._parse_interval(cfg.get("interval", "5m")) for name, cfg in dconf.items()
+        self.intervals: dict[str, float] = {
+            name: self._parse_interval(cfg.get("interval", "5m"))
+            for name, cfg in dconf.items()
         }
-        self.cooldowns: Dict[str, float] = {name: 0.0 for name in self.detectors}
-        self.cd_spans: Dict[str, float] = {
-            name: self._parse_interval(cfg.get("cooldown", "0s")) for name, cfg in dconf.items()
+        self.cooldowns: dict[str, float] = {name: 0.0 for name in self.detectors}
+        self.cd_spans: dict[str, float] = {
+            name: self._parse_interval(cfg.get("cooldown", "0s"))
+            for name, cfg in dconf.items()
         }
 
-        self.adaptive = self.cfg.get("adaptive_backoff", {"cpu_hot_percent": 85, "net_hot_utilization": 0.70, "scale_factor": 2.0})
-        self.pool = concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers, thread_name_prefix="ap-det")
+        self.adaptive = self.cfg.get(
+            "adaptive_backoff",
+            {"cpu_hot_percent": 85, "net_hot_utilization": 0.70, "scale_factor": 2.0},
+        )
+        self.pool = concurrent.futures.ThreadPoolExecutor(
+            max_workers=self.max_workers, thread_name_prefix="ap-det"
+        )
 
     # timings
     @staticmethod
@@ -319,7 +387,7 @@ class AutoPilot:
         units = [("ms", 0.001), ("s", 1), ("m", 60), ("h", 3600)]
         for u, k in units:
             if s.endswith(u):
-                return float(s[:-len(u)]) * k
+                return float(s[: -len(u)]) * k
         try:
             return float(s)
         except Exception:
@@ -332,7 +400,9 @@ class AutoPilot:
         self._stop.clear()
         self._running.set()
         self.netmon.start()
-        self._thread = threading.Thread(target=self._loop, name="autopilot", daemon=True)
+        self._thread = threading.Thread(
+            target=self._loop, name="autopilot", daemon=True
+        )
         self._thread.start()
         self.logger.info("Autopilot started")
 
@@ -345,18 +415,24 @@ class AutoPilot:
         self.netmon.stop()
         self.logger.info("Autopilot stopped")
 
-    def status(self) -> Dict[str, Any]:
+    def status(self) -> dict[str, Any]:
         bw = self.netmon.read()
         return {
             "running": self._running.is_set(),
             "tick_seconds": self.tick_seconds,
-            "max_workers": self.pool._max_workers if hasattr(self.pool, "_max_workers") else self.max_workers,
+            "max_workers": self.pool._max_workers
+            if hasattr(self.pool, "_max_workers")
+            else self.max_workers,
             "net_fraction": self.net_fraction,
             "limiter_rate_bps": getattr(self, "_last_rate", 0),
             "iface": bw.get("iface", "unknown"),
             "idle_bps": bw.get("idle_bps", 0),
             "utilization": self.netmon.utilization(),
-            "detectors": {k: v.metrics() for k, v in self.detectors.items() if hasattr(v, "metrics")},
+            "detectors": {
+                k: v.metrics()
+                for k, v in self.detectors.items()
+                if hasattr(v, "metrics")
+            },
         }
 
     def set_net_fraction(self, f: float):
@@ -381,21 +457,31 @@ class AutoPilot:
     def _recalc_limiter(self):
         bw = self.netmon.read() or {}
         headroom_bps = max(0, int(bw.get("idle_bps", 0)))
-        rate = max(50_000, int(headroom_bps * float(self.net_fraction)))  # never below 50 kbps
-        cap  = max(rate * 4, 2_000_000)
+        rate = max(
+            50_000, int(headroom_bps * float(self.net_fraction))
+        )  # never below 50 kbps
+        cap = max(rate * 4, 2_000_000)
         self.limiter.reset(rate_bps=rate, capacity_bytes=cap)
         self._last_rate = rate
 
     def _schedule_due(self):
         now = time.time()
-        cpu_hot = self.netmon.cpu_percent() >= float(self.adaptive.get("cpu_hot_percent", 85))
-        net_hot = self.netmon.utilization() >= float(self.adaptive.get("net_hot_utilization", 0.70))
-        scale   = float(self.adaptive.get("scale_factor", 2.0)) if (cpu_hot or net_hot) else 1.0
+        cpu_hot = self.netmon.cpu_percent() >= float(
+            self.adaptive.get("cpu_hot_percent", 85)
+        )
+        net_hot = self.netmon.utilization() >= float(
+            self.adaptive.get("net_hot_utilization", 0.70)
+        )
+        scale = (
+            float(self.adaptive.get("scale_factor", 2.0))
+            if (cpu_hot or net_hot)
+            else 1.0
+        )
 
         for name, det in self.detectors.items():
             interval = float(self.intervals.get(name, 300.0)) * scale
             cooldown = float(self.cd_spans.get(name, 0.0))
-            last     = float(getattr(det, "_last_run", 0.0))
+            last = float(getattr(det, "_last_run", 0.0))
 
             if (now - last) < interval:
                 continue
@@ -413,10 +499,16 @@ class AutoPilot:
     def _run_detector_safe(self, name: str, det):
         try:
             setattr(det, "_last_run", time.time())
-            issues: List[Issue] = det.run() or []
+            issues: list[Issue] = det.run() or []
             for issue in issues:
                 # Currently just log the issue; integrate with triage/actions as needed
-                self.logger.warning("[ISSUE] %s: %s (sev=%s) — hint=%s", name, issue.title, issue.severity, issue.hint)
+                self.logger.warning(
+                    "[ISSUE] %s: %s (sev=%s) — hint=%s",
+                    name,
+                    issue.title,
+                    issue.severity,
+                    issue.hint,
+                )
         except Exception as e:
             self.logger.exception("Detector %s failed: %s", name, e)
 
@@ -424,6 +516,7 @@ class AutoPilot:
         st = self.status()
         with METRICS_LOCK:
             METRICS_STATE["autopilot"] = st
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Health & Metrics server
@@ -468,6 +561,7 @@ def _metrics_snapshot() -> str:
     ]
     return "\n".join(lines) + "\n"
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # HTTP handler factory (injects config/autopilot/logger)
 # ──────────────────────────────────────────────────────────────────────────────
@@ -507,7 +601,9 @@ def make_handler(logger: logging.Logger, autopilot: AutoPilot, approval_token: s
             if self.path == "/metrics":
                 body = _metrics_snapshot().encode("utf-8")
                 self.send_response(200)
-                self.send_header("Content-Type", "text/plain; version=0.0.4; charset=utf-8")
+                self.send_header(
+                    "Content-Type", "text/plain; version=0.0.4; charset=utf-8"
+                )
                 self.send_header("Cache-Control", "no-cache")
                 self.send_header("Content-Length", str(len(body)))
                 self.end_headers()
@@ -556,38 +652,50 @@ def make_handler(logger: logging.Logger, autopilot: AutoPilot, approval_token: s
 
     return Handler
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Health & control server
 # ──────────────────────────────────────────────────────────────────────────────
 def start_health_server(port: int, logger, handler_cls):
     try:
-        srv = HTTPServer(("127.0.0.1", port), handler_cls)  # pass a class, not a factory
+        srv = HTTPServer(
+            ("127.0.0.1", port), handler_cls
+        )  # pass a class, not a factory
     except OSError as e:
-        logger.error("failed to bind health/metrics server on 127.0.0.1:%d: %s", port, e)
+        logger.error(
+            "failed to bind health/metrics server on 127.0.0.1:%d: %s", port, e
+        )
         return None
 
     t = threading.Thread(target=srv.serve_forever, daemon=True)
     t.start()
-    logger.info("HTTP server on http://127.0.0.1:%d  endpoints: /healthz /metrics /autopilot/* /throttle /shutdown", port)
+    logger.info(
+        "HTTP server on http://127.0.0.1:%d  endpoints: /healthz /metrics /autopilot/* /throttle /shutdown",
+        port,
+    )
     return srv
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Core helpers
 # ──────────────────────────────────────────────────────────────────────────────
 def load_config(path: Path) -> dict:
     try:
-        with open(path, "r", encoding="utf-8") as f:
+        with open(path, encoding="utf-8") as f:
             cfg = json.load(f)
             assert isinstance(cfg, dict)
             return cfg
     except Exception:
         return {}
 
+
 def setup_logger(log_dir: Path, level: str = "INFO") -> logging.Logger:
     log_dir.mkdir(parents=True, exist_ok=True)
     logger = logging.getLogger("charlotte-daemon")
     logger.setLevel(getattr(logging, level.upper(), logging.INFO))
-    handler = RotatingFileHandler(log_dir / "charlotte-daemon.log", maxBytes=5_000_000, backupCount=5)
+    handler = RotatingFileHandler(
+        log_dir / "charlotte-daemon.log", maxBytes=5_000_000, backupCount=5
+    )
     fmt = logging.Formatter("%(asctime)s [%(levelname)s] %(message)s")
     handler.setFormatter(fmt)
     logger.handlers.clear()
@@ -596,6 +704,7 @@ def setup_logger(log_dir: Path, level: str = "INFO") -> logging.Logger:
     sh.setFormatter(fmt)
     logger.addHandler(sh)
     return logger
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Signal handling (portable)
@@ -608,6 +717,7 @@ def signal_handler(signum, frame):
     elif signum == getattr(signal, "SIGBREAK", None):  # Windows Ctrl+Break
         STOP_EVENT.set()
 
+
 def _install_signal_handlers(logger: logging.Logger):
     for sig_name in ("SIGTERM", "SIGINT", "SIGHUP", "SIGBREAK"):
         sig = getattr(signal, sig_name, None)
@@ -619,13 +729,14 @@ def _install_signal_handlers(logger: logging.Logger):
         except Exception:
             logger.debug("could not install handler for %s", sig_name)
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Background work loop
 # ──────────────────────────────────────────────────────────────────────────────
 def heartbeat(logger: logging.Logger, interval: int):
     while not STOP_EVENT.is_set():
         try:
-            logger.info("heartbeat | alive=%s", datetime.utcnow().isoformat()+"Z")
+            logger.info("heartbeat | alive=%s", datetime.utcnow().isoformat() + "Z")
             with METRICS_LOCK:
                 METRICS_STATE["last_heartbeat"] = time.time()
         except Exception as e:
@@ -635,6 +746,7 @@ def heartbeat(logger: logging.Logger, interval: int):
             step = 1.0 if remaining > 1.0 else remaining
             STOP_EVENT.wait(step)
             remaining -= step
+
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main
@@ -666,7 +778,7 @@ def main():
 
     # HTTP server (health/metrics + control)
     port = int(cfg.get("daemon", {}).get("health_port", 8787))
-    handler_cls = make_handler(logger, autopilot, approval_token)   # build the class
+    handler_cls = make_handler(logger, autopilot, approval_token)  # build the class
     srv = start_health_server(port, logger, handler_cls) if port else None
 
     # Enable autopilot at boot if configured
@@ -674,8 +786,10 @@ def main():
         if os.getenv("CHARLOTTE_TOKEN", "") or approval_token:
             autopilot.start()
         else:
-            logger.warning("Autopilot 'enabled' but no control token set; refusing to start for safety. "
-                           "Set CHARLOTTE_TOKEN env or autopilot.approval_token in config.")
+            logger.warning(
+                "Autopilot 'enabled' but no control token set; refusing to start for safety. "
+                "Set CHARLOTTE_TOKEN env or autopilot.approval_token in config."
+            )
 
     # Supervision loop (config reload + graceful stop)
     try:
@@ -685,7 +799,9 @@ def main():
                 cfg = load_config(config_path)
                 logger.info("reloaded config")
                 # live-update heartbeat interval if it changed
-                new_interval = int(cfg.get("daemon", {}).get("heartbeat_seconds", interval))
+                new_interval = int(
+                    cfg.get("daemon", {}).get("heartbeat_seconds", interval)
+                )
                 if new_interval != interval:
                     with METRICS_LOCK:
                         METRICS_STATE["interval"] = new_interval
@@ -707,6 +823,7 @@ def main():
         pass
     t.join(timeout=10)
     logger.info("bye.")
+
 
 if __name__ == "__main__":
     main()

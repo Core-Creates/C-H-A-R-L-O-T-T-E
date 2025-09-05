@@ -1,5 +1,11 @@
+# ruff: noqa: E402
+# Reason: this script adjusts sys.path before importing project modules.
 # cli/mcp_htb.py — Minimal CLI for HTB MCP
-import os, sys, json, asyncio, argparse
+import os
+import sys
+import json
+import asyncio
+import argparse
 
 # 🛠️ PATCH SYS.PATH EARLY
 CURRENT_FILE = os.path.abspath(__file__)
@@ -8,6 +14,7 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 
 from core.mcp_client import load_cfg, HtbMcpClient
+
 
 # Accept either {"data":[...]} or [...] or {"events":[...]}
 def _as_events(res):
@@ -20,6 +27,7 @@ def _as_events(res):
         return res["events"]
     return []
 
+
 # Accept either {"teams":[...]} or [...]
 def _as_teams(res):
     if isinstance(res, dict) and "teams" in res and isinstance(res["teams"], list):
@@ -28,11 +36,17 @@ def _as_teams(res):
         return res
     return []
 
+
 # Accept only dict with "challenges" key
 def _as_challenges(ctf):
-    if isinstance(ctf, dict) and "challenges" in ctf and isinstance(ctf["challenges"], list):
+    if (
+        isinstance(ctf, dict)
+        and "challenges" in ctf
+        and isinstance(ctf["challenges"], list)
+    ):
         return ctf["challenges"]
     return []
+
 
 # Pretty-print or raw JSON
 def _print(obj, as_json: bool):
@@ -44,17 +58,18 @@ def _print(obj, as_json: bool):
         else:
             print(obj)
 
+
 async def run(args):
     url, tok = load_cfg()
     c = HtbMcpClient(url, tok)
     await c.connect()
     try:
-        # Handles commands based on args 
+        # Handles commands based on args
 
         # checks if the command argument is list-events
         if args.cmd == "list-events":
             res = await c.list_events()
-            if args.json: 
+            if args.json:
                 return _print(res, True)
             for e in _as_events(res):
                 title = e.get("title") or e.get("name") or "(no title)"
@@ -63,20 +78,22 @@ async def run(args):
         # checks if the command arg is my-teams or list-teams alias
         elif args.cmd in ("my-teams", "list-teams"):
             res = await c.my_teams()
-            if args.json: 
+            if args.json:
                 return _print(res, True)
             for t in _as_teams(res):
                 print(f"{t.get('id','?'):>6}  {t.get('name','(no name)')}")
-        
+
         # checks if the command arg is join
         elif args.cmd == "join":
-            out = await c.join_ctf(args.ctf, args.team, bool(args.consent), args.password or "")
+            out = await c.join_ctf(
+                args.ctf, args.team, bool(args.consent), args.password or ""
+            )
             return _print(out, args.json)
-        
+
         # checks if the command arg is challenges
         elif args.cmd == "challenges":
             ctf = await c.get_ctf(args.ctf)
-            if args.json: 
+            if args.json:
                 return _print(ctf, True)
             for ch in _as_challenges(ctf):
                 print(f"{ch.get('id','?'):>6}  {ch.get('name','(no name)')}")
@@ -86,20 +103,29 @@ async def run(args):
             res = await c.list_events()
             needle = args.name.lower()
             events = _as_events(res)
-            match = next((e for e in events if needle in (e.get("title") or e.get("name","")).lower()), None)
+            match = next(
+                (
+                    e
+                    for e in events
+                    if needle in (e.get("title") or e.get("name", "")).lower()
+                ),
+                None,
+            )
             if not match:
                 # If not, print an error message
                 print(f"[!] No event title contains: {args.name}")
             else:
                 # If we found a match, print it
                 _print(match, args.json)
-            
+
         # checks if the command arg is pick-challenge
         elif args.cmd == "pick-challenge":
             ctf = await c.get_ctf(args.ctf)
             needle = args.name.lower()
             chals = _as_challenges(ctf)
-            match = next((ch for ch in chals if needle in (ch.get("name","")).lower()), None)
+            match = next(
+                (ch for ch in chals if needle in (ch.get("name", "")).lower()), None
+            )
             if not match:
                 # If not, print an error message
                 print(f"[!] No challenge name contains: {args.name}")
@@ -111,11 +137,11 @@ async def run(args):
         elif args.cmd == "start":
             out = await c.start_container(args.challenge)
             return _print(out, args.json)
-        
+
         # checks if the command arg is download
         elif args.cmd == "download":
             out = await c.get_download_link(args.challenge)
-            if args.json: 
+            if args.json:
                 return _print(out, True)
             print(out.get("url") if isinstance(out, dict) else out)
 
@@ -123,13 +149,14 @@ async def run(args):
         elif args.cmd == "submit":
             out = await c.submit_flag(args.challenge, args.flag)
             return _print(out, args.json)
-        
+
         # If the command is not recognized, print an error message
         else:
             print("Unknown command")
     finally:
         # Close the client connection
         await c.close()
+
 
 def main():
     p = argparse.ArgumentParser(prog="charlotte mcp", description="CHARLOTTE ↔ HTB MCP")
@@ -168,6 +195,7 @@ def main():
 
     args = p.parse_args()
     asyncio.run(run(args))
+
 
 if __name__ == "__main__":
     main()

@@ -15,10 +15,13 @@
 #   These comments should help future contributors quickly follow the control flow.
 # ******************************************************************************************
 
+from __future__ import annotations
+
 import os
 import sys
 import re
-from datetime import datetime, timedelta, timezone  # Used for date parsing in CVE flow
+import json
+from datetime import datetime, timedelta, timezone
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Third-party deps with friendly hints if missing
@@ -28,25 +31,8 @@ try:
     from InquirerPy import inquirer
     from InquirerPy.separator import Separator
 except ModuleNotFoundError:
-    # If InquirerPy isn't installed, fail fast with a helpful message.
     print("[!] Missing dependency: InquirerPy\n    pip install InquirerPy")
-    raise
-
-
-from core.plugin_manager import (
-    run_plugin,
-    _call_plugin_entrypoint,
-    register_post_run,
-    PLUGIN_REGISTRY,
-    ALIASES,
-    # run_dynamic_by_label,  # only keep if you actually use it later
-)
-
-from utils.logger import start_session, append_session_event, end_session, log_error
-
-# Make internal helpers importable by other modules
-# Exposing these names allows other modules/tests to import entries neatly.
-__all__ = ["run_plugin", "_call_plugin_entrypoint", "PLUGIN_REGISTRY", "ALIASES"]
+    sys.exit(1)
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Ensure project-local imports work (agents/, core/, plugins/, etc.)
@@ -63,7 +49,7 @@ if PROJECT_ROOT not in sys.path:
 # If any module is missing, surface a clear, actionable message.
 # ──────────────────────────────────────────────────────────────────────────────
 try:
-    # ⬇️ import robust plugin loader + convenience runners
+    # ⬇️ robust plugin loader + convenience runners
     from core.plugin_manager import (
         load_plugins,
         run_plugin,
@@ -71,16 +57,48 @@ try:
         _call_plugin_entrypoint,
         register_post_run,
         run_dynamic_by_label,
+        PLUGIN_REGISTRY,
+        ALIASES,
     )
     from agents.triage_agent import run_triage_agent, load_findings, save_results
     from core.charlotte_personality import CharlottePersonality
     from utils.paths import display_path
     import core.cve_lookup
+
+    # Make internal helpers importable by other modules/tests.
+    __all__ = ["run_plugin", "_call_plugin_entrypoint", "PLUGIN_REGISTRY", "ALIASES"]
+
 except ModuleNotFoundError as e:
     print(
-        f"[!] Missing CHARLOTTE module: {e.name}\n    Did you activate the venv and install requirements?"
+        f"[!] Missing CHARLOTTE module: {e.name}\n"
+        f"    Did you activate the venv and install requirements?"
     )
     raise
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Session telemetry (safe fallbacks if service module is absent)
+# ──────────────────────────────────────────────────────────────────────────────
+try:
+    from service.charlotte_service import (
+        start_session,
+        append_session_event,
+        end_session,
+        log_error,
+    )
+except Exception:
+
+    def start_session(meta: dict) -> str:
+        # simple fallback session id
+        return datetime.now().strftime("%Y%m%d%H%M%S")
+
+    def append_session_event(session_id: str, event: str, data: dict | None = None):
+        pass
+
+    def end_session(session_id: str, status: str = "ok"):
+        pass
+
+    def log_error(session_id: str, error: str):
+        print(f"[session:{session_id}] ERROR: {error}")
 
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -92,9 +110,8 @@ charlotte = CharlottePersonality()
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Banner (for ✨ vibes ✨)
-# Contains color codes + ASCII skull. Purely cosmetic but establishes identity.
 # ──────────────────────────────────────────────────────────────────────────────
-def print_banner():
+def print_banner() -> None:
     PURPLE = "\033[35m"
     RESET = "\033[0m"
     skull_banner = f"""{PURPLE}
@@ -115,7 +132,6 @@ def print_banner():
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Menu label → plugin key mapping (static registry)
-# These are the “built-ins” that the main menu always shows.
 # Dynamic plugins are discovered at runtime and surfaced separately.
 # ──────────────────────────────────────────────────────────────────────────────
 PLUGIN_TASKS = {
@@ -137,13 +153,12 @@ PLUGIN_TASKS = {
     "🐝 OWASP ZAP Exploitability": "owasp_zap",
 }
 
+
 # ──────────────────────────────────────────────────────────────────────────────
 # Helpers for special flows (CVE date filter parsing)
 # These helpers live here (UI/orchestration layer) rather than in cve_lookup.py,
-# keeping cve_lookup clean as a data-access layer that only expects ISO timestamps.
+# keeping that module clean as a data-access layer that expects ISO timestamps.
 # ──────────────────────────────────────────────────────────────────────────────
-
-
 def _iso_z(dt: datetime) -> str:
     """NVD wants ISO8601 with milliseconds and Z suffix: YYYY-MM-DDTHH:MM:SS.000Z"""
     return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
@@ -151,20 +166,13 @@ def _iso_z(dt: datetime) -> str:
 
 def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     """
-    Translates a human-friendly filter string into NVD pubStartDate/pubEndDate.
+    Translate a human-friendly filter string into NVD pubStartDate/pubEndDate.
 
-    Returns:
-      (pubStartDateISO, pubEndDateISO) or (None, None) if filter is empty/invalid.
-
-    Supported patterns:
+    Supported:
       • 'last 30 days' / 'last 2 weeks' / 'last 3 months' (months≈30 days)
       • 'since 2025-07-01'
       • 'between 2025-07-01 and 2025-07-31'
-      • '2025-07-01..2025-07-31'  (shorthand)
-
-    Rationale:
-      We keep date interpretation here in the UI layer so cve_lookup.py remains
-      reusable in other contexts (e.g., headless or API).
+      • '2025-07-01..2025-07-31'
     """
     if not filter_str:
         return None, None
@@ -172,7 +180,6 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
     s = filter_str.strip().lower()
     now = datetime.now(timezone.utc)
 
-    # Pattern: last N units
     m = re.match(r"^last\s+(\d+)\s*(days?|d|weeks?|w|months?|m)\s*$", s)
     if m:
         n = int(m.group(1))
@@ -181,12 +188,11 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
             delta = timedelta(days=n)
         elif unit.startswith("week") or unit == "w":
             delta = timedelta(weeks=n)
-        else:  # months (approximate as 30 days each)
+        else:
             delta = timedelta(days=30 * n)
         start = now - delta
         return _iso_z(start), _iso_z(now)
 
-    # Pattern: since YYYY-MM-DD
     m = re.match(r"^since\s+(\d{4}-\d{2}-\d{2})\s*$", s)
     if m:
         try:
@@ -197,14 +203,12 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
         except Exception:
             return None, None
 
-    # Pattern: between YYYY-MM-DD and YYYY-MM-DD
     m = re.match(r"^between\s+(\d{4}-\d{2}-\d{2})\s+and\s+(\d{4}-\d{2}-\d{2})\s*$", s)
     if m:
         try:
             start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
                 tzinfo=timezone.utc
             )
-            # End-of-day inclusive: add a day then subtract 1 ms
             end = (
                 datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc)
                 + timedelta(days=1)
@@ -214,7 +218,6 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
         except Exception:
             return None, None
 
-    # Pattern: YYYY-MM-DD..YYYY-MM-DD shorthand
     m = re.match(r"^(\d{4}-\d{2}-\d{2})\s*\.\.\s*(\d{4}-\d{2}-\d{2})$", s)
     if m:
         try:
@@ -230,112 +233,59 @@ def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
         except Exception:
             return None, None
 
-    # Fallback: unrecognized expression
-    return None, None
-
-
-# These helpers live here (UI/orchestration layer) rather than in cve_lookup.py,
-# keeping cve_lookup clean as a data-access layer that only expects ISO timestamps.
-# ──────────────────────────────────────────────────────────────────────────────
-
-
-def _iso_z(dt: datetime) -> str:
-    """NVD wants ISO8601 with milliseconds and Z suffix: YYYY-MM-DDTHH:MM:SS.000Z"""
-    return dt.astimezone(timezone.utc).strftime("%Y-%m-%dT%H:%M:%S.000Z")
-
-
-def _parse_date_filter(filter_str: str) -> tuple[str | None, str | None]:
-    """
-    Translates a human-friendly filter string into NVD pubStartDate/pubEndDate.
-
-    Returns:
-      (pubStartDateISO, pubEndDateISO) or (None, None) if filter is empty/invalid.
-
-    Supported patterns:
-      • 'last 30 days' / 'last 2 weeks' / 'last 3 months' (months≈30 days)
-      • 'since 2025-07-01'
-      • 'between 2025-07-01 and 2025-07-31'
-      • '2025-07-01..2025-07-31'  (shorthand)
-
-    Rationale:
-      We keep date interpretation here in the UI layer so cve_lookup.py remains
-      reusable in other contexts (e.g., headless or API).
-    """
-    if not filter_str:
-        return None, None
-
-    s = filter_str.strip().lower()
-    now = datetime.now(timezone.utc)
-
-    # Pattern: last N units
-    m = re.match(r"^last\s+(\d+)\s*(days?|d|weeks?|w|months?|m)\s*$", s)
-    if m:
-        n = int(m.group(1))
-        unit = m.group(2)
-        if unit.startswith("day") or unit == "d":
-            delta = timedelta(days=n)
-        elif unit.startswith("week") or unit == "w":
-            delta = timedelta(weeks=n)
-        else:  # months (approximate as 30 days each)
-            delta = timedelta(days=30 * n)
-        start = now - delta
-        return _iso_z(start), _iso_z(now)
-
-    # Pattern: since YYYY-MM-DD
-    m = re.match(r"^since\s+(\d{4}-\d{2}-\d{2})\s*$", s)
-    if m:
-        try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
-            return _iso_z(start), _iso_z(now)
-        except Exception:
-            return None, None
-
-    # Pattern: between YYYY-MM-DD and YYYY-MM-DD
-    m = re.match(r"^between\s+(\d{4}-\d{2}-\d{2})\s+and\s+(\d{4}-\d{2}-\d{2})\s*$", s)
-    if m:
-        try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
-            # End-of-day inclusive: add a day then subtract 1 ms
-            end = (
-                datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                + timedelta(days=1)
-                - timedelta(milliseconds=1)
-            )
-            return _iso_z(start), _iso_z(end)
-        except Exception:
-            return None, None
-
-    # Pattern: YYYY-MM-DD..YYYY-MM-DD shorthand
-    m = re.match(r"^(\d{4}-\d{2}-\d{2})\s*\.\.\s*(\d{4}-\d{2}-\d{2})$", s)
-    if m:
-        try:
-            start = datetime.strptime(m.group(1), "%Y-%m-%d").replace(
-                tzinfo=timezone.utc
-            )
-            end = (
-                datetime.strptime(m.group(2), "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                + timedelta(days=1)
-                - timedelta(milliseconds=1)
-            )
-            return _iso_z(start), _iso_z(end)
-        except Exception:
-            return None, None
-
-    # Fallback: unrecognized expression
     return None, None
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# CVE Lookup sub-menu
-# This function orchestrates the CVE workflow:
-#  • Prompts user for mode (ID vs Keyword)
-#  • For keyword, optionally parses a human date filter and forwards ISO dates
-#  • Calls cve_lookup helpers and then show_and_export for CSV/JSON
-# All logic here is "UI/controller"; data fetching lives in core.cve_lookup.
+# LLM Router: analyze result & recommend next plugin
+# ──────────────────────────────────────────────────────────────────────────────
+def _llm_recommend_next(
+    session_id: str, current_result: dict | str
+) -> tuple[str | None, str]:
+    """Return (next_label, analysis_markdown). If LLM is not configured, return (None, '')."""
+    try:
+        from core.ai.llm import analyze_plugin_output, redact_for_prompt
+    except Exception:
+        return None, ""
+    try:
+        # Build candidate labels from dynamic discovery
+        try:
+            from core.plugin_manager import dynamic_index_by_label
+
+            dyn_map = dynamic_index_by_label()
+            labels = sorted(list(dyn_map.keys()))
+        except Exception:
+            labels = []
+        payload = {
+            "session_id": session_id,
+            "result": current_result,
+            "available_dynamic_labels": labels,
+            "instruction": "Summarize concisely, then pick exactly ONE label from available_dynamic_labels to run next. "
+            'Respond with a JSON block: {"summary_md": str, "next_label": str}. '
+            "The next_label MUST match one item from available_dynamic_labels. Keep summary short.",
+        }
+        safe = redact_for_prompt(payload)
+        md = analyze_plugin_output("post-run router", safe, model=None, max_tokens=700)
+
+        next_label = None
+        summary_md = ""
+        m = re.search(r"\{[\s\S]*\}", md)
+        if m:
+            try:
+                j = json.loads(m.group(0))
+                summary_md = j.get("summary_md", "") or ""
+                nl = j.get("next_label")
+                if isinstance(nl, str):
+                    next_label = nl.strip()
+            except Exception:
+                pass
+        return next_label, (summary_md or md or "")
+    except Exception as e:
+        return None, f"_LLM router error: {e}_"
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# CVE Intelligence flow
 # ──────────────────────────────────────────────────────────────────────────────
 def run_cve_lookup(session_id: str | None = None):
     print("\n=== CHARLOTTE CVE Intelligence Module ===")
@@ -343,7 +293,6 @@ def run_cve_lookup(session_id: str | None = None):
         inquirer,
     )  # local import keeps startup faster if CVE flow unused
 
-    # Prompt for CVE lookup mode
     mode = inquirer.select(
         message="Choose your CVE query method:",
         choices=["🔎 Search by CVE ID", "🗂️ Search by Keyword"],
@@ -351,14 +300,11 @@ def run_cve_lookup(session_id: str | None = None):
     ).execute()
 
     if mode.startswith("🔎"):
-        # ---- CVE ID path (unchanged) ----
-        # Accepts a mix of full IDs and short numeric IDs (with optional year hint)
         ids = input(
             "Enter CVE ID(s) (comma-separated or short IDs with year): "
         ).strip()
         year_hint = input("Optional year hint for short IDs (YYYY): ").strip()
 
-        # Normalize input to a list of full CVE IDs (CVE-YYYY-NNNN)
         cve_ids = []
         for raw in ids.split(","):
             c = raw.strip()
@@ -374,38 +320,31 @@ def run_cve_lookup(session_id: str | None = None):
             else:
                 print(f"[!] Invalid CVE ID format: '{c}'. Skipping.")
 
-        # Fetch in batch and display/export via cve_lookup
         results = core.cve_lookup.fetch_cves_batch(
             cve_ids, year_filter=year_hint or None
         )
         core.cve_lookup.show_and_export(results, multiple=True)
         return
 
-    # ---- Keyword path with optional date filter ----
-    # Ask for keyword; required to proceed.
     keyword = input("Enter keyword (e.g., apache, buffer overflow): ").strip()
     if not keyword:
         print("[!] No keyword provided.")
         return
 
-    # Offer examples to reduce user error in natural-language date filters.
     print(
         "\n(Date filter is optional. Examples: 'last 30 days', 'since 2025-07-01', "
         "'between 2025-07-01 and 2025-07-31', '2025-07-01..2025-07-31')"
     )
     filt = input("Date filter (press Enter to skip): ").strip()
 
-    # Convert human text → NVD ISO window (pubStartDate/pubEndDate) if provided.
     pub_start, pub_end = _parse_date_filter(filt)
 
-    # Optional results limit; keeps NVD responses fast/sane.
     lim_raw = input("Max results (default 20): ").strip()
     try:
         limit = max(1, min(2000, int(lim_raw))) if lim_raw else 20
     except ValueError:
         limit = 20
 
-    # Delegate actual API query to cve_lookup (data layer).
     results = core.cve_lookup.search_by_keyword(
         keyword=keyword,
         results_limit=limit,
@@ -413,41 +352,33 @@ def run_cve_lookup(session_id: str | None = None):
         pub_end_iso=pub_end,
         start_index=0,
     )
-
-    # Normalize + pretty print + export (CSV/JSON) for later pipelines.
     core.cve_lookup.show_and_export(results, multiple=True)
 
 
-# ── Helpers to fetch dynamic registry robustly ───────────────────────────────
-def _get_dynamic_registry():
+# ──────────────────────────────────────────────────────────────────────────────
+# Dynamic plugin registry fetch (robust)
+# ──────────────────────────────────────────────────────────────────────────────
+def _get_dynamic_registry() -> dict:
     """
     Attempt to retrieve the dynamic plugin registry regardless of how
-    core.plugin_manager exposes it. We try load_plugins() first, then
-    several likely attribute names as fallbacks.
-
-    Returns:
-      A dict mapping dynamic task keys → metadata dicts (or {} if not found).
+    core.plugin_manager exposes it.
     """
-    reg = {}
+    reg: dict = {}
     try:
-        # Primary path: rely on plugin_manager's public loader
         plugins = load_plugins() or {}
         if isinstance(plugins, dict) and "dynamic" in plugins:
             reg = plugins.get("dynamic") or {}
     except Exception:
-        # We swallow here to remain resilient if plugin discovery changes.
         pass
     if reg:
         return reg
 
-    # Fallbacks: probe for common attribute names exposed by plugin_manager
     try:
         from core import plugin_manager as _pm
 
         for attr in ("DYNAMIC_PLUGINS", "PLUGINS", "REGISTRY", "_PLUGINS"):
             obj = getattr(_pm, attr, None)
             if isinstance(obj, dict):
-                # Some shapes nest dynamic under a 'dynamic' key; others are flat.
                 if "dynamic" in obj and isinstance(obj["dynamic"], dict):
                     return obj["dynamic"]
                 if obj and all(isinstance(v, dict) for v in obj.values()):
@@ -457,12 +388,10 @@ def _get_dynamic_registry():
     return {}
 
 
-# ── Classifiers for dynamic plugin surfacing ─────────────────────────────────
+# ──────────────────────────────────────────────────────────────────────────────
+# Recon classifiers for dynamic surfacing
+# ──────────────────────────────────────────────────────────────────────────────
 def _is_recon_like(task_key: str, pretty: str, desc: str, tags: list[str]) -> bool:
-    """
-    Heuristically classify a dynamic plugin as 'Recon' so it appears with recon items.
-    We check tags and fuzzy match against common recon-related keywords.
-    """
     t = {x.lower() for x in (tags or [])}
     name_lc = (pretty or "").lower()
     desc_lc = (desc or "").lower()
@@ -481,7 +410,6 @@ def _is_recon_like(task_key: str, pretty: str, desc: str, tags: list[str]) -> bo
 
 
 def _is_amass_like(task_key: str, pretty: str, desc: str, tags: list[str]) -> bool:
-    """Special check so we can add a neat satellite emoji for Amass-like entries."""
     t = {x.lower() for x in (tags or [])}
     if "amass" in t:
         return True
@@ -493,28 +421,16 @@ def _is_amass_like(task_key: str, pretty: str, desc: str, tags: list[str]) -> bo
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Special handling: OWASP ZAP with comprehensive parameter input
-# Provides a user-friendly interface for configuring ZAP scans with validation
 # ──────────────────────────────────────────────────────────────────────────────
 def run_owasp_zap_interface(session_id: str | None = None):
     """
     Interactive interface for OWASP ZAP vulnerability scanning.
-    Prompts user for target URL, ZAP server settings, and scan parameters.
-
-    ⚠️  IMPORTANT DISCLAIMER:
-    - Passive scan: Only analyzes responses without modifying target pages
-    - Spider crawler: Actively requests pages by following links (may generate server logs)
-    - Active scan: Sends malicious payloads to test for vulnerabilities (REQUIRES EXPLICIT PERMISSION)
-
-    Testing websites or applications without proper authorization may violate laws in many
-    countries and regions. Always ensure you have written permission from the target
-    owner before conducting any security assessments.
     """
     print("\n=== 🐝 OWASP ZAP Vulnerability Scanner ===")
     print("⚠️  IMPORTANT: Only scan targets you have permission to test!")
     print("Configure your ZAP scan parameters below:\n")
 
     try:
-        # Target URL input with validation
         target = inquirer.text(
             message="Enter target URL to scan:",
             default="https://public-firing-range.appspot.com",
@@ -525,7 +441,6 @@ def run_owasp_zap_interface(session_id: str | None = None):
             target = "https://public-firing-range.appspot.com"
             print(f"[ℹ️] Using default target: {target}")
 
-        # Scan type selection
         scan_type_tuple = inquirer.select(
             message="Select scan type:",
             choices=[
@@ -534,53 +449,38 @@ def run_owasp_zap_interface(session_id: str | None = None):
             ],
             default="passive",
         ).execute()
-
-        # Extract the actual value from the tuple
         scan_type = (
             scan_type_tuple[1]
             if isinstance(scan_type_tuple, tuple)
             else scan_type_tuple
         )
 
-        # ZAP server configuration
         zap_host = inquirer.text(
             message="ZAP server host (press Enter for default):", default="127.0.0.1"
         ).execute()
-
         zap_port = inquirer.text(
             message="ZAP server port (press Enter for default):", default="8080"
         ).execute()
-
-        # Scan configuration
         scan_timeout = inquirer.text(
             message="Scan timeout in seconds (press Enter for default):", default="900"
         ).execute()
-
-        # API key (optional)
         api_key = inquirer.text(
             message="ZAP API key (press Enter if not required):", default=""
         ).execute()
-
-        # HTTP timeout
         http_timeout = inquirer.text(
             message="HTTP timeout in seconds (press Enter for default):", default="5.0"
         ).execute()
 
-        # Build arguments dictionary
         args = {
             "target": target,
             "zap_host": zap_host or "127.0.0.1",
             "zap_port": int(zap_port or "8080"),
             "scan_timeout": int(scan_timeout or "900"),
             "http_timeout": float(http_timeout or "5.0"),
+            "scan_type": scan_type,
         }
-
-        # Add API key if provided
         if api_key:
             args["api_key"] = api_key
-
-        # Add scan type to args
-        args["scan_type"] = scan_type
 
         print("\n[🔧] Configuration:")
         print(f"  Target: {args['target']}")
@@ -591,7 +491,6 @@ def run_owasp_zap_interface(session_id: str | None = None):
         if api_key:
             print(f"  API Key: {'*' * min(len(api_key), 8)}...")
 
-        # Special warning for active scans
         if scan_type == "active":
             print("\n🚨  ACTIVE SCAN WARNING 🚨")
             print(f"Active scanning will send malicious payloads to {target}")
@@ -601,14 +500,11 @@ def run_owasp_zap_interface(session_id: str | None = None):
             print(
                 "By proceeding, you confirm you have explicit permission to test this target."
             )
-
-            # Require explicit confirmation for active scans
             proceed = inquirer.confirm(
                 message="⚠️  I understand the risks and have permission to perform active scanning. Proceed?",
                 default=False,
             ).execute()
         else:
-            # Confirm before proceeding for passive scans
             proceed = inquirer.confirm(
                 message="Proceed with scan?", default=True
             ).execute()
@@ -619,16 +515,13 @@ def run_owasp_zap_interface(session_id: str | None = None):
 
         print(f"\n[🚀] Starting OWASP ZAP scan of {target}...")
 
-        # Log the action
         if session_id:
             append_session_event(
                 session_id, "ACTION_BEGIN", {"plugin": "owasp_zap", "target": target}
             )
 
-        # Execute the scan
         result = run_plugin("owasp_zap", args)
 
-        # Log the result
         if session_id:
             append_session_event(
                 session_id, "ACTION_RESULT", {"plugin": "owasp_zap", "result": result}
@@ -637,8 +530,11 @@ def run_owasp_zap_interface(session_id: str | None = None):
         print("\n[✅] OWASP ZAP scan completed!")
         print(f"\n{result}")
 
+        return result
+
     except KeyboardInterrupt:
         print("\n[❌] Scan cancelled by user.")
+        return None
     except Exception as e:
         error_msg = f"OWASP ZAP interface error: {e}"
         print(f"\n[!] {error_msg}")
@@ -648,14 +544,9 @@ def run_owasp_zap_interface(session_id: str | None = None):
 
 
 # ──────────────────────────────────────────────────────────────────────────────
-# Helper function to handle graceful exit with session logging
-# Centralizes the repeated pattern of goodbye message + session cleanup
+# Graceful exit helper
 # ──────────────────────────────────────────────────────────────────────────────
-def graceful_exit(session_id: str | None = None):
-    """
-    Handles graceful exit with goodbye message and session cleanup.
-    Centralizes the repeated pattern used throughout the main loop.
-    """
+def graceful_exit(session_id: str | None = None) -> None:
     print("Goodbye, bestie 🖤")
     if session_id:
         end_session(session_id, status="ok")
@@ -663,28 +554,19 @@ def graceful_exit(session_id: str | None = None):
 
 # ──────────────────────────────────────────────────────────────────────────────
 # Main CLI
-# Orchestrates:
-#   • Session lifecycle logging (start/end, events)
-#   • Plugin discovery (static + dynamic)
-#   • Menu presentation and user choice handling
-#   • Special-cased flows: CVE Lookup, Nmap, triage, exploit predictor
-#   • Generic plugin execution path for everything else
 # ──────────────────────────────────────────────────────────────────────────────
-def main():
-    # Start session logging early so we capture startup diagnostics.
+def main() -> None:
     session_id = start_session({"version": "0.1.0", "stage": "cli_start"})
     append_session_event(session_id, "BANNER_PRINT")
     print_banner()
 
-    # ── Load plugin registry (static is handled by PLUGIN_TASKS) ─────────────
     try:
-        _ = load_plugins()  # side-effects: populate registry in plugin_manager
+        _ = load_plugins()
     except Exception as e:
         print(f"[!] Failed to load plugins: {e}")
         end_session(session_id, status="ok")
         return
 
-    # ── Register post-run LLM hook so every plugin result gets analyzed ──
     try:
         from core.ai.postrun_llm import postrun_llm
 
@@ -693,17 +575,14 @@ def main():
     except Exception as hook_err:
         print(f"[hook] postrun_llm not registered: {hook_err}")
 
-    # ── Collect dynamic plugins robustly ─────────────────────────────────────
     dynamic_registry = _get_dynamic_registry()
 
-    # Optional debug dump of discovered dynamic plugins
     if os.environ.get("CHARLOTTE_DEBUG"):
         print("[debug] dynamic keys:", list((dynamic_registry or {}).keys()))
         for k, m in (dynamic_registry or {}).items():
             print(f"[debug] {k} meta:", m)
 
-    # ── Build auto-surfaced Recon entries ────────────────────────────────────
-    # We attempt to group recon-ish plugins into the Recon section for UX polish.
+    # Build auto-surfaced Recon entries
     recon_dynamic_entries = []
     for task_key, meta in (dynamic_registry or {}).items():
         pretty = (
@@ -721,7 +600,6 @@ def main():
                 }
             )
 
-    # If nothing classified as Recon, we still show a catch-all dynamic section.
     show_dynamic_fallback = not bool(recon_dynamic_entries)
     dynamic_fallback_entries = []
     if show_dynamic_fallback:
@@ -739,9 +617,7 @@ def main():
                 }
             )
 
-    # ── Main menu loop: keep letting the user run tasks until exit ───────────
     while True:
-        # Construct menu with sections. We combine static tasks + surfaced dynamic.
         menu_choices = [
             Separator("=== Binary Ops ==="),
             *[k for k in PLUGIN_TASKS if "Binary" in k],
@@ -763,29 +639,25 @@ def main():
             "❌ Exit",
         ]
 
-        # Present interactive selection and capture user choice.
         task = inquirer.select(
             message="What would you like CHARLOTTE to do?",
             choices=menu_choices,
         ).execute()
 
-        # Graceful exit path with session end logging.
         if task == "❌ Exit":
             graceful_exit(session_id)
             break
 
-        # Special route: CVE Intelligence flow (own sub-menu + exports)
         if task == "🕵️ CVE Lookup (CHARLOTTE)":
             run_cve_lookup(session_id)
             continue
 
-        # Special route: Run a dynamic plugin (tuple value is ('dynamic', key))
         if isinstance(task, tuple) and len(task) == 2 and task[0] == "dynamic":
             _, dyn_key = task
+            result = None
             try:
                 append_session_event(session_id, "ACTION_BEGIN", {"plugin": dyn_key})
                 result = run_dynamic_by_label(dyn_key, args=None)
-                # If plugin returned a structured result, hand it to report dispatcher.
                 from core import report_dispatcher
 
                 if result:
@@ -797,23 +669,68 @@ def main():
                     )
                     print(f"\n[📁 Saved] {file_path}")
             except Exception as e:
-                # Log + surface the error without crashing the whole CLI.
                 log_error(session_id, f"Dynamic plugin '{dyn_key}' failed: {e}")
                 print(f"[!] Error running dynamic plugin '{dyn_key}': {e}")
-            # Offer to run another task before we loop back.
-            again = inquirer.confirm(
-                message="Would you like to run another plugin?", default=True
-            ).execute()
-            if not again:
-                graceful_exit(session_id)
-                break
+
+            next_label, analysis_md = _llm_recommend_next(
+                session_id, result if result is not None else {}
+            )
+            if analysis_md:
+                print("\n[🧠 LLM Analysis]\n" + analysis_md + "\n")
+
+            try:
+                from core.plugin_manager import dynamic_index_by_label
+
+                dyn_map = dynamic_index_by_label()
+            except Exception:
+                dyn_map = {}
+            dyn_labels = list(dyn_map.keys())
+            default_label = (
+                next_label
+                if next_label and next_label in dyn_labels
+                else (dyn_labels[0] if dyn_labels else None)
+            )
+
+            if dyn_labels:
+                ordered = [lbl for lbl in [default_label] if lbl] + [
+                    lbl for lbl in dyn_labels if lbl != default_label
+                ]
+                choice = inquirer.select(
+                    message="Choose next plugin to run (LLM suggested first):",
+                    choices=ordered,
+                    default=default_label,
+                ).execute()
+                use_prev = inquirer.confirm(
+                    message="Pass previous output to the next plugin as chain_input?",
+                    default=True,
+                ).execute()
+                chain_args = {"chain_input": result} if use_prev else None
+                try:
+                    append_session_event(
+                        session_id,
+                        "CHAIN_DECISION",
+                        {"use_prev": bool(use_prev), "next": choice},
+                    )
+                except Exception:
+                    pass
+                try:
+                    result = run_dynamic_by_label(choice, args=chain_args)
+                except Exception as e:
+                    log_error(
+                        session_id, f"Chained dynamic plugin '{choice}' failed: {e}"
+                    )
+                    print(f"[!] Error running dynamic plugin '{choice}': {e}")
+            else:
+                again = inquirer.confirm(
+                    message="Would you like to run another plugin?", default=True
+                ).execute()
+                if not again:
+                    graceful_exit(session_id)
+                    break
             continue
 
-        # For static choices, map pretty label → plugin key.
         plugin_key = PLUGIN_TASKS.get(task)
 
-        # ── Special handling: Nmap always prompts interactively
-        # We bypass the generic path to ensure a great interactive UX.
         if plugin_key == "port_scan":
             try:
                 append_session_event(
@@ -824,14 +741,12 @@ def main():
                     message="Enter ports (e.g., 80,443 or leave blank):"
                 ).execute()
 
-                # 🔒 Robust load with nested category support
                 nmap_module = _load_plugin_module("recon.nmap", "nmap_plugin")
                 result = _call_plugin_entrypoint(
                     nmap_module,
                     {"target": target, "ports": ports, "interactive": True},
                 )
 
-                # Dispatch result to report pipeline (local file + any downstream hooks)
                 from core import report_dispatcher
 
                 append_session_event(
@@ -852,41 +767,139 @@ def main():
                 else:
                     print("[!] No report data returned.")
             except Exception as e:
-                # We attempt a graceful fallback even if the direct module path fails
                 print(f"[!] Nmap plugin error: {e}")
                 log_error(session_id, f"Nmap error: {e}")
                 append_session_event(
                     session_id, "ERROR", {"where": "nmap", "error": str(e)}
                 )
                 try:
-                    run_plugin(plugin_key, args=None)
+                    result = run_plugin(plugin_key, args=None)
                 except Exception as e2:
                     print(f"[!] Plugin manager also failed to run Nmap: {e2}")
-            # Offer to run another task after Nmap completes.
-            again = inquirer.confirm(
-                message="Would you like to run another plugin?", default=True
-            ).execute()
-            if not again:
-                graceful_exit(session_id)
-                break
+                    result = None
+
+            next_label, analysis_md = _llm_recommend_next(
+                session_id, result if result is not None else {}
+            )
+            if analysis_md:
+                print("\n[🧠 LLM Analysis]\n" + analysis_md + "\n")
+
+            try:
+                from core.plugin_manager import dynamic_index_by_label
+
+                dyn_map = dynamic_index_by_label()
+            except Exception:
+                dyn_map = {}
+            dyn_labels = list(dyn_map.keys())
+            default_label = (
+                next_label
+                if next_label and next_label in dyn_labels
+                else (dyn_labels[0] if dyn_labels else None)
+            )
+
+            if dyn_labels:
+                ordered = [lbl for lbl in [default_label] if lbl] + [
+                    lbl for lbl in dyn_labels if lbl != default_label
+                ]
+                choice = inquirer.select(
+                    message="Choose next plugin to run (LLM suggested first):",
+                    choices=ordered,
+                    default=default_label,
+                ).execute()
+                use_prev = inquirer.confirm(
+                    message="Pass previous output to the next plugin as chain_input?",
+                    default=True,
+                ).execute()
+                chain_args = {"chain_input": result} if use_prev else None
+                try:
+                    append_session_event(
+                        session_id,
+                        "CHAIN_DECISION",
+                        {"use_prev": bool(use_prev), "next": choice},
+                    )
+                except Exception:
+                    pass
+                try:
+                    result = run_dynamic_by_label(choice, args=chain_args)
+                except Exception as e:
+                    log_error(
+                        session_id, f"Chained dynamic plugin '{choice}' failed: {e}"
+                    )
+                    print(f"[!] Error running dynamic plugin '{choice}': {e}")
+            else:
+                again = inquirer.confirm(
+                    message="Would you like to run another plugin?", default=True
+                ).execute()
+                if not again:
+                    graceful_exit(session_id)
+                    break
             continue
 
-        # ── Special handling: triage (interactive path for selecting scan file)
         if plugin_key == "triage_agent":
             scan_path = inquirer.text(
                 message="Enter path to scan file (press Enter for default: data/findings.json):"
             ).execute()
             scan_path = (scan_path or "").strip() or "data/findings.json"
             run_triage_agent(scan_file=scan_path)
-            again = inquirer.confirm(
-                message="Would you like to run another plugin?", default=True
-            ).execute()
-            if not again:
-                graceful_exit(session_id)
-                break
+            result = {"task": "triage_agent", "scan_file": scan_path}
+
+            next_label, analysis_md = _llm_recommend_next(
+                session_id, result if result is not None else {}
+            )
+            if analysis_md:
+                print("\n[🧠 LLM Analysis]\n" + analysis_md + "\n")
+
+            try:
+                from core.plugin_manager import dynamic_index_by_label
+
+                dyn_map = dynamic_index_by_label()
+            except Exception:
+                dyn_map = {}
+            dyn_labels = list(dyn_map.keys())
+            default_label = (
+                next_label
+                if next_label and next_label in dyn_labels
+                else (dyn_labels[0] if dyn_labels else None)
+            )
+
+            if dyn_labels:
+                ordered = [lbl for lbl in [default_label] if lbl] + [
+                    lbl for lbl in dyn_labels if lbl != default_label
+                ]
+                choice = inquirer.select(
+                    message="Choose next plugin to run (LLM suggested first):",
+                    choices=ordered,
+                    default=default_label,
+                ).execute()
+                use_prev = inquirer.confirm(
+                    message="Pass previous output to the next plugin as chain_input?",
+                    default=True,
+                ).execute()
+                chain_args = {"chain_input": result} if use_prev else None
+                try:
+                    append_session_event(
+                        session_id,
+                        "CHAIN_DECISION",
+                        {"use_prev": bool(use_prev), "next": choice},
+                    )
+                except Exception:
+                    pass
+                try:
+                    result = run_dynamic_by_label(choice, args=chain_args)
+                except Exception as e:
+                    log_error(
+                        session_id, f"Chained dynamic plugin '{choice}' failed: {e}"
+                    )
+                    print(f"[!] Error running dynamic plugin '{choice}': {e}")
+            else:
+                again = inquirer.confirm(
+                    message="Would you like to run another plugin?", default=True
+                ).execute()
+                if not again:
+                    graceful_exit(session_id)
+                    break
             continue
 
-        # ── Special handling: exploit predictor (batch model inference)
         if plugin_key == "exploit_predictor":
             from core.logic_modules.exploit_predictor import batch_predict
 
@@ -894,6 +907,7 @@ def main():
                 message="Enter path to scan file (press Enter for default: data/findings.json):"
             ).execute()
             scan_path = (scan_path or "").strip() or "data/findings.json"
+            result = None
             try:
                 findings = load_findings(scan_path)
                 enriched = batch_predict(findings)
@@ -903,57 +917,195 @@ def main():
                 print(
                     "Use '🧮 Vulnerability Triage' to further refine prioritization.\n"
                 )
+                result = {"task": "exploit_predictor", "output_path": output_path}
             except Exception as e:
                 print(f"[!] Error processing exploit prediction: {e}")
-            again = inquirer.confirm(
-                message="Would you like to run another plugin?", default=True
-            ).execute()
-            if not again:
-                graceful_exit(session_id)
-                break
+
+            next_label, analysis_md = _llm_recommend_next(
+                session_id, result if result is not None else {}
+            )
+            if analysis_md:
+                print("\n[🧠 LLM Analysis]\n" + analysis_md + "\n")
+
+            try:
+                from core.plugin_manager import dynamic_index_by_label
+
+                dyn_map = dynamic_index_by_label()
+            except Exception:
+                dyn_map = {}
+            dyn_labels = list(dyn_map.keys())
+            default_label = (
+                next_label
+                if next_label and next_label in dyn_labels
+                else (dyn_labels[0] if dyn_labels else None)
+            )
+
+            if dyn_labels:
+                ordered = [lbl for lbl in [default_label] if lbl] + [
+                    lbl for lbl in dyn_labels if lbl != default_label
+                ]
+                choice = inquirer.select(
+                    message="Choose next plugin to run (LLM suggested first):",
+                    choices=ordered,
+                    default=default_label,
+                ).execute()
+                use_prev = inquirer.confirm(
+                    message="Pass previous output to the next plugin as chain_input?",
+                    default=True,
+                ).execute()
+                chain_args = {"chain_input": result} if use_prev else None
+                try:
+                    append_session_event(
+                        session_id,
+                        "CHAIN_DECISION",
+                        {"use_prev": bool(use_prev), "next": choice},
+                    )
+                except Exception:
+                    pass
+                try:
+                    result = run_dynamic_by_label(choice, args=chain_args)
+                except Exception as e:
+                    log_error(
+                        session_id, f"Chained dynamic plugin '{choice}' failed: {e}"
+                    )
+                    print(f"[!] Error running dynamic plugin '{choice}': {e}")
+            else:
+                again = inquirer.confirm(
+                    message="Would you like to run another plugin?", default=True
+                ).execute()
+                if not again:
+                    graceful_exit(session_id)
+                    break
             continue
 
-        # ── Special handling: OWASP ZAP (interactive interface)
         if plugin_key == "owasp_zap":
-            run_owasp_zap_interface(session_id)
-            # Offer to run another task after OWASP ZAP completes.
-            again = inquirer.confirm(
-                message="Would you like to run another plugin?", default=True
-            ).execute()
-            if not again:
-                graceful_exit(session_id)
-                break
+            result = run_owasp_zap_interface(session_id)
+            next_label, analysis_md = _llm_recommend_next(
+                session_id, result if result is not None else {}
+            )
+            if analysis_md:
+                print("\n[🧠 LLM Analysis]\n" + analysis_md + "\n")
+
+            try:
+                from core.plugin_manager import dynamic_index_by_label
+
+                dyn_map = dynamic_index_by_label()
+            except Exception:
+                dyn_map = {}
+            dyn_labels = list(dyn_map.keys())
+            default_label = (
+                next_label
+                if next_label and next_label in dyn_labels
+                else (dyn_labels[0] if dyn_labels else None)
+            )
+
+            if dyn_labels:
+                ordered = [lbl for lbl in [default_label] if lbl] + [
+                    lbl for lbl in dyn_labels if lbl != default_label
+                ]
+                choice = inquirer.select(
+                    message="Choose next plugin to run (LLM suggested first):",
+                    choices=ordered,
+                    default=default_label,
+                ).execute()
+                use_prev = inquirer.confirm(
+                    message="Pass previous output to the next plugin as chain_input?",
+                    default=True,
+                ).execute()
+                chain_args = {"chain_input": result} if use_prev else None
+                try:
+                    append_session_event(
+                        session_id,
+                        "CHAIN_DECISION",
+                        {"use_prev": bool(use_prev), "next": choice},
+                    )
+                except Exception:
+                    pass
+                try:
+                    result = run_dynamic_by_label(choice, args=chain_args)
+                except Exception as e:
+                    log_error(
+                        session_id, f"Chained dynamic plugin '{choice}' failed: {e}"
+                    )
+                    print(f"[!] Error running dynamic plugin '{choice}': {e}")
+            else:
+                again = inquirer.confirm(
+                    message="Would you like to run another plugin?", default=True
+                ).execute()
+                if not again:
+                    graceful_exit(session_id)
+                    break
             continue
 
-        # ── Generic static plugin execution
-        # For all other static items, defer to plugin_manager.run_plugin().
+        # Generic static plugin execution
         try:
-            run_plugin(plugin_key, args=None)
-            print(f"\n[✔] Running plugin: {plugin_key}...\n")
+            print(f"[✔] Running plugin: {plugin_key}...")
+            result = run_plugin(plugin_key, args=None)
         except TypeError as the:
-            # Helpful tip if plugin signature doesn't match expectations.
             print(f"[!] Plugin '{plugin_key}' raised a TypeError: {the}")
             print("    Tip: Ensure its entrypoint is 'def run_plugin(args=None, ...):'")
+            result = None
         except Exception as e:
             print(f"[!] Error running plugin '{plugin_key}': {e}")
+            result = None
 
-        # Post-run: ask if the user wants to continue; end session if not.
-        again = inquirer.confirm(
-            message="Would you like to run another plugin?", default=True
-        ).execute()
-        if not again:
-            graceful_exit(session_id)
-            break
+        next_label, analysis_md = _llm_recommend_next(
+            session_id, result if result is not None else {}
+        )
+        if analysis_md:
+            print("\n[🧠 LLM Analysis]\n" + analysis_md + "\n")
+
+        try:
+            from core.plugin_manager import dynamic_index_by_label
+
+            dyn_map = dynamic_index_by_label()
+        except Exception:
+            dyn_map = {}
+        dyn_labels = list(dyn_map.keys())
+        default_label = (
+            next_label
+            if next_label and next_label in dyn_labels
+            else (dyn_labels[0] if dyn_labels else None)
+        )
+
+        if dyn_labels:
+            ordered = [lbl for lbl in [default_label] if lbl] + [
+                lbl for lbl in dyn_labels if lbl != default_label
+            ]
+            choice = inquirer.select(
+                message="Choose next plugin to run (LLM suggested first):",
+                choices=ordered,
+                default=default_label,
+            ).execute()
+            use_prev = inquirer.confirm(
+                message="Pass previous output to the next plugin as chain_input?",
+                default=True,
+            ).execute()
+            chain_args = {"chain_input": result} if use_prev else None
+            try:
+                append_session_event(
+                    session_id,
+                    "CHAIN_DECISION",
+                    {"use_prev": bool(use_prev), "next": choice},
+                )
+            except Exception:
+                pass
+            try:
+                result = run_dynamic_by_label(choice, args=chain_args)
+            except Exception as e:
+                log_error(session_id, f"Chained dynamic plugin '{choice}' failed: {e}")
+                print(f"[!] Error running dynamic plugin '{choice}': {e}")
+        else:
+            again = inquirer.confirm(
+                message="Would you like to run another plugin?", default=True
+            ).execute()
+            if not again:
+                graceful_exit(session_id)
+                break
 
 
 # ******************************************************************************************
-# This is the main entry point for the CHARLOTTE CLI application.
-# When executed as a script (python -m core.main or python charlotte), we enter main().
-# ──────────────────────────────────────────────────────────────────────────────
+# Entrypoint
+# ******************************************************************************************
 if __name__ == "__main__":
     main()
-
-# ******************************************************************************************
-# End of main.py
-# ******************************************************************************************#
-#

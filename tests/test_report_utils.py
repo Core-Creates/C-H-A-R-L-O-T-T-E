@@ -1,6 +1,3 @@
-
-import os
-import pytest
 from core.logic_modules import report_utils
 
 mock_findings = [
@@ -12,7 +9,7 @@ mock_findings = [
         "impact": "RCE",
         "cwe": "CWE-120",
         "exploit_prediction": "Exploit Likely",
-        "confidence": "High"
+        "confidence": "High",
     },
     {
         "id": "CVE-2023-0002",
@@ -22,9 +19,10 @@ mock_findings = [
         "impact": "Privilege Escalation",
         "cwe": "CWE-287",
         "exploit_prediction": "Exploit Unlikely",
-        "confidence": "Low"
-    }
+        "confidence": "Low",
+    },
 ]
+
 
 def test_generate_markdown(tmp_path):
     out = tmp_path / "report.md"
@@ -33,11 +31,13 @@ def test_generate_markdown(tmp_path):
     content = out.read_text()
     assert "CVE-2023-0001" in content
 
+
 def test_generate_pdf(tmp_path):
     out = tmp_path / "report.pdf"
     report_utils.generate_pdf_report(mock_findings, str(out))
     assert out.exists()
     assert out.stat().st_size > 0
+
 
 def test_generate_html(tmp_path):
     out = tmp_path / "report.html"
@@ -46,6 +46,8 @@ def test_generate_html(tmp_path):
     content = out.read_text()
     assert "CHARLOTTE Vulnerability Triage Report" in content
     assert "CVE-2023-0001" in content
+
+
 def test_generate_csv(tmp_path):
     out = tmp_path / "report.csv"
     report_utils.generate_csv_report(mock_findings, str(out))

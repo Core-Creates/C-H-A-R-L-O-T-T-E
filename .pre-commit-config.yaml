@@ -1,40 +1,38 @@
+# .pre-commit-config.yaml
+
 repos:
-  # Basic hygiene
   - repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.6.0
+    rev: v4.5.0
     hooks:
       - id: check-yaml
       - id: end-of-file-fixer
       - id: trailing-whitespace
       - id: check-merge-conflict
       - id: mixed-line-ending
-        args: [--fix=lf]
 
-  # Ruff = linter + formatter (keeps things fast and simple)
-  - repo: https://github.com/astral-sh/ruff-pre-commit
-    rev: v0.6.9
+  - repo: https://github.com/charliermarsh/ruff-pre-commit
+    rev: v0.4.4
     hooks:
       - id: ruff
-        args: [--fix, --exit-non-zero-on-fix]
-        additional_dependencies: []  # keep empty unless you need plugins
+        args: ["--fix"]
       - id: ruff-format
 
-  # Modernize syntax for your Python (we target 3.12 here)
   - repo: https://github.com/asottile/pyupgrade
-    rev: v3.19.0
+    rev: v3.15.0
     hooks:
       - id: pyupgrade
-        args: [--py312-plus]
+        args: ["--py311-plus"]
 
-  # Optional spell checker (comment out if noisy)
   - repo: https://github.com/codespell-project/codespell
     rev: v2.3.0
     hooks:
       - id: codespell
-        args: [--ignore-words-list=nd,fo]  # tweak as you like
-        exclude: >
-          (?x)^(
-            .*\.lock|
-            .*\.min\.js|
-            .*\.svg
-          )$
+        args:
+          - --ignore-words=.codespellignore
+        exclude: |
+          (^data/|
+           ^logs/|
+           ^\.gradle/|
+           \.xml$|
+           ^data/findings/|
+           ^data/reports/)

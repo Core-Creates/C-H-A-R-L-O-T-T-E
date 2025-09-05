@@ -11,11 +11,9 @@ import os  # For file existence checks
 import sys  # For modifying sys.path to include CHARLOTTE root directory
 import torch  # PyTorch library for tensor computation and model handling
 import joblib  # For loading saved scaler objects (StandardScaler from sklearn)
-import pandas as pd  # For reading CSV files
 import numpy as np  # For numerical operations, array, and matrix operations
 import torch.nn as nn  # For building neural network layers
 import torch.nn.functional as F  # Functional API for activations like ReLU
-from sklearn.preprocessing import StandardScaler  # Used to normalize input features
 
 # Add CHARLOTTE root directory to sys.path
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
@@ -30,6 +28,7 @@ DEVICE = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ========================
 # END OF IMPORTS
 # ========================
+
 
 # ==========================================================================================
 # CLASS: CVESeverityNet
@@ -46,7 +45,7 @@ class CVESeverityNet(nn.Module):
             hidden_dim (int): Neuron count for the first hidden layer (default: 32)
             output_dim (int): Number of severity classes (Low, Medium, High, Critical) → 4
         """
-        super(CVESeverityNet, self).__init__()
+        super().__init__()
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, 16)
         self.output = nn.Linear(16, output_dim)
@@ -61,9 +60,9 @@ class CVESeverityNet(nn.Module):
         Returns:
             Tensor: Raw logits of shape [batch_size, output_dim]
         """
-        x = F.relu(self.fc1(x))   # First hidden layer with ReLU
-        x = F.relu(self.fc2(x))   # Second hidden layer with ReLU
-        return self.output(x)     # Output layer (logits, not softmaxed)
+        x = F.relu(self.fc1(x))  # First hidden layer with ReLU
+        x = F.relu(self.fc2(x))  # Second hidden layer with ReLU
+        return self.output(x)  # Output layer (logits, not softmaxed)
 
 
 # ==========================================================================================
@@ -112,7 +111,7 @@ def predict_severity(cve_features, model=None, scaler=None):
     Predicts the severity class of a CVE using a trained neural network.
 
     Args:
-        cve_features (List[float]): Features: 
+        cve_features (List[float]): Features:
             [cvss_base, cvss_impact, exploitability_score, is_remote, cwe_id]
         model (CVESeverityNet): Optional pre-loaded model
         scaler (StandardScaler): Optional pre-loaded scaler
@@ -179,10 +178,11 @@ def predict_batch(cve_feature_list, model=None, scaler=None):
         # Map indices to human-readable severity classes
         severity_classes = ["Low", "Medium", "High", "Critical"]
         return [severity_classes[i] for i in preds]
+
+
 # ==========================================================================================
 # END OF FUNCTION: predict_batch
 # ==========================================================================================
-
 
 
 # ******************************************************************************************

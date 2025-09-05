@@ -12,8 +12,6 @@ import os
 import csv
 import json
 import argparse
-import xml.etree.ElementTree as ET
-from typing import List, Dict, Tuple
 from collections import Counter
 
 # ========================
@@ -26,7 +24,7 @@ from collections import Counter
 # Parses newline-delimited JSON logs where EventData is a JSON string.
 # Extracts rich features for CHARLOTTE, including network/registry fields and threat stage.
 # ==========================================================================================
-def parse_json_file(file_path: str) -> Tuple[List[Dict], List[str]]:
+def parse_json_file(file_path: str) -> tuple[list[dict], list[str]]:
     """
     Parses a JSONL Sysmon log file for CHARLOTTE ML training.
 
@@ -46,7 +44,7 @@ def parse_json_file(file_path: str) -> Tuple[List[Dict], List[str]]:
     STAGE_CATEGORIES = ["benign", "exploit_attempt", "data_exfil", "persistence"]
 
     try:
-        with open(file_path, 'r', encoding='utf-8') as f:
+        with open(file_path, encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if not line:
@@ -62,7 +60,7 @@ def parse_json_file(file_path: str) -> Tuple[List[Dict], List[str]]:
                 try:
                     event_data = json.loads(entry.get("EventData", "{}"))
                 except json.JSONDecodeError:
-                    print("[!] Skipping entry with unparseable EventData")
+                    print("[!] Skipping entry with unparsable EventData")
                     continue
 
                 event_id = entry.get("EventID", None)
@@ -75,7 +73,8 @@ def parse_json_file(file_path: str) -> Tuple[List[Dict], List[str]]:
                     "commandLine": event_data.get("CommandLine"),
                     "parentImage": event_data.get("ParentImage"),
                     "processId": event_data.get("ProcessId"),
-                    "filePath": event_data.get("TargetFilename") or event_data.get("TargetObject"),
+                    "filePath": event_data.get("TargetFilename")
+                    or event_data.get("TargetObject"),
                     "protocol": event_data.get("Protocol"),
                     "destinationIp": event_data.get("DestinationIp"),
                     "user": event_data.get("User"),
@@ -114,7 +113,9 @@ def parse_json_file(file_path: str) -> Tuple[List[Dict], List[str]]:
                 features["stage"] = stage
 
                 # Debug output
-                print(f"[DEBUG] EventID: {event_id}, Stage: {stage}, Severity: {severity}")
+                print(
+                    f"[DEBUG] EventID: {event_id}, Stage: {stage}, Severity: {severity}"
+                )
 
                 # Append results
                 features_list.append(features)
@@ -131,14 +132,15 @@ def parse_json_file(file_path: str) -> Tuple[List[Dict], List[str]]:
 # FUNCTION: save_to_csv
 # Saves parsed features and labels to CSV files formatted for CHARLOTTE ML training
 # ==========================================================================================
-def save_to_csv(features: List[Dict], labels: List[str], output_dir: str = "data/parsed") -> None:
-
+def save_to_csv(
+    features: list[dict], labels: list[str], output_dir: str = "data/parsed"
+) -> None:
     os.makedirs(output_dir, exist_ok=True)
     feature_keys = list(features[0].keys()) if features else []
 
     # Save features.csv
     features_path = os.path.join(output_dir, "charlotte_features.csv")
-    with open(features_path, "w", newline='', encoding="utf-8") as f_csv:
+    with open(features_path, "w", newline="", encoding="utf-8") as f_csv:
         writer = csv.DictWriter(f_csv, fieldnames=feature_keys)
         writer.writeheader()
         writer.writerows(features)
@@ -146,7 +148,7 @@ def save_to_csv(features: List[Dict], labels: List[str], output_dir: str = "data
 
     # Save labels.csv
     labels_path = os.path.join(output_dir, "charlotte_labels.csv")
-    with open(labels_path, "w", newline='', encoding="utf-8") as l_csv:
+    with open(labels_path, "w", newline="", encoding="utf-8") as l_csv:
         writer = csv.writer(l_csv)
         writer.writerow(["label"])
         for label in labels:
@@ -155,7 +157,7 @@ def save_to_csv(features: List[Dict], labels: List[str], output_dir: str = "data
 
     # Save combined dataset.csv
     dataset_path = os.path.join(output_dir, "charlotte_dataset.csv")
-    with open(dataset_path, "w", newline='', encoding="utf-8") as d_csv:
+    with open(dataset_path, "w", newline="", encoding="utf-8") as d_csv:
         writer = csv.DictWriter(d_csv, fieldnames=feature_keys + ["label"])
         writer.writeheader()
         for feat, lbl in zip(features, labels):
@@ -170,7 +172,9 @@ def save_to_csv(features: List[Dict], labels: List[str], output_dir: str = "data
 # Allows this script to be used as a standalone CLI tool
 # ==========================================================================================
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description="Parse JSON log file for CHARLOTTE ML training.")
+    parser = argparse.ArgumentParser(
+        description="Parse JSON log file for CHARLOTTE ML training."
+    )
     parser.add_argument("file_path", help="Path to the JSON log file")
     args = parser.parse_args()
 

@@ -1,5 +1,7 @@
 # core/mcp_client.py
-import asyncio, json, os
+import asyncio
+import json
+import os
 from contextlib import AsyncExitStack
 from pathlib import Path
 
@@ -10,11 +12,13 @@ from mcp.client.sse import sse_client
 # Load .env if present (ASCII/UTF-8, no BOM; only KEY=VALUE and # comments)
 try:
     from dotenv import load_dotenv
+
     load_dotenv()
 except Exception:
     pass
 
 SETTINGS_FILE = Path("data/user_settings.json")
+
 
 def _cfg_from_json():
     if not SETTINGS_FILE.exists():
@@ -22,6 +26,7 @@ def _cfg_from_json():
     data = json.loads(SETTINGS_FILE.read_text(encoding="utf-8"))
     htb = (data.get("mcp") or {}).get("htb") or {}
     return htb.get("url"), htb.get("token")
+
 
 def load_cfg():
     # Priority: env > user_settings.json
@@ -42,9 +47,13 @@ def load_cfg():
 
     problems = []
     if not url:
-        problems.append("HTB_MCP_URL is missing. Set it in .env or data/user_settings.json.")
+        problems.append(
+            "HTB_MCP_URL is missing. Set it in .env or data/user_settings.json."
+        )
     if not token:
-        problems.append("HTB_MCP_TOKEN is missing. Put your MCP token in .env or user_settings.json.")
+        problems.append(
+            "HTB_MCP_TOKEN is missing. Put your MCP token in .env or user_settings.json."
+        )
     if problems:
         raise RuntimeError("\n".join(problems))
 
@@ -60,6 +69,7 @@ def load_cfg():
 
     return url, token
 
+
 def _unwrap_call_result(res):
     """Return a plain dict/string from CallToolResult; fallback to res."""
     blocks = getattr(res, "content", []) or []
@@ -73,6 +83,7 @@ def _unwrap_call_result(res):
             except Exception:
                 return b.text
     return res
+
 
 class HtbMcpClient:
     def __init__(self, url: str, token: str):
@@ -108,10 +119,18 @@ class HtbMcpClient:
     async def list_events(self):
         return await self.call("list_ctf_events", {})
 
-    async def join_ctf(self, ctf_id: int, team_id: int, consent: bool = True, ctf_password: str = ""):
-        return await self.call("join_ctf_event", {
-            "ctf_id": ctf_id, "team_id": team_id, "consent": consent, "ctf_password": ctf_password
-        })
+    async def join_ctf(
+        self, ctf_id: int, team_id: int, consent: bool = True, ctf_password: str = ""
+    ):
+        return await self.call(
+            "join_ctf_event",
+            {
+                "ctf_id": ctf_id,
+                "team_id": team_id,
+                "consent": consent,
+                "ctf_password": ctf_password,
+            },
+        )
 
     async def get_ctf(self, ctf_id: int):
         return await self.call("retrieve_ctf", {"ctf_id": ctf_id})
@@ -123,10 +142,13 @@ class HtbMcpClient:
         return await self.call("get_download_link", {"challenge_id": challenge_id})
 
     async def submit_flag(self, challenge_id: int, flag: str):
-        return await self.call("submit_flag", {"challenge_id": challenge_id, "flag": flag})
+        return await self.call(
+            "submit_flag", {"challenge_id": challenge_id, "flag": flag}
+        )
 
     async def close(self):
         await self.exit.aclose()
+
 
 async def demo():
     url, token = load_cfg()
@@ -140,6 +162,7 @@ async def demo():
             print(f" - {name}: {desc}")
     finally:
         await c.close()
+
 
 if __name__ == "__main__":
     asyncio.run(demo())

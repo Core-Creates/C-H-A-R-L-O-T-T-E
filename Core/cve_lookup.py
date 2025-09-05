@@ -9,8 +9,8 @@ import sys
 import csv
 import json
 import requests
-from datetime import datetime, timezone
-from typing import Dict, Any, List, Tuple, Optional
+from datetime import datetime
+from typing import Any
 
 # ------------------------------------------------------------------------------------------
 # Configuration
@@ -25,17 +25,18 @@ NVD_API_KEY = os.getenv("NVD_API_KEY")  # optional; improves rate limits
 # Cache Management
 # ------------------------------------------------------------------------------------------
 
-def load_cache() -> Dict[str, Any]:
+
+def load_cache() -> dict[str, Any]:
     if os.path.exists(CACHE_FILE):
         try:
-            with open(CACHE_FILE, "r", encoding="utf-8") as f:
+            with open(CACHE_FILE, encoding="utf-8") as f:
                 return json.load(f)
         except json.JSONDecodeError:
             print("[WARN] Cache file corrupted. Starting fresh.")
     return {}
 
 
-def save_cache(cache: Dict[str, Any]) -> None:
+def save_cache(cache: dict[str, Any]) -> None:
     os.makedirs(os.path.dirname(CACHE_FILE), exist_ok=True)
     with open(CACHE_FILE, "w", encoding="utf-8") as f:
         json.dump(cache, f, indent=2)
@@ -45,7 +46,8 @@ def save_cache(cache: Dict[str, Any]) -> None:
 # Internal helpers
 # ------------------------------------------------------------------------------------------
 
-def _nvd_get(params: Dict[str, Any]) -> Dict[str, Any]:
+
+def _nvd_get(params: dict[str, Any]) -> dict[str, Any]:
     headers = {}
     if NVD_API_KEY:
         headers["apiKey"] = NVD_API_KEY
@@ -54,7 +56,7 @@ def _nvd_get(params: Dict[str, Any]) -> Dict[str, Any]:
     return r.json()
 
 
-def _extract_cvss(metrics: Dict[str, Any]) -> Optional[float]:
+def _extract_cvss(metrics: dict[str, Any]) -> float | None:
     """Return first available CVSS base score (prefers v3.1 -> v3.0 -> v2)."""
     for key in ("cvssMetricV31", "cvssMetricV30", "cvssMetricV2"):
         if key in metrics and metrics[key]:
@@ -69,7 +71,8 @@ def _extract_cvss(metrics: Dict[str, Any]) -> Optional[float]:
 # Core Lookup Functions (by explicit CVE ID)
 # ------------------------------------------------------------------------------------------
 
-def fetch_cve_data(cve_id: str) -> Tuple[Dict[str, Any], bool]:
+
+def fetch_cve_data(cve_id: str) -> tuple[dict[str, Any], bool]:
     cache = load_cache()
     cve_id = cve_id.upper()
 
@@ -89,7 +92,9 @@ def fetch_cve_data(cve_id: str) -> Tuple[Dict[str, Any], bool]:
     return {"error": "CVE not found"}, False
 
 
-def fetch_cves_batch(cve_ids: List[str], year_filter: Optional[str] = None) -> Dict[str, Any]:
+def fetch_cves_batch(
+    cve_ids: list[str], year_filter: str | None = None
+) -> dict[str, Any]:
     results = {}
     for cve_id in cve_ids:
         if year_filter and not cve_id.startswith(f"CVE-{year_filter}"):
@@ -103,13 +108,14 @@ def fetch_cves_batch(cve_ids: List[str], year_filter: Optional[str] = None) -> D
 # NEW: Keyword Search (used by core.main.run_cve_lookup)
 # ------------------------------------------------------------------------------------------
 
+
 def search_by_keyword(
     keyword: str,
     results_limit: int = 20,
-    pub_start_iso: Optional[str] = None,
-    pub_end_iso: Optional[str] = None,
+    pub_start_iso: str | None = None,
+    pub_end_iso: str | None = None,
     start_index: int = 0,
-) -> List[Dict[str, Any]]:
+) -> list[dict[str, Any]]:
     """
     Search CVEs by keyword using the NVD 2.0 API.
 
@@ -124,11 +130,13 @@ def search_by_keyword(
     """
     # Cache key for keyword queries (kept small/simple; no TTL logic here)
     cache = load_cache()
-    cache_key = f"KW:{keyword}:{results_limit}:{pub_start_iso}:{pub_end_iso}:{start_index}"
+    cache_key = (
+        f"KW:{keyword}:{results_limit}:{pub_start_iso}:{pub_end_iso}:{start_index}"
+    )
     if cache_key in cache:
         return cache[cache_key]
 
-    params: Dict[str, Any] = {
+    params: dict[str, Any] = {
         "keywordSearch": keyword,
         "resultsPerPage": max(1, min(int(results_limit), 2000)),
         "startIndex": max(0, int(start_index)),
@@ -143,7 +151,7 @@ def search_by_keyword(
     except Exception as e:
         return [{"error": f"NVD request failed: {e}"}]
 
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for item in data.get("vulnerabilities", []):
         c = item.get("cve", {})
         cve_id = c.get("id")
@@ -165,19 +173,24 @@ def search_by_keyword(
         cvss = _extract_cvss(c.get("metrics", {}))
         url = f"https://nvd.nist.gov/vuln/detail/{cve_id}"
 
-        out.append({
-            "cve_id": cve_id,
-            "description": desc,
-            "published": published,
-            "cvss": cvss,
-            "url": url,
-        })
+        out.append(
+            {
+                "cve_id": cve_id,
+                "description": desc,
+                "published": published,
+                "cvss": cvss,
+                "url": url,
+            }
+        )
 
     # Save lightweight cache for keyword queries
     cache[cache_key] = out
     save_cache(cache)
     return out
+
+
 # paste the following helpers anywhere below your other functions in cve_lookup.py
+
 
 def _normalize_results_for_export(results):
     """
@@ -194,14 +207,18 @@ def _normalize_results_for_export(results):
             if not isinstance(r, dict):
                 continue
             if "cve_id" in r:  # our keyword search format
-                rows.append({
-                    "cve_id": r.get("cve_id", ""),
-                    "published": r.get("published", ""),
-                    "cvss": r.get("cvss", ""),
-                    "description": (r.get("description") or "").replace("\n", " ").strip(),
-                    "url": r.get("url", ""),
-                    "source": "keyword",
-                })
+                rows.append(
+                    {
+                        "cve_id": r.get("cve_id", ""),
+                        "published": r.get("published", ""),
+                        "cvss": r.get("cvss", ""),
+                        "description": (r.get("description") or "")
+                        .replace("\n", " ")
+                        .strip(),
+                        "url": r.get("url", ""),
+                        "source": "keyword",
+                    }
+                )
         return rows
 
     # Case 2: batch dict from fetch_cves_batch()
@@ -210,14 +227,16 @@ def _normalize_results_for_export(results):
             if not isinstance(data, dict):
                 continue
             if "error" in data:
-                rows.append({
-                    "cve_id": cve_id,
-                    "published": "",
-                    "cvss": "",
-                    "description": f"ERROR: {data.get('error')}",
-                    "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}",
-                    "source": "id_lookup",
-                })
+                rows.append(
+                    {
+                        "cve_id": cve_id,
+                        "published": "",
+                        "cvss": "",
+                        "description": f"ERROR: {data.get('error')}",
+                        "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}",
+                        "source": "id_lookup",
+                    }
+                )
                 continue
 
             cve = (data or {}).get("cve", {})
@@ -232,22 +251,29 @@ def _normalize_results_for_export(results):
 
             published = data.get("published") or cve.get("published") or ""
             score = _extract_cvss(cve.get("metrics", {}))
-            rows.append({
-                "cve_id": cve.get("id", cve_id),
-                "published": published,
-                "cvss": score if score is not None else "",
-                "description": (desc or "").replace("\n", " ").strip(),
-                "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}",
-                "source": "id_lookup",
-            })
+            rows.append(
+                {
+                    "cve_id": cve.get("id", cve_id),
+                    "published": published,
+                    "cvss": score if score is not None else "",
+                    "description": (desc or "").replace("\n", " ").strip(),
+                    "url": f"https://nvd.nist.gov/vuln/detail/{cve_id}",
+                    "source": "id_lookup",
+                }
+            )
         return rows
 
     # Fallback: unknown structure
     return rows
 
 
-def show_and_export(results, multiple: bool = True, outdir: str | None = None,
-                    filename_prefix: str = "cve_search", open_after: bool = False) -> None:
+def show_and_export(
+    results,
+    multiple: bool = True,
+    outdir: str | None = None,
+    filename_prefix: str = "cve_search",
+    open_after: bool = False,
+) -> None:
     """
     Pretty-print results to console and export CSV/JSON for later pipelines.
     Signature matches how core.main calls it: show_and_export(results, multiple=True)
@@ -259,7 +285,6 @@ def show_and_export(results, multiple: bool = True, outdir: str | None = None,
       filename_prefix: base filename used for exports
       open_after: if True on mac/linux/windows, try to open the CSV after writing
     """
-    from datetime import datetime
     ts = datetime.now().strftime("%Y%m%d_%H%M%S")
     outdir = outdir or os.path.join("reports", "cve_lookup")
     os.makedirs(outdir, exist_ok=True)
@@ -276,15 +301,19 @@ def show_and_export(results, multiple: bool = True, outdir: str | None = None,
         w_cvss = 5
         w_url = 40
         print("=" * 100)
-        print(f"{'CVE ID':<{w_id}}  {'Published':<{w_pub}}  {'CVSS':>{w_cvss}}  {'URL':<{w_url}}  Description")
+        print(
+            f"{'CVE ID':<{w_id}}  {'Published':<{w_pub}}  {'CVSS':>{w_cvss}}  {'URL':<{w_url}}  Description"
+        )
         print("-" * 100)
         for r in rows:
             cve_id = (r.get("cve_id") or "")[:w_id]
-            published = (str(r.get("published") or "")[:w_pub])
-            cvss = ("" if r.get("cvss") in (None, "") else str(r.get("cvss")))
+            published = str(r.get("published") or "")[:w_pub]
+            cvss = "" if r.get("cvss") in (None, "") else str(r.get("cvss"))
             url = (r.get("url") or "")[:w_url]
             desc = r.get("description") or ""
-            print(f"{cve_id:<{w_id}}  {published:<{w_pub}}  {cvss:>{w_cvss}}  {url:<{w_url}}  {desc}")
+            print(
+                f"{cve_id:<{w_id}}  {published:<{w_pub}}  {cvss:>{w_cvss}}  {url:<{w_url}}  {desc}"
+            )
         print("=" * 100)
 
     # --- Exports ---
@@ -295,7 +324,15 @@ def show_and_export(results, multiple: bool = True, outdir: str | None = None,
         # CSV
         with open(csv_path, "w", newline="", encoding="utf-8") as f:
             writer = csv.DictWriter(
-                f, fieldnames=["cve_id", "published", "cvss", "description", "url", "source"]
+                f,
+                fieldnames=[
+                    "cve_id",
+                    "published",
+                    "cvss",
+                    "description",
+                    "url",
+                    "source",
+                ],
             )
             writer.writeheader()
             for r in rows:
@@ -326,7 +363,8 @@ def show_and_export(results, multiple: bool = True, outdir: str | None = None,
 # Summary Formatter
 # ------------------------------------------------------------------------------------------
 
-def summarize_cve(cve_data: Dict[str, Any]) -> str:
+
+def summarize_cve(cve_data: dict[str, Any]) -> str:
     try:
         if "error" in cve_data:
             return f"[!] Error: {cve_data['error']}"
@@ -350,7 +388,8 @@ def summarize_cve(cve_data: Dict[str, Any]) -> str:
 # Optional CLI Entry Point
 # ------------------------------------------------------------------------------------------
 
-def run(args: Dict[str, Any]):
+
+def run(args: dict[str, Any]):
     """
     CLI-compatible entry:
       - If 'keyword' in args: run keyword search
@@ -414,7 +453,9 @@ if __name__ == "__main__":
             print(r.get("url", ""))
     else:
         ids_input = input("Enter CVE ID(s) (comma-separated or just numbers): ").strip()
-        year = input("Filter by year (optional, required if using just numbers): ").strip()
+        year = input(
+            "Filter by year (optional, required if using just numbers): "
+        ).strip()
 
         cve_ids = []
         for c in ids_input.split(","):

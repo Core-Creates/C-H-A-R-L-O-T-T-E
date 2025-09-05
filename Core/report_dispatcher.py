@@ -10,7 +10,6 @@ import json
 import smtplib
 import requests
 import mimetypes
-from pathlib import Path
 
 # Dynamically locate CHARLOTTE root and add to Python path
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "../../../"))
@@ -18,7 +17,6 @@ if ROOT_DIR not in sys.path:
     sys.path.insert(0, ROOT_DIR)
 # Ensure CHARLOTTE core and plugins are importable
 try:
-    from utils.paths import display_path  # preferred location
     from email.message import EmailMessage
     from plugins.exploitation.metasploit.msf_mapper import find_exploit_for_cve
     from plugins.exploitation.metasploit.cve_autoscript import generate_exploit_script
@@ -31,6 +29,7 @@ except ImportError as e:
 
 SETTINGS_FILE = os.path.join("data", "user_settings.json")
 
+
 # ==========================================================================================
 # FUNCTION: load_user_settings()
 # Loads user-defined config from JSON
@@ -38,8 +37,9 @@ SETTINGS_FILE = os.path.join("data", "user_settings.json")
 def load_user_settings():
     if not os.path.exists(SETTINGS_FILE):
         raise FileNotFoundError("User settings not found. Run user_config.py first.")
-    with open(SETTINGS_FILE, "r", encoding="utf-8") as f:
+    with open(SETTINGS_FILE, encoding="utf-8") as f:
         return json.load(f)
+
 
 # If Metasploit is connected, generate scripts for all CVEs with exploits
 def autoscript_exploits(report_data, client, rhost, lhost, lport):
@@ -49,6 +49,7 @@ def autoscript_exploits(report_data, client, rhost, lhost, lport):
             script_path = generate_exploit_script(cve_id, client, rhost, lhost, lport)
             if script_path:
                 vuln["exploit_script"] = script_path
+
 
 # ==========================================================================================
 # FUNCTION: enrich_report_with_exploits()
@@ -60,10 +61,11 @@ def enrich_report_with_exploits(report_data, client):
 
     if settings.get("auto_script_exploits") and client:
         autoscript_exploits(
-            report_data, client,
+            report_data,
+            client,
             defaults.get("rhost"),
             defaults.get("lhost"),
-            defaults.get("lport")
+            defaults.get("lport"),
         )
 
     for vuln in report_data.get("vulnerabilities", []):
@@ -71,6 +73,7 @@ def enrich_report_with_exploits(report_data, client):
         if cve_id:
             exploits = find_exploit_for_cve(client, cve_id)
             vuln["metasploit_modules"] = exploits
+
 
 # ==========================================================================================
 # FUNCTION: send_email_report()
@@ -89,13 +92,19 @@ def send_email_report(file_path, subject="CHARLOTTE Triage Report"):
     maintype, subtype = (ctype or "application/octet-stream").split("/", 1)
 
     with open(file_path, "rb") as f:
-        msg.add_attachment(f.read(), maintype=maintype, subtype=subtype, filename=os.path.basename(file_path))
+        msg.add_attachment(
+            f.read(),
+            maintype=maintype,
+            subtype=subtype,
+            filename=os.path.basename(file_path),
+        )
 
     with smtplib.SMTP_SSL(config["smtp_server"], config["smtp_port"]) as smtp:
         smtp.login(config["username"], config["password"])
         smtp.send_message(msg)
 
     print(f"[+] Report sent to {config['to']} via email.")
+
 
 # ==========================================================================================
 # FUNCTION: send_servicenow_ticket()
@@ -104,10 +113,7 @@ def send_email_report(file_path, subject="CHARLOTTE Triage Report"):
 def send_servicenow_ticket(file_path, short_description="CHARLOTTE Triage Report"):
     config = load_user_settings().get("servicenow", {})
 
-    headers = {
-        "Accept": "application/json",
-        "Content-Type": "application/json"
-    }
+    headers = {"Accept": "application/json", "Content-Type": "application/json"}
 
     auth = (config["username"], config["password"])
     instance_url = config["instance_url"].rstrip("/")
@@ -117,7 +123,7 @@ def send_servicenow_ticket(file_path, short_description="CHARLOTTE Triage Report
         "short_description": short_description,
         "description": "Attached is a CHARLOTTE triage report.",
         "category": config.get("category", "security"),
-        "urgency": config.get("urgency", "2")
+        "urgency": config.get("urgency", "2"),
     }
 
     response = requests.post(incident_api, auth=auth, headers=headers, json=payload)
@@ -130,29 +136,40 @@ def send_servicenow_ticket(file_path, short_description="CHARLOTTE Triage Report
     with open(file_path, "rb") as file_data:
         files = {"file": (os.path.basename(file_path), file_data)}
         params = {"table_name": "incident", "table_sys_id": incident_sys_id}
-        attach_response = requests.post(attachment_api, auth=auth, headers={}, params=params, files=files)
+        attach_response = requests.post(
+            attachment_api, auth=auth, headers={}, params=params, files=files
+        )
         attach_response.raise_for_status()
 
     print("[+] Report attached to ServiceNow incident.")
+
 
 def show_report_summary(report_data):
     print("\n--- Triage Report Summary ---")
     print(f"Total Vulnerabilities: {len(report_data.get('vulnerabilities', []))}")
     for vuln in report_data.get("vulnerabilities", []):
-        print(f"- {vuln.get('cve_id', 'Unknown CVE')}: {vuln.get('description', 'No description')}")
+        print(
+            f"- {vuln.get('cve_id', 'Unknown CVE')}: {vuln.get('description', 'No description')}"
+        )
     print("------------------------------")
+
+
 # ==========================================================================================
 # FUNCTION: save_report_locally()
 # Saves the report data to a local file
 # ==========================================================================================
 
+
 def save_report_locally(report_data, file_path=None, interactive=True):
     if interactive:
-        save_report = input("Save report locally? (y/n): ").strip().lower() == 'y'
+        save_report = input("Save report locally? (y/n): ").strip().lower() == "y"
         if not save_report:
             print("[*] Report not saved locally.")
             return None
-        file_name = input("Enter file name (default: triage_report.json): ").strip() or "triage_report.json"
+        file_name = (
+            input("Enter file name (default: triage_report.json): ").strip()
+            or "triage_report.json"
+        )
     else:
         file_name = "triage_report.json"
 
@@ -165,6 +182,7 @@ def save_report_locally(report_data, file_path=None, interactive=True):
     print(f"[+] Report saved locally to {file_path}")
     show_report_summary(report_data)
     return file_path
+
 
 # ==========================================================================================
 # FUNCTION: dispatch_report()
@@ -182,6 +200,7 @@ def dispatch_report(file_path):
         print("[!] No valid dispatch method configured. Report saved locally.")
     print(f"[+] Report dispatched successfully: {file_path}")
 
+
 # ==========================================================================================
 # FUNCTION: resend_queued_reports()
 # Resends any reports that failed to dispatch previously
@@ -194,7 +213,7 @@ def resend_queued_reports():
         print("[*] No queued reports to resend.")
         return
 
-    with open(queue_file, "r", encoding="utf-8") as f:
+    with open(queue_file, encoding="utf-8") as f:
         queued_reports = json.load(f)
 
     for report in queued_reports:
