@@ -1,6 +1,0 @@
-{"ts": "2025-08-24T14-25-40Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
-{"ts": "2025-08-24T14-25-40Z", "event": "BANNER_PRINT", "payload": {}}
-{"ts": "2025-08-24T14-25-53Z", "event": "PROMPT_SELECTION", "payload": {"selected": "port_scan"}}
-{"ts": "2025-08-24T14-26-52Z", "event": "ACTION_BEGIN", "payload": {"plugin": "port_scan"}}
-{"ts": "2025-08-24T14-27-01Z", "event": "ERROR", "payload": {"where": "nmap", "error": "Expecting value: line 1 column 1 (char 0)"}}
-{"ts": "2025-08-24T14-27-01Z", "event": "END", "payload": {"status": "ok"}}

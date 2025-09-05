@@ -196,3 +196,9 @@ cython_debug/
 
 # OWASP ZAP
 docs/zap-data/
+# build/runtime artifacts
+.gradle/
+logs/
+data/cache/
+data/findings/
+data/reports/

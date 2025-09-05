@@ -1,4 +1,0 @@
-{"ts": "2025-08-25T18-47-33Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
-{"ts": "2025-08-25T18-47-33Z", "event": "BANNER_PRINT", "payload": {}}
-{"ts": "2025-08-25T18-47-42Z", "event": "PROMPT_SELECTION", "payload": {"selected": "port_scan"}}
-{"ts": "2025-08-25T18-48-31Z", "event": "ACTION_RESULT", "payload": {"plugin": "port_scan", "result_kind": "dict"}}

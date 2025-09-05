@@ -3,5 +3,10 @@
         "priority": "Low",
         "last_scanned": "20250826_201415",
         "heuristic_score": 3
+    },
+    "192.168.1.7": {
+        "priority": "Low",
+        "last_scanned": "20250904_183042",
+        "heuristic_score": 30
     }
 }

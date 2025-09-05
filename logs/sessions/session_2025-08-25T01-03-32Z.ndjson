@@ -1,6 +1,0 @@
-{"ts": "2025-08-25T01-03-32Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
-{"ts": "2025-08-25T01-03-32Z", "event": "BANNER_PRINT", "payload": {}}
-{"ts": "2025-08-25T01-24-50Z", "event": "PROMPT_SELECTION", "payload": {"selected": "port_scan"}}
-{"ts": "2025-08-25T01-46-27Z", "event": "ERROR", "payload": {"where": "nmap", "error": "No module named 'plugins.recon.nmap_plugin'"}}
-{"ts": "2025-08-25T01-46-46Z", "event": "PROMPT_SELECTION", "payload": {"selected": "port_scan"}}
-{"ts": "2025-08-25T01-47-06Z", "event": "ERROR", "payload": {"where": "nmap", "error": "No module named 'plugins.recon.nmap_plugin'"}}

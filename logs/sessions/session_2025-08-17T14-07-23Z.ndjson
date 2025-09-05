@@ -1,7 +1,0 @@
-{"ts": "2025-08-17T14-07-23Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
-{"ts": "2025-08-17T14-07-23Z", "event": "BANNER_PRINT", "payload": {}}
-{"ts": "2025-08-17T14-07-27Z", "event": "PROMPT_SELECTION", "payload": {"selected": "port_scan"}}
-{"ts": "2025-08-17T14-09-23Z", "event": "ACTION_BEGIN", "payload": {"plugin": "port_scan"}}
-{"ts": "2025-08-17T14-10-28Z", "event": "ACTION_RESULT", "payload": {"plugin": "port_scan", "result_kind": "list"}}
-{"ts": "2025-08-17T14-10-28Z", "event": "ERROR", "payload": {"where": "nmap", "error": "'list' object has no attribute 'get'"}}
-{"ts": "2025-08-17T14-10-28Z", "event": "END", "payload": {"status": "ok"}}

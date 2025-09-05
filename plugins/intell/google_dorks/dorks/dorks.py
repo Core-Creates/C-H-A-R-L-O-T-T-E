@@ -1,9 +1,7 @@
 # plugins/intell/google_dorks/dorks.py
 # GHDB (Google Hacking Database) fetcher for CHARLOTTE
-# - Preferred source: Official XML dump (GHDB_DUMP_URL, override via env)
-# - Fallback: HTML scraping (limited; site may be JS-rendered)
-# - Filters: --category, --author, --grep (regex/keyword, case-insensitive)
-# - Exposes provider: ghdb.query(...) for other plugins
+# Provides: ghdb.query(source="dump"|"scrape", ..., grep=...) → List[dict]
+from __future__ import annotations
 
 import os
 import re
@@ -15,7 +13,23 @@ import requests
 import xml.etree.ElementTree as ET
 from bs4 import BeautifulSoup
 from types import SimpleNamespace
-from typing import Optional, List, Dict, Any
+from typing import Any
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Paths (prefer utils.paths; safe fallback)
+# ──────────────────────────────────────────────────────────────────────────────
+try:
+    from utils.paths import p, ensure_parent
+except Exception:
+
+    def p(*parts) -> str:
+        return os.path.abspath(os.path.join(*parts))
+
+    def ensure_parent(*parts) -> str:
+        path = p(*parts)
+        os.makedirs(os.path.dirname(path), exist_ok=True)
+        return path
+
 
 BASE = "https://www.exploit-db.com"
 LIST_URL = f"{BASE}/google-hacking-database"
@@ -24,7 +38,7 @@ LIST_URL = f"{BASE}/google-hacking-database"
 #   setx GHDB_DUMP_URL "https://raw.githubusercontent.com/iphelix/seat/master/databases/GHDB.xml"
 GHDB_DUMP_URL = os.environ.get(
     "GHDB_DUMP_URL",
-    "https://gitlab.com/exploit-database/exploitdb/-/raw/main/ghdb.xml"
+    "https://gitlab.com/exploit-database/exploitdb/-/raw/main/ghdb.xml",
 )
 
 HEADERS = {
@@ -39,13 +53,20 @@ HEADERS = {
 }
 
 GHDB_DETAIL_RX = re.compile(r"^/ghdb/\d+$")  # e.g., /ghdb/7129
-CACHE_PATH = os.path.join("data", "cache", "ghdb.json")
+CACHE_PATH = p("data", "cache", "ghdb.json")
+CACHE_TTL_S = int(os.environ.get("GHDB_CACHE_TTL_S", "86400"))  # 24h default
+ENABLE_CACHE = os.environ.get("GHDB_ENABLE_CACHE", "1") != "0"
 
 
-# -----------------------------
-# HTTP helper
-# -----------------------------
-def _get(session: requests.Session, url: str, params: Optional[dict] = None, max_retries: int = 5) -> requests.Response:
+# ──────────────────────────────────────────────────────────────────────────────
+# HTTP helper (simple retry with backoff)
+# ──────────────────────────────────────────────────────────────────────────────
+def _get(
+    session: requests.Session,
+    url: str,
+    params: dict | None = None,
+    max_retries: int = 5,
+) -> requests.Response:
     delay = 1.0
     for _ in range(max_retries):
         r = session.get(url, params=params, headers=HEADERS, timeout=30)
@@ -59,17 +80,17 @@ def _get(session: requests.Session, url: str, params: Optional[dict] = None, max
     r.raise_for_status()
 
 
-# -----------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 # Small utils
-# -----------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 def _title_from_dork(dork: str, maxlen: int = 80) -> str:
     if not dork:
         return "(no title)"
-    t = " ".join(dork.split())  # collapse whitespace
-    return t if len(t) <= maxlen else t[:maxlen - 1] + "…"
+    t = " ".join(dork.split())
+    return t if len(t) <= maxlen else t[: maxlen - 1] + "…"
 
 
-def _find_ci(node: ET.Element, *names: str) -> Optional[str]:
+def _find_ci(node: ET.Element, *names: str) -> str | None:
     """Case-insensitive findtext within node subtree across tag aliases."""
     wanted = {n.lower() for n in names}
     for elt in node.iter():
@@ -80,7 +101,7 @@ def _find_ci(node: ET.Element, *names: str) -> Optional[str]:
     return None
 
 
-def _find_id_near(node: ET.Element) -> Optional[str]:
+def _find_id_near(node: ET.Element) -> str | None:
     """
     Try to find a numeric GHDB id near this node.
     Accept tags like <id>, <ghdbid>, <ghdb-id>, <entryid>, etc.
@@ -104,26 +125,57 @@ def _find_id_near(node: ET.Element) -> Optional[str]:
     return None
 
 
-# -----------------------------
+def _load_cache() -> list[dict[str, Any]] | None:
+    if not ENABLE_CACHE or not os.path.exists(CACHE_PATH):
+        return None
+    try:
+        st = os.stat(CACHE_PATH)
+        if (time.time() - st.st_mtime) > CACHE_TTL_S:
+            return None
+        with open(CACHE_PATH, encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return None
+
+
+def _save_cache(rows: list[dict[str, Any]]):
+    try:
+        ensure_parent(CACHE_PATH)
+        with open(CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump(rows, f, indent=2, ensure_ascii=False)
+    except Exception:
+        pass
+
+
+# ──────────────────────────────────────────────────────────────────────────────
 # Source A: Official XML dump (preferred)
-# -----------------------------
-def fetch_ghdb_dump(limit: Optional[int] = None, save_cache: bool = True, debug: bool = False) -> List[Dict[str, Any]]:
+# ──────────────────────────────────────────────────────────────────────────────
+def fetch_ghdb_dump(
+    limit: int | None = None, use_cache: bool = True, debug: bool = False
+) -> list[dict[str, Any]]:
     """
     Download & parse the GHDB XML dump.
     Returns list of dicts: {id,title,dork,category,author,date,url}
     """
+    if use_cache:
+        cached = _load_cache()
+        if cached:
+            return cached[: limit or None]
+
     with requests.Session() as s:
-        r = s.get(GHDB_DUMP_URL, timeout=30)
+        r = _get(s, GHDB_DUMP_URL)
         if debug:
-            print(f"[dbg] GET {GHDB_DUMP_URL} -> {r.status_code} {r.headers.get('Content-Type')}")
-        r.raise_for_status()
+            print(
+                f"[dbg] GET {GHDB_DUMP_URL} -> {r.status_code} {r.headers.get('Content-Type')}"
+            )
         xml_bytes = r.content
 
-    # Ensure XML (rate-limit pages are HTML)
-    if not xml_bytes.lstrip().startswith(b"<"):
+    # Ensure it's XML (rate-limit or errors may return HTML)
+    prefix = xml_bytes.lstrip()[:16]
+    if not prefix.startswith(b"<"):
         preview = xml_bytes[:300].decode("utf-8", errors="replace")
         raise RuntimeError(
-            "Expected XML from GHDB_DUMP_URL, got non-XML/HTML.\n"
+            "Expected XML from GHDB_DUMP_URL; got non-XML/HTML.\n"
             f"Preview (first 300 bytes):\n{preview}"
         )
 
@@ -135,11 +187,10 @@ def fetch_ghdb_dump(limit: Optional[int] = None, save_cache: bool = True, debug:
     if debug:
         print(f"[dbg] found {len(dork_nodes)} candidate dork nodes")
 
-    entries: List[Dict[str, Any]] = []
+    entries: list[dict[str, Any]] = []
     seen = set()
 
     for dn in dork_nodes:
-        # Walk up a few levels to a likely record wrapper
         container = dn
         for _ in range(3):
             if container in parent:
@@ -171,7 +222,6 @@ def fetch_ghdb_dump(limit: Optional[int] = None, save_cache: bool = True, debug:
             "url": url,
         }
 
-        # De-dup by (url,dork) or just dork if no url
         key = (rec["url"] or "", rec["dork"])
         if key in seen:
             continue
@@ -181,30 +231,28 @@ def fetch_ghdb_dump(limit: Optional[int] = None, save_cache: bool = True, debug:
         if limit and len(entries) >= limit:
             break
 
-    if save_cache:
-        os.makedirs(os.path.dirname(CACHE_PATH), exist_ok=True)
-        with open(CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump(entries, f, indent=2, ensure_ascii=False)
+    if ENABLE_CACHE:
+        _save_cache(entries)
 
     return entries
 
 
-# -----------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 # Source B: HTML scraping (fallback)
-# -----------------------------
-def _fetch_ghdb_index_html(max_pages: int = 3) -> List[Dict[str, Any]]:
+# ──────────────────────────────────────────────────────────────────────────────
+def _fetch_ghdb_index_html(max_pages: int = 3) -> list[dict[str, Any]]:
     items, seen = [], set()
     with requests.Session() as s:
         for page in range(1, max_pages + 1):
             resp = _get(s, LIST_URL, params={"page": page})
             soup = BeautifulSoup(resp.text, "html.parser")
-            # NOTE: If site renders entries via JS, this will find 0.
+            # If site renders entries via JS, this will find 0.
             for a in soup.select('a[href^="/ghdb/"]'):
                 href = a.get("href", "")
                 if not GHDB_DETAIL_RX.match(href):
                     continue
                 url = BASE + href
-                title = a.get_text(strip=True)
+                title = " ".join(a.get_text(strip=True).split())
                 if url in seen or not title:
                     continue
                 seen.add(url)
@@ -213,21 +261,20 @@ def _fetch_ghdb_index_html(max_pages: int = 3) -> List[Dict[str, Any]]:
     return items
 
 
-def fetch_dork_text(session: requests.Session, detail_url: str) -> Optional[str]:
+def fetch_dork_text(session: requests.Session, detail_url: str) -> str | None:
     resp = _get(session, detail_url)
     soup = BeautifulSoup(resp.text, "html.parser")
     cand = soup.select_one("pre, code")
     return cand.get_text("\n", strip=True) if cand else None
 
 
-def fetch_ghdb_scrape(max_pages: int = 1, enrich: bool = False, cap_enrich: int = 50) -> List[Dict[str, Any]]:
-    """
-    Fallback: scrape list pages; optionally fetch each detail’s dork string.
-    """
+def fetch_ghdb_scrape(
+    max_pages: int = 1, enrich: bool = False, cap_enrich: int = 50
+) -> list[dict[str, Any]]:
     items = _fetch_ghdb_index_html(max_pages=max_pages)
     if not enrich or not items:
         return items
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     with requests.Session() as s:
         for i, it in enumerate(items):
             if i >= cap_enrich:
@@ -238,35 +285,35 @@ def fetch_ghdb_scrape(max_pages: int = 1, enrich: bool = False, cap_enrich: int 
     return out
 
 
-# -----------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 # Filtering & Provider
-# -----------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 def _apply_filters(
-    rows: List[Dict[str, Any]],
-    category: Optional[str] = None,
-    author: Optional[str] = None,
-    grep: Optional[str] = None
-) -> List[Dict[str, Any]]:
-    """
-    Case-insensitive filters:
-      - category: substring match against row['category']
-      - author:   substring match against row['author']
-      - grep:     regex/keyword searched in title OR dork
-    """
+    rows: list[dict[str, Any]],
+    category: str | None = None,
+    author: str | None = None,
+    grep: str | None = None,
+) -> list[dict[str, Any]]:
     if grep:
         try:
             rx = re.compile(grep, re.IGNORECASE)
-            grep_fn = lambda s: bool(rx.search(s or ""))
-        except re.error:
-            needle = grep.lower()
-            grep_fn = lambda s: needle in (s or "").lower()
-    else:
-        grep_fn = lambda s: True  # no-op
 
-    def has(sub: Optional[str], val: Optional[str]) -> bool:
+            def grep_fn(s):
+                return bool(rx.search(s or ""))
+        except re.error:
+            needle = (grep or "").lower()
+
+            def grep_fn(s):
+                return needle in (s or "").lower()
+    else:
+
+        def grep_fn(s):
+            return True
+
+    def has(sub: str | None, val: str | None) -> bool:
         return True if not sub else (sub.lower() in (val or "").lower())
 
-    out: List[Dict[str, Any]] = []
+    out: list[dict[str, Any]] = []
     for r in rows:
         if not has(category, r.get("category")):
             continue
@@ -280,30 +327,22 @@ def _apply_filters(
 
 def ghdb_query(
     source: str = "dump",
-    limit: Optional[int] = None,
+    limit: int | None = None,
     pages: int = 1,
     enrich: bool = False,
-    category: Optional[str] = None,
-    author: Optional[str] = None,
-    grep: Optional[str] = None,
+    category: str | None = None,
+    author: str | None = None,
+    grep: str | None = None,
     debug: bool = False,
-) -> List[Dict[str, Any]]:
-    """
-    Programmatic entrypoint for CHARLOTTE plugins.
-
-    Example:
-        from plugins.intell.google_dorks.dorks import ghdb
-        rows = ghdb.query(source="dump", grep="intitle:index.of", category="Files", limit=100)
-    """
+) -> list[dict[str, Any]]:
     if source == "dump":
-        rows = fetch_ghdb_dump(limit=None, save_cache=True, debug=debug)
+        rows = fetch_ghdb_dump(limit=None, use_cache=True, debug=debug)
     else:
         rows = fetch_ghdb_scrape(max_pages=max(1, pages), enrich=enrich)
 
     rows = _apply_filters(rows, category=category, author=author, grep=grep)
-
     if limit:
-        rows = rows[:max(0, int(limit))]
+        rows = rows[: max(0, int(limit))]
     return rows
 
 
@@ -311,20 +350,27 @@ def ghdb_query(
 ghdb = SimpleNamespace(query=ghdb_query)
 
 
-# -----------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 # CLI
-# -----------------------------
+# ──────────────────────────────────────────────────────────────────────────────
 def main():
     ap = argparse.ArgumentParser(description="Fetch Google Dorks (GHDB) for CHARLOTTE")
-    ap.add_argument("--source", choices=["dump", "scrape"], default="dump",
-                    help="Preferred source. 'dump' uses OffSec GHDB XML (recommended).")
-    ap.add_argument("--limit", type=int, default=0, help="Max items returned AFTER filtering (0 = no cap)")
-    ap.add_argument("--pages", type=int, default=1, help="Pages to scrape (scrape only)")
-    ap.add_argument("--enrich", action="store_true", help="Scrape detail pages for dork text (scrape only)")
-    ap.add_argument("--category", type=str, default=None, help="Filter by category (substring, case-insensitive)")
-    ap.add_argument("--author", type=str, default=None, help="Filter by author (substring, case-insensitive)")
-    ap.add_argument("--grep", type=str, default=None, help="Regex/keyword to match title OR dork (case-insensitive)")
-    ap.add_argument("--debug", action="store_true", help="Verbose diagnostics for dump/scrape")
+    ap.add_argument("--source", choices=["dump", "scrape"], default="dump")
+    ap.add_argument(
+        "--limit", type=int, default=0, help="Cap AFTER filtering (0 = no cap)"
+    )
+    ap.add_argument(
+        "--pages", type=int, default=1, help="Pages to scrape (scrape only)"
+    )
+    ap.add_argument(
+        "--enrich", action="store_true", help="Fetch each detail’s dork (scrape only)"
+    )
+    ap.add_argument("--category", type=str, default=None)
+    ap.add_argument("--author", type=str, default=None)
+    ap.add_argument(
+        "--grep", type=str, default=None, help="Regex/keyword matches title OR dork"
+    )
+    ap.add_argument("--debug", action="store_true")
     args = ap.parse_args()
 
     rows = ghdb_query(

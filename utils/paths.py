@@ -10,6 +10,26 @@ try:
 except Exception:
     _external_display_path = None  # Fallback inline shim will be used
 
+# repo root = parent of the 'utils' folder
+ROOT = Path(__file__).resolve().parents[1]
+
+
+def p(*parts) -> str:
+    """Path from repo root → string."""
+    return str((ROOT / Path(*parts)).resolve())
+
+
+def here(*parts) -> str:
+    """Path relative to this file (utils/) → string."""
+    return str((Path(__file__).resolve().parent / Path(*parts)).resolve())
+
+
+def ensure_parent(*parts) -> str:
+    """Create parent dirs for the final path, return full path."""
+    path = Path(p(*parts))
+    path.parent.mkdir(parents=True, exist_ok=True)
+    return str(path)
+
 
 def display_path(path: str, base: str | None = None) -> str:
     """
