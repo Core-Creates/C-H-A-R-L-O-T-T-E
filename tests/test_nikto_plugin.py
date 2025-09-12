@@ -414,6 +414,17 @@ class TestDocumentationTests:
         assert OUTPUT_FORMATS['3']['name'] == 'HTML'
         assert OUTPUT_FORMATS['4']['name'] == 'CSV'
         assert OUTPUT_FORMATS['5']['name'] == 'JSON'
+        
+        # Verify reliability flags
+        assert OUTPUT_FORMATS['1']['reliable'] == True  # TXT is reliable
+        assert OUTPUT_FORMATS['2']['reliable'] == True  # XML is reliable
+        assert OUTPUT_FORMATS['3']['reliable'] == True  # HTML is reliable
+        assert OUTPUT_FORMATS['4']['reliable'] == True  # CSV is reliable
+        assert OUTPUT_FORMATS['5']['reliable'] == False  # JSON has issues
+        
+        # Verify JSON has warning note
+        assert 'note' in OUTPUT_FORMATS['5']
+        assert 'Perl JSON module' in OUTPUT_FORMATS['5']['note']
     
     def test_tuning_options_completeness(self):
         """Test that tuning options are comprehensive."""

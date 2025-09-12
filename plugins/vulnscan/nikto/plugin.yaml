@@ -13,6 +13,7 @@ dependencies:
   - nikto
   - perl
   - perl-modules: [Net::SSLeay, LWP::UserAgent, HTTP::Cookies]
+  - optional: [perl-modules: [JSON]]  # Required for JSON output format
 requirements:
   - external_tool: nikto
   - python_packages: [subprocess, json, os, sys, datetime]

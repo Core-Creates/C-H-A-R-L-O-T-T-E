@@ -127,13 +127,13 @@ TUNING_OPTIONS = {
     "z": "Remote File Retrieval - Inside Web Root"
 }
 
-# Output formats
+    # Output formats
 OUTPUT_FORMATS = {
-    "1": {"name": "TXT", "ext": "txt", "args": ""},
-    "2": {"name": "XML", "ext": "xml", "args": "-Format xml"},
-    "3": {"name": "HTML", "ext": "html", "args": "-Format htm"},
-    "4": {"name": "CSV", "ext": "csv", "args": "-Format csv"},
-    "5": {"name": "JSON", "ext": "json", "args": "-Format json"}
+    "1": {"name": "TXT", "ext": "txt", "args": "", "reliable": True},
+    "2": {"name": "XML", "ext": "xml", "args": "-Format xml", "reliable": True},
+    "3": {"name": "HTML", "ext": "html", "args": "-Format htm", "reliable": True},
+    "4": {"name": "CSV", "ext": "csv", "args": "-Format csv", "reliable": True},
+    "5": {"name": "JSON", "ext": "json", "args": "-Format json", "reliable": False, "note": "Requires Perl JSON module"}
 }
 
 # ──────────────────────────────────────────────────────────────────────────────
@@ -180,7 +180,10 @@ def display_output_formats():
     """Display available output formats."""
     print("\n[CHARLOTTE] Available Output Formats:\n")
     for key, fmt in OUTPUT_FORMATS.items():
-        print(f"  {key}. {fmt['name']}")
+        reliability_note = ""
+        if not fmt.get('reliable', True):
+            reliability_note = f" (⚠️  {fmt.get('note', 'May have issues')})"
+        print(f"  {key}. {fmt['name']}{reliability_note}")
 
 def get_user_choice(prompt: str, choices: Dict[str, Any], default: str = None) -> str:
     """Get user choice from a dictionary of options."""
@@ -324,7 +327,12 @@ def run_nikto_scan(target: str, scan_type: str, output_format: str,
             
             # Check if output file was created and has content
             if os.path.exists(output_file) and os.path.getsize(output_file) > 0:
-                print(f"[CHARLOTTE] Scan completed successfully!")
+                # Check for JSON format issues
+                if output_format == "5" and "Can't locate object method" in stderr:
+                    print(f"[CHARLOTTE] Scan completed with warnings - JSON format may be incomplete due to missing Perl JSON module")
+                    print(f"[CHARLOTTE] Consider using TXT format for reliable results")
+                else:
+                    print(f"[CHARLOTTE] Scan completed successfully!")
                 return True, output_file, ""
             else:
                 error_msg = f"Nikto scan failed - no output file created or file is empty"
