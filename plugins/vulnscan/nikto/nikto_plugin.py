@@ -336,8 +336,10 @@ def run_nikto_scan(target: str, scan_type: str, output_format: str,
             # Kill the process and its children
             try:
                 if os.name == 'nt':
-                    process.terminate()
+                    # Windows: just terminate the process
+                    process.terminate()  # noqa: unreachable
                 else:
+                    # Unix/Linux: kill the process group
                     os.killpg(os.getpgid(process.pid), 9)
                 process.wait(timeout=5)
             except:
