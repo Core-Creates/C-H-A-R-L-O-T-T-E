@@ -39,6 +39,13 @@ def open_binary_ninja_installer():
     subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "binary_ninja", "binary_ninja_installer.py")])
 
 # ==========================================================================================
+# FUNCTION: open_zap_installer()
+# Launches OWASP ZAP installer script
+# ==========================================================================================
+def open_zap_installer():
+    subprocess.Popen([sys.executable, os.path.join(os.path.dirname(__file__), "owasp_zap", "zap_installer.py")])
+
+# ==========================================================================================
 # FUNCTION: open_jdk_download()
 # Opens JDK 21 download page in browser
 # ==========================================================================================
@@ -84,8 +91,9 @@ def show_recon_window(parent):
 def show_vulnscan_window(parent):
     win = Toplevel(parent)
     win.title("Vulnscan Installers")
-    win.geometry("350x150")
+    win.geometry("350x200")
     Label(win, text="Vulnscan Tools", font=("Arial", 14, "bold")).pack(pady=10)
+    Button(win, text="Install OWASP ZAP", width=30, command=open_zap_installer).pack(pady=5)
     Button(win, text="Back", width=30, command=win.destroy).pack(pady=20)
 
 # ==========================================================================================
