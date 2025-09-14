@@ -10,6 +10,15 @@ ROOT = Path(__file__).resolve().parents[1]
 if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
+def pytest_configure(config):
+    """Configure pytest markers."""
+    config.addinivalue_line(
+        "markers", "integration: marks tests as integration tests (may be slow)"
+    )
+    config.addinivalue_line(
+        "markers", "slow: marks tests as slow (may take several minutes)"
+    )
+
 
 @pytest.fixture(scope="session")
 def patch_planner():

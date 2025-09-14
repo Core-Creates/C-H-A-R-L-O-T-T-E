@@ -151,6 +151,7 @@ PLUGIN_TASKS = {
     "🌐 Web Recon (Subdomains)": "web_recon",
     "🧼 XSS Scan": "xss_scan",
     "🐝 OWASP ZAP Exploitability": "owasp_zap",
+    "🔍 Nikto Web Vulnerability Scanner": "nikto_scan"
 }
 
 
