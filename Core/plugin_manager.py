@@ -76,6 +76,7 @@ PLUGIN_REGISTRY: dict[str, tuple[str, str]] = {
         "vulnscore_plugin",
     ),  # ⚖️ Combines severity + exploitability
     "owasp_zap": ("exploitation.owasp_zap", "zap_plugin"),  # 🐝 OWASP ZAP integration
+    "nikto_scan": ("vulnscan.nikto", "nikto_plugin"),  # 🔍 Nikto web vulnerability scanner
 }
 
 ALIASES: dict[str, str] = {

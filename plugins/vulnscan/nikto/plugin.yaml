@@ -1,0 +1,21 @@
+id: nikto_scan
+name: Nikto Web Vulnerability Scanner
+category: vulnscan
+description: Comprehensive web server vulnerability scanner that tests for over 6700 potentially dangerous files/programs and checks for outdated versions of over 1250 servers.
+entrypoint: plugins/vulnscan/nikto/nikto_plugin.py
+function: run
+tags: [nikto, web, vulnerability, scanner, http, https, security]
+enabled: true
+exposed: true
+author: CHARLOTTE Security Framework
+version: 1.0.0
+dependencies:
+  - nikto
+  - perl
+  - perl-modules: [Net::SSLeay, LWP::UserAgent, HTTP::Cookies]
+  - optional: [perl-modules: [JSON]]  # Required for JSON output format
+requirements:
+  - external_tool: nikto
+  - python_packages: [subprocess, json, os, sys, datetime]
+security_warning: "Only scan targets you have explicit permission to test. Unauthorized scanning may violate laws and terms of service."
+default_target: "https://public-firing-range.appspot.com"

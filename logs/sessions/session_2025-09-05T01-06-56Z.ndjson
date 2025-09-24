@@ -1,0 +1,4 @@
+{"ts": "2025-09-05T01-06-56Z", "event": "START", "payload": {"version": "0.1.0", "stage": "cli_start"}}
+{"ts": "2025-09-05T01-06-56Z", "event": "BANNER_PRINT", "payload": {}}
+{"ts": "2025-09-05T01-07-03Z", "event": "ACTION_BEGIN", "payload": {"plugin": "cve_analysis"}}
+{"ts": "2025-09-05T01-07-13Z", "event": "END", "payload": {"status": "ok"}}
