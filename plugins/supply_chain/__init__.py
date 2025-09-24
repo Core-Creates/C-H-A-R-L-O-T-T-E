@@ -1,0 +1,1 @@
+from .sbom_validator import SUPPLY_CHAIN_PLUGIN_NAME as SUPPLY_CHAIN_PLUGIN_NAME
