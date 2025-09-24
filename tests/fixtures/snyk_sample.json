@@ -1,0 +1,20 @@
+{
+  "vulnerabilities": [
+    {
+      "id": "SNYK-123",
+      "packageName": "example-lib",
+      "version": "1.0.0",
+      "packageManager": "pypi",
+      "severity": "high",
+      "title": "Example RCE in example-lib",
+      "cvssScore": 7.5,
+      "CVSSv3": "CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H",
+      "from": ["root", "example-lib"],
+      "fixVersion": "1.0.1",
+      "identifiers": {
+        "CVE": ["CVE-2024-0001"],
+        "CWE": ["CWE-94"]
+      }
+    }
+  ]
+}
