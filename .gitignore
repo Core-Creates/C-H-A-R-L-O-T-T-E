@@ -202,6 +202,8 @@ logs/
 data/cache/
 data/findings/
 data/reports/
+data/zenodo/
+
 
 # macOS
 .DS_Store
