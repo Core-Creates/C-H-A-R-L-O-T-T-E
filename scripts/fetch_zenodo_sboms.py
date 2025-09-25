@@ -21,8 +21,10 @@ import argparse
 import hashlib
 import logging
 import time
+import sys
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from urllib.parse import quote
 
 import requests
 from requests.adapters import HTTPAdapter, Retry
@@ -47,7 +49,7 @@ def requests_session_with_retries(
         total=total_retries,
         backoff_factor=backoff,
         status_forcelist=(429, 500, 502, 503, 504),
-        allowed_methods=frozenset(["GET", "POST"]),
+        allowed_methods=frozenset(["GET", "POST", "HEAD"]),
     )
     s.mount("https://", HTTPAdapter(max_retries=retries))
     s.mount("http://", HTTPAdapter(max_retries=retries))
@@ -165,6 +167,69 @@ def parse_zenodo_checksum(checksum_str: str) -> tuple[str, str]:
     return ("sha256", checksum_str.lower())
 
 
+def _probe_url_is_ok(url: str, session: requests.Session, timeout: int = 15) -> bool:
+    """
+    Probe a url with HEAD (or fallback GET) to check if it's likely usable for download.
+    Returns True if we get HTTP 2xx/3xx or a bytes response from a lightweight GET.
+    """
+    try:
+        head = session.head(url, allow_redirects=True, timeout=timeout)
+        if 200 <= head.status_code < 400:
+            return True
+        # Some endpoints disallow HEAD and return 405; try a tiny GET
+        if head.status_code in (405, 501):
+            r = session.get(url, stream=True, timeout=timeout)
+            # read one chunk then cancel
+            for _ in r.iter_content(chunk_size=64):
+                break
+            r.close()
+            if 200 <= r.status_code < 400:
+                return True
+    except Exception:
+        # any exception counts as "not OK" here
+        return False
+    return False
+
+
+def resolve_download_url(
+    fmeta: dict, rec_id: str, session: requests.Session
+) -> str | None:
+    """
+    Robustly determine a usable download URL for a file metadata object.
+    Tries:
+      1) fmeta['links']['download']
+      2) fmeta['links']['self']
+      3) constructed record-file public URL(s):
+         - https://zenodo.org/record/{rec_id}/files/{filename}?download=1
+         - https://zenodo.org/record/{rec_id}/files/{filename}
+    Returns the usable URL (string) or None.
+    """
+    links = fmeta.get("links", {}) or {}
+    # direct download link if present
+    for key in ("download", "self"):
+        url = links.get(key)
+        if url:
+            # quick probe to ensure it's usable
+            if _probe_url_is_ok(url, session):
+                return url
+
+    # fallback: attempt the public record-file URL patterns
+    filename = fmeta.get("key") or ""
+    if not filename:
+        return None
+    # URL-encode filename to be safe
+    quoted = quote(filename, safe="")
+    candidates = [
+        f"{ZENODO_BASE}/record/{rec_id}/files/{quoted}?download=1",
+        f"{ZENODO_BASE}/record/{rec_id}/files/{quoted}",
+    ]
+    for cand in candidates:
+        if _probe_url_is_ok(cand, session):
+            return cand
+
+    return None
+
+
 def download_file(
     url: str,
     outpath: Path,
@@ -189,12 +254,14 @@ def download_file(
                 total = int(r.headers.get("Content-Length") or 0)
                 # compute hash if requested
                 hasher = None
+                algo_name = None
                 if checksum and checksum[0]:
                     algo_name = checksum[0].lower()
                     try:
                         hasher = hashlib.new(algo_name)
                     except Exception:
                         hasher = None
+                        algo_name = None
 
                 tmp_out = outpath.with_suffix(outpath.suffix + ".part")
                 with open(tmp_out, "wb") as fh, tqdm(
@@ -264,11 +331,15 @@ def download_files_concurrent(
             checksum = None
             if fmeta.get("checksum"):
                 checksum = parse_zenodo_checksum(fmeta.get("checksum"))
-            url = fmeta.get("links", {}).get("download") or fmeta.get("links", {}).get(
-                "self"
-            )
+
+            # Resolve a usable download URL (robust to missing 'download' key)
+            url = resolve_download_url(fmeta, rec_id, session)
             if not url:
-                log.warning("No download link for %s in record %s", filename, rec_id)
+                log.warning(
+                    "No download link (or fallback) for %s in record %s",
+                    filename,
+                    rec_id,
+                )
                 results.append(
                     {
                         "record": rec_id,
@@ -279,6 +350,7 @@ def download_files_concurrent(
                     }
                 )
                 continue
+
             fut = ex.submit(download_file, url, outpath, session, checksum)
             futures[fut] = {"record": rec_id, "filename": filename, "outpath": outpath}
         for fut in as_completed(futures):
@@ -375,6 +447,12 @@ def main():
         "--sandbox",
         action="store_true",
         help="Use Zenodo sandbox (developer/testing) - toggles base URL (not implemented for search).",
+    )
+    p.add_argument(
+        "-y",
+        "--yes",
+        action="store_true",
+        help="Assume yes to prompt and download without asking (useful for CI/non-interactive runs).",
     )
     args = p.parse_args()
 
@@ -492,16 +570,52 @@ def main():
         log.warning("No files found to download (try --file-ext or a different query).")
         return
 
-    # dry run -> just print
+    # dry run -> just print (and show resolved download URL if available)
     if args.dry_run:
         log.info("Dry run: listing candidate files:")
         for rec, f in items:
             rec_id = (
                 rec.get("id") or rec.get("doi") or rec.get("conceptdoi") or "unknown"
             )
-            print(f"{rec_id} -> {f.get('key')} ({f.get('links',{}).get('download')})")
+            resolved = resolve_download_url(f, rec_id, sess)
+            if resolved:
+                print(f"{rec_id} -> {f.get('key')} ({resolved})")
+            else:
+                # show possible fallbacks to help troubleshooting
+                filename = f.get("key") or ""
+                quoted = quote(filename, safe="")
+                candidates = [
+                    f"{ZENODO_BASE}/record/{rec_id}/files/{quoted}?download=1",
+                    f"{ZENODO_BASE}/record/{rec_id}/files/{quoted}",
+                ]
+                print(
+                    f"{rec_id} -> {f.get('key')} (no direct link; tried: {candidates})"
+                )
         return
 
+    # Interactive confirmation before downloading (unless --yes/-y provided)
+    if not args.yes:
+        if sys.stdin.isatty():
+            try:
+                resp = (
+                    input(
+                        f"Found {len(items)} candidate file(s). Download now? [y/N]: "
+                    )
+                    .strip()
+                    .lower()
+                )
+            except EOFError:
+                resp = ""
+            if resp not in ("y", "yes"):
+                log.info("User declined download. Exiting.")
+                return
+        else:
+            log.warning(
+                "Non-interactive session and --yes not provided. Aborting without downloading."
+            )
+            return
+
+    # Proceed to download
     log.info(
         "Preparing to download %d file(s) using %d workers", len(items), args.workers
     )
@@ -519,3 +633,8 @@ def main():
 
 if __name__ == "__main__":
     main()
+
+
+# ==============================================================================
+# End of fetch_zenodo_sboms.py
+# ===============================================================================
