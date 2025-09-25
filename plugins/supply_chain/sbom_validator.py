@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-sbom_validator.py — CHARLOTTE Supply-Chain: CycloneDX SBOM validation (OSV/NVD)
+plugins/supply_chain/sbom_validator.py — CHARLOTTE Supply-Chain: CycloneDX SBOM validation (OSV/NVD)
 
 Capabilities
 -----------
