@@ -102,18 +102,53 @@ def choose_files_from_record(
 ) -> list[dict]:
     """
     From a record metadata dict, return list of file dicts that match allowed_exts.
+    Handles multi-part suffixes like '.tar.gz' and common shorthands like 'tgz'.
     Each file dict has keys like: 'key', 'links', 'checksum', 'id', 'files' etc.
     """
     files = record.get("files", []) or []
     if not allowed_exts:
         return files
-    allowed_exts_lower = [e.lower().lstrip(".") for e in allowed_exts]
-    chosen = []
+
+    # Normalize allowed extensions: strip dots, lower-case
+    requested = [e.lower().lstrip(".") for e in allowed_exts]
+    norm = set()
+    for e in requested:
+        if e == "tgz":
+            # accept both 'tgz' and 'tar.gz' for the shorthand
+            norm.add("tgz")
+            norm.add("tar.gz")
+        elif e == "tar.gz":
+            norm.add("tar.gz")
+            norm.add("tgz")
+        else:
+            norm.add(e)
+
+    chosen: list[dict] = []
     for f in files:
-        fname = f.get("key", "")
-        ext = Path(fname).suffix.lower().lstrip(".")
-        if ext in allowed_exts_lower:
+        fname = f.get("key", "") or ""
+        fname_l = fname.lower()
+
+        # full multi-suffix (e.g. ['.tar', '.gz'] -> '.tar.gz')
+        suffixes = "".join(Path(fname).suffixes).lower().lstrip(".")
+        # last suffix (e.g. '.gz' from 'file.tar.gz')
+        last = Path(fname).suffix.lower().lstrip(".")
+
+        candidates = {suffixes, last}
+
+        matched = False
+        # direct match with normalized extensions
+        for a in norm:
+            if a in candidates:
+                matched = True
+                break
+            # also fallback to endswith check for robustness (handles weird filenames)
+            if fname_l.endswith("." + a):
+                matched = True
+                break
+
+        if matched:
             chosen.append(f)
+
     return chosen
 
 
