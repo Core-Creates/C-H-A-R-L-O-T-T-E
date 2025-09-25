@@ -191,7 +191,7 @@ def _timeout() -> int:
         return 15
 
 
-def _requests_session() -> requests.Session:
+def _requests_session() -> Any:
     if requests is None:
         raise RuntimeError(
             "The 'requests' package is required. Install with: pip install requests"
