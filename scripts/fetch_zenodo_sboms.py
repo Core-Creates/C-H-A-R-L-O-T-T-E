@@ -113,36 +113,35 @@ def choose_files_from_record(
     requested = [e.lower().lstrip(".") for e in allowed_exts]
     norm = set()
     for e in requested:
-        if e == "tgz":
-            # accept both 'tgz' and 'tar.gz' for the shorthand
-            norm.add("tgz")
-            norm.add("tar.gz")
-        elif e == "tar.gz":
-            norm.add("tar.gz")
-            norm.add("tgz")
+        # map shorthand/synonyms and include related archive/container forms
+        if e in {"tgz", "tar.gz"}:
+            norm.update({"tgz", "tar.gz", "tar"})
+        elif e == "tar":
+            norm.update({"tar", "tgz", "tar.gz"})
+        elif e in {"json", "xml", "cyclonedx", "spdx", "cdx"}:
+            # SBOM-like formats may be distributed inside archives
+            norm.update({e, "zip", "tgz", "tar.gz", "tar"})
         else:
             norm.add(e)
 
     chosen: list[dict] = []
     for f in files:
-        fname = f.get("key", "") or ""
-        fname_l = fname.lower()
+        fname = (f.get("key") or "").lower()
 
-        # full multi-suffix (e.g. ['.tar', '.gz'] -> '.tar.gz')
+        # Build multi-suffix string (e.g. ['.tar', '.gz'] -> 'tar.gz')
         suffixes = "".join(Path(fname).suffixes).lower().lstrip(".")
-        # last suffix (e.g. '.gz' from 'file.tar.gz')
+        # last suffix (e.g. 'gz' from 'file.tar.gz' or 'zip' from file.zip)
         last = Path(fname).suffix.lower().lstrip(".")
 
         candidates = {suffixes, last}
 
         matched = False
-        # direct match with normalized extensions
         for a in norm:
             if a in candidates:
                 matched = True
                 break
-            # also fallback to endswith check for robustness (handles weird filenames)
-            if fname_l.endswith("." + a):
+            # fallback endswith check for robustness (handles weird filenames)
+            if fname.endswith("." + a):
                 matched = True
                 break
 
@@ -190,14 +189,12 @@ def download_file(
                 total = int(r.headers.get("Content-Length") or 0)
                 # compute hash if requested
                 hasher = None
-                algo_name = None
                 if checksum and checksum[0]:
                     algo_name = checksum[0].lower()
                     try:
                         hasher = hashlib.new(algo_name)
                     except Exception:
                         hasher = None
-                        algo_name = None
 
                 tmp_out = outpath.with_suffix(outpath.suffix + ".part")
                 with open(tmp_out, "wb") as fh, tqdm(
@@ -227,7 +224,7 @@ def download_file(
                         continue
                 # move tmp to final
                 tmp_out.replace(outpath)
-                return (True, None)
+                return True, None
         except requests.HTTPError as e:
             last_err = f"HTTP error: {e}"
             log.warning("Attempt %d/%d failed: %s", attempt, max_retries, last_err)
@@ -238,7 +235,7 @@ def download_file(
             log.warning("Attempt %d/%d failed: %s", attempt, max_retries, last_err)
             time.sleep(2**attempt)
             continue
-    return (False, last_err)
+    return False, last_err
 
 
 def download_files_concurrent(
@@ -250,7 +247,7 @@ def download_files_concurrent(
     Returns list of result dicts {record_id, filename, path, success, error}
     """
     session = requests_session_with_retries()
-    results = []
+    results: list[dict] = []
     with ThreadPoolExecutor(max_workers=workers) as ex:
         futures = {}
         for rec, fmeta in items:
@@ -309,7 +306,7 @@ def build_item_list_from_records(
     """
     From a list of record metadata dicts, collect (record, file_meta) pairs for files we want to download.
     """
-    items = []
+    items: list[tuple[dict, dict]] = []
     for rec in records:
         files = choose_files_from_record(rec, allowed_exts)
         if not files:
@@ -320,7 +317,7 @@ def build_item_list_from_records(
 
 
 def is_likely_sbom_filename(name: str) -> bool:
-    name = name.lower()
+    name = (name or "").lower()
     sbom_exts = (
         ".json",
         ".xml",
@@ -331,6 +328,7 @@ def is_likely_sbom_filename(name: str) -> bool:
         ".zip",
         ".tar.gz",
         ".tgz",
+        ".tar",
     )
     return (
         any(name.endswith(e) for e in sbom_exts)
@@ -385,7 +383,7 @@ def main():
 
     sess = requests_session_with_retries()
 
-    records = []
+    records: list[dict] = []
     if args.record:
         # support passing DOI-like values too (Zenodo accepts numeric id in endpoint)
         try:
@@ -395,29 +393,100 @@ def main():
             log.error("Failed to fetch record %s: %s", args.record, e)
             return
     else:
-        # search mode
-        records = search_zenodo(
+        # search mode: get lightweight hits first, then fetch full record metadata per hit
+        hits = search_zenodo(
             args.query or "",
             page_size=args.page_size,
             max_records=args.max_records,
             session=sess,
         )
-        log.info("Found %d records from search", len(records))
+        log.info("Found %d search hits from Zenodo", len(hits))
+
+        # Expand each hit to full record metadata so file download links are available.
+        records = []
+        for hit in hits:
+            # Most hits contain numeric 'id'
+            rec_id = hit.get("id") or hit.get("record_id") or hit.get("recordId")
+            if not rec_id:
+                # If the hit already looks like a full record, accept it
+                records.append(hit)
+                continue
+            try:
+                full = fetch_record_metadata(rec_id, session=sess)
+                records.append(full)
+                # be a little polite with the API
+                time.sleep(0.05)
+            except Exception as e:
+                log.warning(
+                    "Failed to fetch full metadata for record %s: %s", rec_id, e
+                )
+        log.info("Collected %d full record metadata objects", len(records))
 
     # Decide allowed extensions
-    allowed_exts = None
+    allowed_exts: list[str] | None = None
     if args.file_ext:
-        allowed_exts = [
-            e.strip().lstrip(".") for e in args.file_ext.split(",") if e.strip()
+        # parse user-provided extensions and expand to include related archive/container forms
+        requested = [
+            e.strip().lstrip(".").lower() for e in args.file_ext.split(",") if e.strip()
         ]
+        expanded = set()
+        for r in requested:
+            expanded.add(r)
+            # If user asked for xml/json or SBOM-ish formats, also accept common archives that may contain SBOMs
+            if r in {"json", "xml", "cyclonedx", "spdx", "cdx"}:
+                expanded.update({"zip", "tgz", "tar.gz", "tar"})
+            # map shorthand/synonyms for tar family
+            if r == "tgz":
+                expanded.update({"tar.gz", "tar", "tgz"})
+            if r == "tar.gz":
+                expanded.update({"tgz", "tar", "tar.gz"})
+            if r == "tar":
+                expanded.update({"tgz", "tar.gz", "tar"})
+        allowed_exts = list(expanded)
+        log.info(
+            "Requesting extensions: %s -> expanded to: %s",
+            ", ".join(requested),
+            ", ".join(sorted(allowed_exts)),
+        )
 
-    # Build list of candidate files
+    # Build list of candidate files (respect explicit allowed_exts when they match)
     items = build_item_list_from_records(records, allowed_exts)
-    # If file_ext not specified, filter by heuristic SBOM filenames
+
+    # If caller didn't specify file-ext, apply the heuristic to filter SBOM-like names
     if not allowed_exts:
         items = [
             (r, f) for (r, f) in items if is_likely_sbom_filename(f.get("key", ""))
         ]
+
+    # If user specified allowed_exts but nothing matched, fall back to heuristic
+    if allowed_exts and not items:
+        log.warning(
+            "Requested extensions (%s) produced no matches. Falling back to filename heuristic to find likely SBOMs.",
+            ", ".join(sorted(allowed_exts)),
+        )
+        all_items = build_item_list_from_records(records, None)
+        heuristic_items = [
+            (r, f) for (r, f) in all_items if is_likely_sbom_filename(f.get("key", ""))
+        ]
+        if heuristic_items:
+            log.info(
+                "Found %d candidate files via heuristic fallback.", len(heuristic_items)
+            )
+            items = heuristic_items
+        else:
+            log.warning(
+                "Fallback heuristic also found no likely SBOM files. Example record file lists:"
+            )
+            for rec in records[:5]:
+                rec_id = (
+                    rec.get("id")
+                    or rec.get("doi")
+                    or rec.get("conceptdoi")
+                    or "unknown"
+                )
+                filenames = [f.get("key") for f in (rec.get("files") or [])]
+                log.info("  Record %s -> %s", rec_id, filenames[:8])
+            # items remains empty and will trigger the no-files warning below
 
     if not items:
         log.warning("No files found to download (try --file-ext or a different query).")
