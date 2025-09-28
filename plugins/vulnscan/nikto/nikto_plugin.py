@@ -428,6 +428,7 @@ def parse_nikto_txt(output_file: str) -> Dict[str, Any]:
                 }
                 findings.append(finding)
         
+        #Summary based on results
         return {
             "plugin": "nikto",
             "target": target,
@@ -493,7 +494,7 @@ def parse_nikto_json(output_file: str) -> Dict[str, Any]:
             "error": f"Failed to parse Nikto output: {str(e)}",
             "findings": []
         }
-
+#Display the scan's results
 def display_scan_results(results: Dict[str, Any]):
     """Display scan results in a user-friendly format."""
     print("\n" + "="*60)
