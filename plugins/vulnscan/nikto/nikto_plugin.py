@@ -552,11 +552,11 @@ def run_interactive_scan():
     
     # Display scan types
     display_scan_types()
-    scan_type = get_user_choice("Select scan type (1-4): ", SCAN_TYPES, "1")
+    scan_type = get_user_choice("Select scan type (1-5): ", SCAN_TYPES, "1")
     
     # Get tuning options for custom scan
     tuning = ""
-    if scan_type == "4":
+    if scan_type == "5":
         tuning = get_custom_tuning()
     
     # Display output formats

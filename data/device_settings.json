@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 {
     "192.168.88.140": {
         "priority": "Low",
@@ -10,3 +11,22 @@
         "heuristic_score": 30
     }
 }
+=======
+{
+    "192.168.88.140": {
+        "priority": "Low",
+        "last_scanned": "20250826_201415",
+        "heuristic_score": 3
+    },
+    "192.168.1.7": {
+        "priority": "Low",
+        "last_scanned": "20250905_101755",
+        "heuristic_score": 30
+    },
+    "192.168.142.1": {
+        "priority": "Low",
+        "last_scanned": "20250909_182752",
+        "heuristic_score": 27
+    }
+}
+>>>>>>> 04589116300c7d386dc0da4a531b76f5cdc20a26
